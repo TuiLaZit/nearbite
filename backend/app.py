@@ -12,17 +12,20 @@ app.secret_key = "dev-secret-key"   # 🔥 KHÔNG dùng getenv lúc này
 
 app.static_folder = 'static'
 
-# 🔥 CORS CHUẨN CHO LOCAL
 CORS(
     app,
+    resources={r"/*": {
+        "origins": [
+            "http://127.0.0.1:5500",
+            "http://localhost:5500",
+            "https://location-based-food-street-guide-fr.vercel.app"
+        ]
+    }},
     supports_credentials=True,
-    origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "https://location-based-food-street-guide-production.up.railway.app"
-    ]
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"]
 )
-# 🔥 SESSION CONFIG CHUẨN LOCAL
+
 app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=False,
