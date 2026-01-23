@@ -11,12 +11,17 @@ let watchTimer = null;
 let lastRestaurantId = null;
 let isTracking = false;
 
+const API_BASE =
+  window.location.hostname === "localhost"
+    ? "http://127.0.0.1:5000"
+    : "https://location-based-food-street-guide.onrender.com/";
+
 // =====================
 // CORE: gọi backend
 // =====================
 function fetchAndUpdateLocation() {
   navigator.geolocation.getCurrentPosition((pos) => {
-    fetch("http://127.0.0.1:5000/location", {
+    fetch("${API_BASE}/location", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
