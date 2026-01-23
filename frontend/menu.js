@@ -1,11 +1,11 @@
 const params = new URLSearchParams(window.location.search);
 const restaurantId = params.get("restaurant_id");
 
-const API_MENU = `https://location-based-food-street-guide.onrender.com/admin/restaurants/${restaurantId}/menu`;
+const API_MENU = `${BASE_URL}/admin/restaurants/${restaurantId}/menu`;
 let editingItemId = null;
 
 function loadMenu() {
-  fetch(API_MENU,{credentials: "include"})
+  fetch(API_MENU, { credentials: "include" })
     .then(res => res.json())
     .then(data => {
       const list = document.getElementById("menuList");
@@ -31,7 +31,7 @@ function saveItem() {
 
   const method = editingItemId ? "PUT" : "POST";
   const url = editingItemId
-    ? `http://127.0.0.1:5000/admin/menu/${editingItemId}`
+    ? `${BASE_URL}/admin/menu/${editingItemId}`
     : API_MENU;
 
   fetch(url, {
@@ -56,15 +56,14 @@ function editItem(id, name, price) {
 function deleteItem(id) {
   if (!confirm("Xoá món này?")) return;
 
-  fetch(`https://location-based-food-street-guide.onrender.com/admin/menu/${id}`, {
-    credentials: "include",
-    method: "DELETE"
+  fetch(`${BASE_URL}/admin/menu/${id}`, {
+    method: "DELETE",
+    credentials: "include"
   }).then(loadMenu);
 }
 
 function goBack() {
   window.location.href = "admin.html";
 }
-
 
 loadMenu();

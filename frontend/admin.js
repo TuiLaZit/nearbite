@@ -1,4 +1,4 @@
-const API = "https://location-based-food-street-guide.onrender.com/admin/restaurants";
+const API = `${BASE_URL}/admin/restaurants`;
 let editingId = null;
 
 /* ======================
