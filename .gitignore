@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+
+# Virtual env
+venv/
+.env
+
+# VSCode
+.vscode/
+
+# Generated files
+backend/static/tts/*.mp3
