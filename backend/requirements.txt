@@ -3,3 +3,4 @@ flask-cors
 flask-sqlalchemy
 gtts
 deep-translator
+psycopg2-binary
