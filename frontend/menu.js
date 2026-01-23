@@ -1,7 +1,7 @@
 const params = new URLSearchParams(window.location.search);
 const restaurantId = params.get("restaurant_id");
 
-const API_MENU = `http://127.0.0.1:5000/admin/restaurants/${restaurantId}/menu`;
+const API_MENU = `https://location-based-food-street-guide.onrender.com/admin/restaurants/${restaurantId}/menu`;
 let editingItemId = null;
 
 function loadMenu() {
@@ -56,7 +56,7 @@ function editItem(id, name, price) {
 function deleteItem(id) {
   if (!confirm("Xoá món này?")) return;
 
-  fetch(`http://127.0.0.1:5000/admin/menu/${id}`, {
+  fetch(`https://location-based-food-street-guide.onrender.com/admin/menu/${id}`, {
     credentials: "include",
     method: "DELETE"
   }).then(loadMenu);
