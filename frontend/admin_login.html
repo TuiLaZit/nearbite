@@ -1,0 +1,25 @@
+<input type="password" id="password" placeholder="Admin password">
+<button onclick="login()">Login</button>
+
+<script>
+const API_URL = "http://127.0.0.1:5000";
+
+function login() {
+  fetch(`${API_URL}/admin/login`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    credentials: "include",
+    body: JSON.stringify({
+      password: document.getElementById("password").value
+    })
+  })
+  .then(res => {
+    if (res.ok) {
+      window.location.href = "admin.html";
+    } else {
+      alert("Sai mật khẩu");
+    }
+  });
+}
+</script>
+
