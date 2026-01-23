@@ -11,14 +11,12 @@ let watchTimer = null;
 let lastRestaurantId = null;
 let isTracking = false;
 
-const API_BASE = "https://location-based-food-street-guide.onrender.com";
-
 // =====================
 // CORE: gọi backend
 // =====================
 function fetchAndUpdateLocation() {
   navigator.geolocation.getCurrentPosition((pos) => {
-    fetch("${API_BASE}/location", {
+    fetch(`${BASE_URL}/location`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -27,41 +25,37 @@ function fetchAndUpdateLocation() {
         language: langSelect.value
       })
     })
-    .then(res => res.json())
-    .then(data => {
-      const newId = data.nearest_place.id;
+      .then(res => res.json())
+      .then(data => {
+        const newId = data.nearest_place.id;
 
-      // 👉 CHỈ xử lý khi đổi quán
-      if (newId !== lastRestaurantId) {
-        lastRestaurantId = newId;
+        if (newId !== lastRestaurantId) {
+          lastRestaurantId = newId;
 
-        // ⛔ Tắt audio cũ
-        if (audio) {
-          audio.pause();
-          audio = null;
+          if (audio) {
+            audio.pause();
+            audio = null;
+          }
+
+          placeName.innerText = data.nearest_place.name;
+          narration.innerText = data.narration;
+          distanceText.innerText = `Khoảng cách: ${data.distance_km} km`;
+          resultDiv.classList.remove("hidden");
+
+          if (data.audio_url) {
+            playBtn.classList.remove("hidden");
+
+            audio = new Audio(`${BASE_URL}${data.audio_url}`);
+            audio.play();
+
+            audio.onended = () => {
+              playBtn.innerText = "🔊";
+            };
+
+            playBtn.innerText = "⏸";
+          }
         }
-
-        // UI
-        placeName.innerText = data.nearest_place.name;
-        narration.innerText = data.narration;
-        distanceText.innerText = `Khoảng cách: ${data.distance_km} km`;
-        resultDiv.classList.remove("hidden");
-
-        // 🔊 Tạo audio mới
-        if (data.audio_url) {
-          playBtn.classList.remove("hidden");
-
-          audio = new Audio(`http://127.0.0.1:5000${data.audio_url}`);
-          audio.play();
-
-          audio.onended = () => {
-            playBtn.innerText = "🔊";
-          };
-
-          playBtn.innerText = "⏸";
-        }
-      }
-    });
+      });
   });
 }
 
@@ -74,17 +68,14 @@ btn.onclick = () => {
     return;
   }
 
-  // 👉 BẮT ĐẦU THEO DÕI
   if (!isTracking) {
     isTracking = true;
     btn.innerText = "⏹ Đang theo dõi... (bấm để dừng)";
-
     fetchAndUpdateLocation();
     watchTimer = setInterval(fetchAndUpdateLocation, 5000);
     return;
   }
 
-  // 👉 DỪNG THEO DÕI
   isTracking = false;
   btn.innerText = "▶️ Bắt đầu theo dõi";
 

@@ -5,10 +5,11 @@
   <title>Admin - Food Street</title>
 </head>
 <body>
+  <script src="config/api.js"></script>
   <script>
-const API_URL = "http://127.0.0.1:5000";
+const API_URL = API_CONFIG.BASE_URL;
 
-fetch(`${API_URL}/admin/check`, {
+fetch(API_CONFIG.getFullUrl(API_CONFIG.endpoints.ADMIN_CHECK), {
   credentials: "include"
 })
 .then(res => {
@@ -24,7 +25,7 @@ fetch(`${API_URL}/admin/check`, {
 
   <script>
     function logout() {
-      fetch("${API_URL}/admin/logout", {
+      fetch(API_CONFIG.getFullUrl(API_CONFIG.endpoints.ADMIN_LOGOUT), {
         method: "POST",
         credentials: "include"
       }).then(() => {

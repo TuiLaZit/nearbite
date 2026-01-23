@@ -16,9 +16,12 @@ app.static_folder = 'static'
 CORS(
     app,
     supports_credentials=True,
-    origins=["http://127.0.0.1:5500"]
+    origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "https://location-based-food-street-guide-production.up.railway.app"
+    ]
 )
-
 # 🔥 SESSION CONFIG CHUẨN LOCAL
 app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
