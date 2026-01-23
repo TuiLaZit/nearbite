@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Food Street PoC</title>
+</head>
+<body>
+  <div class="container">
+    <h1>🍜 Food Street PoC</h1>
+
+    <button id="locateBtn" type="button">
+      ▶️ Bắt đầu theo dõi
+    </button>
+
+    <select id="language"></select>
+
+    <div id="result" class="hidden">
+      <h2 id="placeName"></h2>
+      <p id="narration"></p>
+      <button id="playAudioBtn" type="button" class="hidden">🔊</button>
+      <small id="distance"></small>
+    </div>
+  </div>
+
+  <script src="languages.js"></script>
+  <script src="main.js"></script>
+</body>
+
+<style>
+.hidden {
+  display: none;
+}
+</style>
+</html>

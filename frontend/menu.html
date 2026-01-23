@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Quản lý Menu</title>
+</head>
+<body>
+    <button onclick="goBack()">⬅️ Quay lại trang Admin</button>
+    <h1>🍽 Quản lý menu</h1>
+
+    <h3>Thêm / sửa món</h3>
+    <input id="itemName" placeholder="Tên món">
+    <input id="itemPrice" placeholder="Giá">
+    <button onclick="saveItem()">💾 Lưu</button>
+
+    <hr>
+
+    <h3>Danh sách món</h3>
+    <ul id="menuList"></ul>
+
+    <script src="menu.js"></script>
+</body>
+</html>
