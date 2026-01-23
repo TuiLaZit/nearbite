@@ -1,3 +1,3 @@
-import os
+from flask_sqlalchemy import SQLAlchemy
 
-SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
+db = SQLAlchemy()
