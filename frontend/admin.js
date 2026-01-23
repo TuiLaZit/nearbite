@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:5000/admin/restaurants";
+const API = "https://location-based-food-street-guide.onrender.com/admin/restaurants";
 let editingId = null;
 
 /* ======================
