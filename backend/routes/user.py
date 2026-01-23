@@ -9,6 +9,8 @@ def register_user_routes(app):
 
     @app.route("/location", methods=["POST"])
     def receive_location():
+        if request.method == "OPTIONS":
+            return "", 200
         data = request.get_json()
         user_lat = data.get("latitude")
         user_lng = data.get("longitude")
