@@ -60,22 +60,9 @@ function fetchAndUpdateLocation() {
 }
 
 // =====================
-// NÚT CHÍNH
+// HÀM DỪNG TRACKING
 // =====================
-btn.onclick = () => {
-  if (!navigator.geolocation) {
-    alert("Trình duyệt không hỗ trợ GPS");
-    return;
-  }
-
-  if (!isTracking) {
-    isTracking = true;
-    btn.innerText = "⏹ Đang theo dõi... (bấm để dừng)";
-    fetchAndUpdateLocation();
-    watchTimer = setInterval(fetchAndUpdateLocation, 5000);
-    return;
-  }
-
+function stopTracking() {
   isTracking = false;
   btn.innerText = "▶️ Bắt đầu theo dõi";
 
@@ -86,6 +73,32 @@ btn.onclick = () => {
   if (audio) {
     audio.pause();
     audio = null;
+  }
+}
+
+// =====================
+// HÀM BẮT ĐẦU TRACKING
+// =====================
+function startTracking() {
+  if (!navigator.geolocation) {
+    alert("Trình duyệt không hỗ trợ GPS");
+    return;
+  }
+
+  isTracking = true;
+  btn.innerText = "⏹ Đang theo dõi... (bấm để dừng)";
+  fetchAndUpdateLocation();
+  watchTimer = setInterval(fetchAndUpdateLocation, 5000);
+}
+
+// =====================
+// NÚT CHÍNH
+// =====================
+btn.onclick = () => {
+  if (!isTracking) {
+    startTracking();
+  } else {
+    stopTracking();
   }
 };
 
@@ -119,4 +132,23 @@ langSelect.value = savedLang || "vi";
 
 langSelect.addEventListener("change", () => {
   localStorage.setItem("language", langSelect.value);
+  
+  // Dừng tracking và reset
+  if (isTracking) {
+    stopTracking();
+  }
+  
+  // Reset kết quả hiện tại
+  resultDiv.classList.add("hidden");
+  playBtn.classList.add("hidden");
+  lastRestaurantId = null;
+});
+
+// =====================
+// AUTO START KHI LOAD TRANG
+// =====================
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    startTracking();
+  }, 500);
 });
