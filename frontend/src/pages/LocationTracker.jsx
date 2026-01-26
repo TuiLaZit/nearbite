@@ -274,13 +274,14 @@ function LocationTracker() {
         restaurant.lat, restaurant.lng
       )
       
+      // Dùng ngôn ngữ hiện tại đã chọn
       fetch(`${BASE_URL}/location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: language
+          language: language  // Dùng language state hiện tại
         })
       })
         .then(res => res.json())
@@ -319,8 +320,32 @@ function LocationTracker() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div style={{ padding: '15px', background: '#fff', borderBottom: '2px solid #ddd', zIndex: 1000 }}>
+      <div style={{ 
+        padding: '15px', 
+        background: '#fff', 
+        borderBottom: '2px solid #ddd', 
+        zIndex: 1000,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
         <h1 style={{ margin: 0, fontSize: '24px' }}>🍜 Food Street PoC</h1>
+        <select 
+          value={language} 
+          onChange={handleLanguageChange}
+          style={{
+            padding: '10px 15px',
+            borderRadius: '8px',
+            border: '2px solid #ddd',
+            fontSize: '14px',
+            cursor: 'pointer',
+            background: 'white'
+          }}
+        >
+          {LANGUAGES.map(lang => (
+            <option key={lang.code} value={lang.code}>{lang.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Leaflet Map */}
@@ -427,40 +452,23 @@ function LocationTracker() {
         boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
         zIndex: 1000
       }}>
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => isTracking ? stopTracking() : startTracking()}
-            style={{
-              flex: '1',
-              padding: '12px 20px',
-              background: isTracking ? '#EA4335' : '#34A853',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: 'pointer'
-            }}
-          >
-            {isTracking ? '⏹ Dừng theo dõi' : '▶️ Bắt đầu theo dõi'}
-          </button>
-
-          <select 
-            value={language} 
-            onChange={handleLanguageChange}
-            style={{
-              padding: '12px',
-              borderRadius: '8px',
-              border: '2px solid #ddd',
-              fontSize: '14px',
-              cursor: 'pointer'
-            }}
-          >
-            {LANGUAGES.map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.label}</option>
-            ))}
-          </select>
-        </div>
+        <button
+          onClick={() => isTracking ? stopTracking() : startTracking()}
+          style={{
+            width: '100%',
+            padding: '12px 20px',
+            background: isTracking ? '#EA4335' : '#34A853',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            marginBottom: '15px'
+          }}
+        >
+          {isTracking ? '⏹ Dừng theo dõi' : '▶️ Bắt đầu theo dõi'}
+        </button>
 
         {/* Thông tin quán hiện tại */}
         {currentNarration && (
