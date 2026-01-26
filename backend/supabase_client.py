@@ -1,25 +1,60 @@
 import os
+import re
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+# Load .env only in development (không ảnh hưởng production)
 load_dotenv()
 
-# Supabase configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # Service key for server-side operations
+def extract_supabase_url_from_database_url(database_url):
+    """
+    Tự động lấy SUPABASE_URL từ DATABASE_URL
+    VD: postgresql://postgres.frukwijesoibjwexwalm:pass@aws-1-ap-south-1.pooler.supabase.com:6543/postgres
+    → https://frukwijesoibjwexwalm.supabase.co
+    """
+    if not database_url:
+        return None
+    
+    # Tìm project reference (phần sau "postgres.")
+    match = re.search(r'postgres\.([a-zA-Z0-9]+)', database_url)
+    if match:
+        project_ref = match.group(1)
+        return f"https://{project_ref}.supabase.co"
+    
+    return None
 
-# Initialize Supabase client (will be None if env vars not set)
+# Lấy DATABASE_URL từ Railway (biến này đã có sẵn)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Tự động tạo SUPABASE_URL từ DATABASE_URL nếu chưa có
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+if not SUPABASE_URL and DATABASE_URL:
+    SUPABASE_URL = extract_supabase_url_from_database_url(DATABASE_URL)
+    if SUPABASE_URL:
+        print(f"✅ Tự động lấy SUPABASE_URL từ DATABASE_URL: {SUPABASE_URL}")
+
+# Vẫn cần SUPABASE_SERVICE_KEY riêng (không thể lấy từ DATABASE_URL)
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+# Debug
+print(f"🔍 SUPABASE_URL: {SUPABASE_URL[:40] if SUPABASE_URL else '❌ MISSING'}...")
+print(f"🔍 SUPABASE_SERVICE_KEY: {'✅ SET (length: ' + str(len(SUPABASE_KEY)) + ')' if SUPABASE_KEY else '❌ MISSING - CẦN THÊM BIẾN NÀY TRÊN RAILWAY'}")
+
+# Initialize Supabase client
 supabase_client: Client = None
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✅ Supabase client initialized successfully")
+        print("✅ Supabase Storage đã sẵn sàng - có thể upload ảnh")
     except Exception as e:
-        print(f"❌ Failed to initialize Supabase client: {e}")
+        print(f"❌ Lỗi khi kết nối Supabase Storage: {e}")
 else:
-    print("⚠️  Supabase credentials not found. Image upload will not work.")
-    print("   Set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env file")
+    print("⚠️  Chưa thể upload ảnh - thiếu SUPABASE_SERVICE_KEY")
+    if not SUPABASE_KEY:
+        print("   📝 Cách fix: Thêm biến SUPABASE_SERVICE_KEY trên Railway")
+        print("   → Vào https://supabase.com/dashboard → chọn project → Settings → API")
+        print("   → Copy 'service_role' key (dạng eyJ...) → thêm vào Railway")
 
 
 def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
