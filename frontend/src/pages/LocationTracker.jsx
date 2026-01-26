@@ -251,11 +251,15 @@ function LocationTracker() {
     setLanguage(newLang)
     localStorage.setItem('language', newLang)
 
+    // Dừng audio và reset
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
       setIsAudioPlaying(false)
     }
+    
+    // Reset selectedRestaurant để đóng popup cũ
+    setSelectedRestaurant(null)
 
     lastRestaurantIdRef.current = null
     if (isTracking && userLocation) {
@@ -265,6 +269,9 @@ function LocationTracker() {
 
   // Xử lý click vào marker quán
   const handleRestaurantClick = (restaurant) => {
+    // Reset selectedRestaurant trước
+    setSelectedRestaurant(null)
+    
     // Dừng audio cũ nếu đang phát
     if (audioRef.current) {
       audioRef.current.pause()
@@ -278,24 +285,26 @@ function LocationTracker() {
         restaurant.lat, restaurant.lng
       )
       
-      // Dùng ngôn ngữ hiện tại đã chọn
+      // Fetch với ngôn ngữ hiện tại
       fetch(`${BASE_URL}/location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: language  // Dùng language state hiện tại
+          language: language
         })
       })
         .then(res => res.json())
         .then(data => {
-          setSelectedRestaurant({
+          // Set selectedRestaurant với data mới
+          const newData = {
             ...restaurant,
             narration: data.narration,
             audioUrl: data.audio_url,
             distance: distance
-          })
+          }
+          setSelectedRestaurant(newData)
         })
         .catch(err => console.error('Error:', err))
     }
