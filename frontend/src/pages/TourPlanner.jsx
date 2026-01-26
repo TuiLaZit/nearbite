@@ -34,9 +34,9 @@ function TourPlanner() {
       .catch(err => console.error('Error fetching languages:', err))
   }, [])
 
-  // Fetch tags khi load
+  // Fetch tags khi load hoặc đổi ngôn ngữ
   useEffect(() => {
-    fetch(`${BASE_URL}/tags`)
+    fetch(`${BASE_URL}/tags?lang=${language}`)
       .then(res => res.json())
       .then(data => {
         if (data.status === 'success' && data.tags) {
@@ -49,7 +49,7 @@ function TourPlanner() {
         console.error('Error fetching tags:', err)
         setTags([]) // Fallback nếu lỗi
       })
-  }, [])
+  }, [language]) // Re-fetch khi đổi ngôn ngữ
 
   // Lấy vị trí user
   const getUserLocation = () => {

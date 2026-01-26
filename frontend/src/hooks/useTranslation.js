@@ -42,8 +42,8 @@ const setCache = (lang, translations) => {
 }
 
 export const useTranslation = (language) => {
-  const [translations, setTranslations] = useState({})
-  const [loading, setLoading] = useState(true)
+  const [translations, setTranslations] = useState(TRANSLATION_KEYS) // Default to Vietnamese
+  const [loading, setLoading] = useState(false) // Không block UI
 
   useEffect(() => {
     const loadTranslations = async () => {
@@ -62,7 +62,7 @@ export const useTranslation = (language) => {
         return
       }
 
-      // Nếu không có cache, gọi API
+      // Nếu không có cache, gọi API trong background
       try {
         setLoading(true)
         const textsToTranslate = getAllTranslatableTexts()

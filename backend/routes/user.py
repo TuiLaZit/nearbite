@@ -60,11 +60,27 @@ def register_user_routes(app):
 
     @app.route("/tags", methods=["GET"])
     def get_tags():
-        """Lấy danh sách tất cả tags (public endpoint)"""
+        """Lấy danh sách tags với translation support (public endpoint)"""
+        target_lang = request.args.get('lang', 'vi')
         tags = Tag.query.all()
+        
+        tags_data = []
+        for tag in tags:
+            tag_dict = tag.to_dict()
+            
+            # Dịch tag name nếu không phải tiếng Việt
+            if target_lang != 'vi' and tag.name:
+                try:
+                    tag_dict['name'] = translate_text(tag.name, target_lang)
+                except Exception as e:
+                    print(f"Error translating tag {tag.id}: {e}")
+                    # Giữ nguyên tiếng Việt nếu lỗi
+            
+            tags_data.append(tag_dict)
+        
         return jsonify({
             "status": "success",
-            "tags": [tag.to_dict() for tag in tags]
+            "tags": tags_data
         })
 
     @app.route("/location", methods=["POST"])
