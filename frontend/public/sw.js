@@ -19,9 +19,19 @@ self.addEventListener('install', (event) => {
 
 // Fetch - Network first, fallback to cache
 self.addEventListener('fetch', (event) => {
+  // Chỉ cache GET requests, bỏ qua POST/PUT/DELETE
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
+        // Chỉ cache response thành công
+        if (!response || response.status !== 200 || response.type === 'error') {
+          return response;
+        }
+
         // Clone response before caching
         const responseToCache = response.clone();
         caches.open(CACHE_NAME)
