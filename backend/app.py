@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from db import db
 import os
@@ -18,12 +18,15 @@ CORS(
         "origins": [
             "http://127.0.0.1:5500",
             "http://localhost:5500",
+            "http://localhost:5173",
             "https://nearbite.vercel.app",
+            "*"  # Cho phép tất cả origins trong development/testing
         ]
     }},
     supports_credentials=True,
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"]
+    allow_headers=["Content-Type", "Authorization"],
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 # Tự động detect môi trường production (HTTPS)
@@ -56,6 +59,15 @@ def check():
 @app.route("/admin/logout", methods=["POST"])
 def logout():
     return admin_logout()
+
+@app.route("/static/<path:path>")
+def serve_static(path):
+    """Serve static files with CORS headers"""
+    response = send_from_directory('static', path)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Cross-Origin-Resource-Policy'] = 'cross-origin'
+    return response
 
 register_user_routes(app)
 register_admin_routes(app)

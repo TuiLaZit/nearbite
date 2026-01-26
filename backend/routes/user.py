@@ -23,6 +23,11 @@ def register_user_routes(app):
         data = request.get_json()
         user_lat = data.get("latitude")
         user_lng = data.get("longitude")
+        language = data.get("language", "vi")
+        
+        print(f"===== LOCATION REQUEST =====")
+        print(f"Language: {language}")
+        print(f"Position: {user_lat}, {user_lng}")
 
         restaurants = Restaurant.query.filter_by(is_active=True).all()
 
@@ -35,7 +40,6 @@ def register_user_routes(app):
                 min_dist = dist
                 nearest = r
 
-        language = data.get("language", "vi")
         narration_vi = generate_narration(nearest, min_dist)
         narration_final = translate_text(narration_vi, language)
         audio_url = text_to_speech(narration_final, language)
@@ -43,6 +47,11 @@ def register_user_routes(app):
         # Message khi chưa đến gần quán
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
         out_of_range_msg = translate_text(out_of_range_msg_vi, language)
+        
+        print(f"Nearest: {nearest.name}")
+        print(f"Distance: {min_dist}")
+        print(f"Audio URL: {audio_url}")
+        print(f"Language used: {language}")
 
         return jsonify({
             "status": "success",
