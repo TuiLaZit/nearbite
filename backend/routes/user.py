@@ -1,12 +1,53 @@
 from flask import request, jsonify
 from models import Restaurant, Tag, db
 from services import calculate_distance, generate_narration
-from translate import translate_text
+from translate import translate_text, LANGUAGE_LABELS
 from tts import text_to_speech
 from sqlalchemy import and_, or_
 
 
 def register_user_routes(app):
+
+    @app.route("/languages", methods=["GET"])
+    def get_languages():
+        """Lấy danh sách ngôn ngữ hỗ trợ (public endpoint)"""
+        languages = [{"code": code, "label": label} for code, label in LANGUAGE_LABELS.items()]
+        return jsonify({
+            "status": "success",
+            "languages": languages
+        })
+
+    @app.route("/translate", methods=["POST"])
+    def translate():
+        """Dịch text sang ngôn ngữ target (public endpoint)"""
+        data = request.json
+        texts = data.get("texts", [])  # Array of texts to translate
+        target_lang = data.get("target_lang", "vi")
+        
+        if not texts or not isinstance(texts, list):
+            return jsonify({"status": "error", "message": "texts must be an array"}), 400
+        
+        # Nếu target là tiếng Việt, trả về text gốc
+        if target_lang == "vi":
+            return jsonify({
+                "status": "success",
+                "translations": {text: text for text in texts}
+            })
+        
+        # Dịch từng text
+        translations = {}
+        for text in texts:
+            try:
+                translated = translate_text(text, target_lang)
+                translations[text] = translated
+            except Exception as e:
+                print(f"Translation error for '{text}': {e}")
+                translations[text] = text  # Fallback to original
+        
+        return jsonify({
+            "status": "success",
+            "translations": translations
+        })
 
     @app.route("/restaurants", methods=["GET"])
     def get_restaurants():

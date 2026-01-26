@@ -19,6 +19,23 @@ LANG_MAP = {
     "vi": "vi"
 }
 
+# Language labels for frontend dropdown
+LANGUAGE_LABELS = {
+    "vi": "Tiếng Việt",
+    "en": "English",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+    "it": "Italiano",
+    "ru": "Русский",
+    "ja": "日本語",
+    "ko": "한국어",
+    "zh": "中文 (简体)",
+    "th": "ไทย",
+    "id": "Bahasa Indonesia",
+    "ms": "Bahasa Melayu"
+}
+
 def translate_text(text, target_lang):
     if target_lang == "vi":
         return text

@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import { BASE_URL } from '../config'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from '../hooks/useTranslation'
 
 function TourPlanner() {
   const navigate = useNavigate()
+  const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'vi')
+  const { t, loading: translationLoading } = useTranslation(language)
+  const [languages, setLanguages] = useState([]) // Fetch từ API
   const [tags, setTags] = useState([])
   const [selectedTags, setSelectedTags] = useState([])
   const [timeLimit, setTimeLimit] = useState(120) // phút
@@ -12,6 +16,23 @@ function TourPlanner() {
   const [tours, setTours] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Sync language with localStorage
+  useEffect(() => {
+    localStorage.setItem('language', language)
+  }, [language])
+
+  // Fetch danh sách ngôn ngữ
+  useEffect(() => {
+    fetch(`${BASE_URL}/languages`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setLanguages(data.languages)
+        }
+      })
+      .catch(err => console.error('Error fetching languages:', err))
+  }, [])
 
   // Fetch tags khi load
   useEffect(() => {
@@ -150,7 +171,26 @@ function TourPlanner() {
         >
           🍜
         </button>
-        <h1 style={{ margin: 0, fontSize: '24px', flex: 1 }}>🗺️ Xếp Tour Ăn Uống</h1>
+        <h1 style={{ margin: 0, fontSize: '24px', flex: 1 }}>🗺️ {t('tourPlanning')}</h1>
+        
+        {/* Language selector */}
+        <select 
+          value={language} 
+          onChange={(e) => setLanguage(e.target.value)}
+          style={{
+            padding: '10px 15px',
+            borderRadius: '8px',
+            border: '2px solid #ddd',
+            fontSize: '13px',
+            cursor: 'pointer',
+            background: 'white',
+            minWidth: '100px'
+          }}
+        >
+          {languages.map(lang => (
+            <option key={lang.code} value={lang.code}>{lang.label}</option>
+          ))}
+        </select>
       </div>
 
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -162,12 +202,12 @@ function TourPlanner() {
           marginBottom: '20px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
-          <h2 style={{ marginTop: 0 }}>📝 Thông tin tour</h2>
+          <h2 style={{ marginTop: 0 }}>📝 {t('tourInfo')}</h2>
 
           {/* Thời gian */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              ⏱️ Tổng thời gian (phút):
+              ⏱️ {t('totalTime')} ({t('minutes')}):
             </label>
             <input
               type="number"
@@ -189,7 +229,7 @@ function TourPlanner() {
           {/* Ngân sách */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              💰 Ngân sách (VND):
+              💰 {t('budget')}:
             </label>
             <input
               type="number"
@@ -211,7 +251,7 @@ function TourPlanner() {
           {/* Tags */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              🏷️ Sở thích ăn uống:
+              🏷️ {t('selectTags')}:
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {tags && tags.length > 0 ? tags.map(tag => (
@@ -233,11 +273,11 @@ function TourPlanner() {
                   {tag.icon} {tag.name}
                 </button>
               )) : (
-                <div style={{ color: '#666', fontStyle: 'italic' }}>Đang tải tags...</div>
+                <div style={{ color: '#666', fontStyle: 'italic' }}>{t('loading')}</div>
               )}
             </div>
             <small style={{ color: '#666' }}>
-              {selectedTags.length > 0 ? `Đã chọn ${selectedTags.length} tag` : 'Chọn tags hoặc bỏ qua để xem tất cả quán'}
+              {selectedTags.length > 0 ? t('selectedTags', {count: selectedTags.length}) : t('noTagsSelected')}
             </small>
           </div>
 
@@ -258,7 +298,7 @@ function TourPlanner() {
               transition: 'background 0.2s'
             }}
           >
-            {loading ? '⏳ Đang xếp tour...' : '🚀 Xếp Tour Ngay'}
+            {loading ? `⏳ ${t('planning')}` : `🚀 ${t('planTourNow')}`}
           </button>
         </div>
 
@@ -272,14 +312,14 @@ function TourPlanner() {
             marginBottom: '20px',
             border: '1px solid #f5c6cb'
           }}>
-            ⚠️ {error}
+            ⚠️ {t('connectionError')}: {error}
           </div>
         )}
 
         {/* Hiển thị tours */}
         {tours.length > 0 && (
           <div>
-            <h2>✨ {tours.length} Tour Gợi Ý</h2>
+            <h2>✨ {t('tourSuggestions', {count: tours.length})}</h2>
             <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))' }}>
               {tours.map((tour, idx) => (
                 <div
@@ -295,7 +335,7 @@ function TourPlanner() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                     <h3 style={{ margin: 0 }}>
                       {idx === 0 && '👑 '}
-                      Tour #{idx + 1}
+                      {t('tour')} #{idx + 1}
                     </h3>
                     <span style={{
                       background: idx === 0 ? '#28a745' : '#007bff',
@@ -305,24 +345,24 @@ function TourPlanner() {
                       fontSize: '12px',
                       fontWeight: 'bold'
                     }}>
-                      {tour.strategy === 'best_score' && 'Điểm cao nhất'}
-                      {tour.strategy === 'nearest' && 'Gần nhất'}
-                      {tour.strategy === 'cheapest' && 'Rẻ nhất'}
+                      {tour.strategy === 'best_score' && t('bestScore')}
+                      {tour.strategy === 'nearest' && t('nearest')}
+                      {tour.strategy === 'cheapest' && t('cheapest')}
                     </span>
                   </div>
 
                   <div style={{ marginBottom: '15px', padding: '10px', background: '#f8f9fa', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span>🕐 Thời gian:</span>
-                      <strong>{tour.total_time} phút</strong>
+                      <span>🕐 {t('time')}:</span>
+                      <strong>{tour.total_time} {t('minutes')}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span>💵 Chi phí:</span>
+                      <span>💵 {t('cost')}:</span>
                       <strong style={{ color: '#28a745' }}>{formatMoney(tour.total_cost)}</strong>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>🍽️ Số quán:</span>
-                      <strong>{tour.num_stops} quán</strong>
+                      <span>🍽️ {t('restaurants')}:</span>
+                      <strong>{t('restaurant_count', {count: tour.num_stops})}</strong>
                     </div>
                   </div>
 
@@ -419,7 +459,7 @@ function TourPlanner() {
                       cursor: userLocation ? 'pointer' : 'not-allowed'
                     }}
                   >
-                    🗺️ Xem chỉ đường
+                    🗺️ {t('viewDirections')}
                   </button>
                 </div>
               ))}
