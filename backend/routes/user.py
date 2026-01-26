@@ -38,6 +38,7 @@ def register_user_routes(app):
         try:
             # Bảo vệ placeholders {variable} trước khi dịch
             import re
+            import uuid
             placeholder_pattern = re.compile(r'\{([^}]+)\}')
             
             # Lưu mapping placeholders
@@ -54,15 +55,28 @@ def register_user_routes(app):
                 protected_text = placeholder_pattern.sub(replace_placeholder, text)
                 protected_texts.append(protected_text)
             
-            # Nối texts bằng separator (dùng newline + marker)
-            separator = "\n■■■\n"
+            # Dùng separator với UUID để tránh bị dịch
+            separator_id = str(uuid.uuid4())[:8]
+            separator = f"\n<<<{separator_id}>>>\n"
             combined_text = separator.join(protected_texts)
+            
+            print(f"Translating to {target_lang}, {len(protected_texts)} texts")
             
             # Dịch 1 lần duy nhất
             translated_combined = translate_text(combined_text, target_lang)
             
-            # Tách lại thành array
+            # Tách lại thành array - thử nhiều cách
             translated_parts = translated_combined.split(separator)
+            
+            # Nếu separator bị thay đổi, thử fallback
+            if len(translated_parts) != len(texts):
+                print(f"WARNING: Split mismatch. Expected {len(texts)}, got {len(translated_parts)}")
+                # Thử split bằng các biến thể khác
+                for alt_sep in [f"\n<<< {separator_id} >>>\n", f"<<< {separator_id} >>>", separator_id]:
+                    translated_parts = translated_combined.split(alt_sep)
+                    if len(translated_parts) == len(texts):
+                        print(f"Found working separator: {alt_sep}")
+                        break
             
             # Khôi phục placeholders và map lại với original texts
             translations = {}
@@ -73,6 +87,11 @@ def register_user_routes(app):
                     for placeholder_id, original_placeholder in placeholder_map.items():
                         translated_text = translated_text.replace(placeholder_id, original_placeholder)
                     translations[text] = translated_text
+                else:
+                    print(f"WARNING: Missing translation for text #{i}: {text[:50]}...")
+                    translations[text] = text  # Fallback
+                    
+            print(f"Translation completed: {len(translations)}/{len(texts)} texts")
                 else:
                     translations[text] = text  # Fallback
         except Exception as e:
