@@ -72,11 +72,14 @@ function LocationTracker() {
   const [selectedRestaurant, setSelectedRestaurant] = useState(null)
   const [currentNarration, setCurrentNarration] = useState(null)
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
+  const [audioBlocked, setAudioBlocked] = useState(false)
+  const [pendingAudioUrl, setPendingAudioUrl] = useState(null)
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
   const lastRestaurantIdRef = useRef(null)
   const languageRef = useRef(language) // Track current language
+  const audioUnlockedRef = useRef(false) // Track nếu audio đã được unlock
   
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -231,26 +234,40 @@ function LocationTracker() {
       console.error('Audio error:', e)
       console.error('Audio error details:', audio.error)
       setIsAudioPlaying(false)
+      setAudioBlocked(false)
     }
     
     audio.onended = () => {
       console.log('Audio ended')
       setIsAudioPlaying(false)
+      setAudioBlocked(false)
     }
     
     setIsAudioPlaying(true)
     audio.play()
       .then(() => {
         console.log('Audio playing')
+        setAudioBlocked(false)
+        setPendingAudioUrl(null)
+        audioUnlockedRef.current = true
       })
       .catch(err => {
         console.error('Error playing audio:', err)
         setIsAudioPlaying(false)
-        // Nếu lỗi autoplay, chờ user tương tác
+        // Nếu lỗi autoplay, lưu URL để chờ user tương tác
         if (err.name === 'NotAllowedError') {
           console.warn('Autoplay blocked. User interaction required.')
+          setAudioBlocked(true)
+          setPendingAudioUrl(url)
         }
       })
+  }
+
+  // Unlock audio khi user click
+  const unlockAudio = () => {
+    if (pendingAudioUrl) {
+      playAudio(pendingAudioUrl)
+    }
   }
 
   // Bắt đầu tracking
@@ -564,7 +581,7 @@ function LocationTracker() {
           }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>{currentNarration.name}</h3>
             <p style={{ margin: '8px 0', fontSize: '14px' }}>{currentNarration.narration}</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', gap: '10px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '13px', color: '#666' }}>
                 📍 {currentNarration.distance.toFixed(3)} km
               </span>
@@ -582,6 +599,24 @@ function LocationTracker() {
                   }}
                 >
                   {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe thuyết minh'}
+                </button>
+              )}
+              {audioBlocked && (
+                <button
+                  onClick={unlockAudio}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#FBBC04',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    animation: 'pulse 1s infinite'
+                  }}
+                >
+                  🔊 Bật âm thanh
                 </button>
               )}
             </div>
