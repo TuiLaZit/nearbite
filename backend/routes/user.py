@@ -196,13 +196,12 @@ def register_user_routes(app):
             if tour3 and tour3 not in tours:
                 tours.append(tour3)
             
-            # Đảm bảo trả về đúng 3 tours (nếu ít hơn thì lặp lại)
-            while len(tours) < 3 and tours:
-                tours.append(tours[0])
+            # Không lặp lại tour - trả về đúng số tour có thể tạo
+            # Mỗi tour có chiến lược riêng, không duplicate
             
             return jsonify({
                 "status": "success",
-                "tours": tours[:3],
+                "tours": tours,
                 "total_restaurants": len(restaurants)
             })
             
