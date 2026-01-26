@@ -3,7 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { BASE_URL, LANGUAGES } from '../config'
+import { BASE_URL } from '../config'
+import { useTranslation } from '../hooks/useTranslation'
 
 const POI_THRESHOLD = 0.03 // 30m
 
@@ -69,6 +70,8 @@ function LocationTracker() {
     console.log('Initial language from localStorage:', saved)
     return saved || 'vi'
   })
+  const { t, loading: translationLoading } = useTranslation(language)
+  const [languages, setLanguages] = useState([]) // Fetch từ API
   const [userLocation, setUserLocation] = useState(null)
   const [restaurants, setRestaurants] = useState([])
   const [selectedRestaurant, setSelectedRestaurant] = useState(null)
@@ -83,13 +86,25 @@ function LocationTracker() {
   const lastDistanceRef = useRef(null) // Track khoảng cách để tránh update liên tục
   const languageRef = useRef(language) // Track current language
   const audioUnlockedRef = useRef(false) // Track nếu audio đã được unlock
-  
+
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
     languageRef.current = language
     localStorage.setItem('language', language)
     console.log('Language synced:', language)
   }, [language])
+
+  // Fetch danh sách ngôn ngữ từ API
+  useEffect(() => {
+    fetch(`${BASE_URL}/languages`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setLanguages(data.languages)
+        }
+      })
+      .catch(err => console.error('Error fetching languages:', err))
+  }, [])
 
   // Fetch danh sách quán khi load
   useEffect(() => {
@@ -457,7 +472,7 @@ function LocationTracker() {
         alignItems: 'center',
         gap: '15px'
       }}>
-        {/* Logo */}
+        {/* Logo & Name */}
         <div style={{ 
           fontSize: '28px', 
           fontWeight: 'bold',
@@ -469,42 +484,23 @@ function LocationTracker() {
           🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
         </div>
         
-        {/* Navigation buttons */}
-        <div style={{ display: 'flex', gap: '10px', flex: 1 }}>
-          <button
-            onClick={() => isTracking ? stopTracking() : startTracking()}
-            style={{
-              padding: '10px 20px',
-              background: isTracking ? '#EA4335' : '#34A853',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'background 0.2s'
-            }}
-          >
-            {isTracking ? '⏸️ Dừng theo dõi' : '▶️ Theo dõi'}
-          </button>
-          
-          <button
-            onClick={() => navigate('/tour-planner')}
-            style={{
-              padding: '10px 20px',
-              background: '#ff9800',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'background 0.2s'
-            }}
-          >
-            🗺️ Xếp Tour
-          </button>
-        </div>
+        {/* Xếp Tour button */}
+        <button
+          onClick={() => navigate('/tour-planner')}
+          style={{
+            padding: '10px 20px',
+            background: '#ff9800',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'background 0.2s'
+          }}
+        >
+          🗺️ {t('planTour')}
+        </button>
         
         {/* Language selector */}
         <select 
@@ -520,7 +516,7 @@ function LocationTracker() {
             minWidth: '100px'
           }}
         >
-          {LANGUAGES.map(lang => (
+          {languages.map(lang => (
             <option key={lang.code} value={lang.code}>{lang.label}</option>
           ))}
         </select>
@@ -545,7 +541,7 @@ function LocationTracker() {
           {userLocation && (
             <Marker position={userLocation} icon={userIcon}>
               <Popup>
-                <strong>📍 Vị trí của bạn</strong>
+                <strong>📍 {t('yourLocation')}</strong>
               </Popup>
             </Marker>
           )}
