@@ -62,7 +62,11 @@ function MapUpdater({ center }) {
 
 function LocationTracker() {
   const [isTracking, setIsTracking] = useState(false)
-  const [language, setLanguage] = useState(localStorage.getItem('language') || 'vi')
+  const [language, setLanguage] = useState(() => {
+    const saved = localStorage.getItem('language')
+    console.log('Initial language from localStorage:', saved)
+    return saved || 'vi'
+  })
   const [userLocation, setUserLocation] = useState(null)
   const [restaurants, setRestaurants] = useState([])
   const [selectedRestaurant, setSelectedRestaurant] = useState(null)
@@ -72,6 +76,21 @@ function LocationTracker() {
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
   const lastRestaurantIdRef = useRef(null)
+
+  // Đảm bảo language được load đúng khi PWA khởi động
+  useEffect(() => {
+    const savedLang = localStorage.getItem('language')
+    console.log('PWA Language check:', savedLang)
+    if (savedLang && savedLang !== language) {
+      setLanguage(savedLang)
+    }
+  }, [])
+
+  // Persist language mỗi khi thay đổi
+  useEffect(() => {
+    console.log('Language changed to:', language)
+    localStorage.setItem('language', language)
+  }, [language])
 
   // Fetch danh sách quán khi load
   useEffect(() => {
@@ -257,8 +276,11 @@ function LocationTracker() {
   // Xử lý thay đổi ngôn ngữ
   const handleLanguageChange = (e) => {
     const newLang = e.target.value
-    setLanguage(newLang)
+    console.log('Changing language to:', newLang)
+    
+    // Lưu vào localStorage TRƯỚC khi setState
     localStorage.setItem('language', newLang)
+    setLanguage(newLang)
 
     // Dừng audio và reset hoàn toàn
     if (audioRef.current) {
