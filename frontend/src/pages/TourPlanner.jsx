@@ -15,12 +15,19 @@ function TourPlanner() {
 
   // Fetch tags khi load
   useEffect(() => {
-    fetch(`${BASE_URL}/admin/tags`)
+    fetch(`${BASE_URL}/tags`)
       .then(res => res.json())
       .then(data => {
-        setTags(data.tags)
+        if (data.status === 'success' && data.tags) {
+          setTags(data.tags)
+        } else {
+          setTags([]) // Fallback nếu lỗi
+        }
       })
-      .catch(err => console.error('Error fetching tags:', err))
+      .catch(err => {
+        console.error('Error fetching tags:', err)
+        setTags([]) // Fallback nếu lỗi
+      })
   }, [])
 
   // Lấy vị trí user
@@ -192,7 +199,7 @@ function TourPlanner() {
               🏷️ Sở thích ăn uống:
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {tags.map(tag => (
+              {tags && tags.length > 0 ? tags.map(tag => (
                 <button
                   key={tag.id}
                   onClick={() => toggleTag(tag.id)}
@@ -210,7 +217,9 @@ function TourPlanner() {
                 >
                   {tag.icon} {tag.name}
                 </button>
-              ))}
+              )) : (
+                <div style={{ color: '#666', fontStyle: 'italic' }}>Đang tải tags...</div>
+              )}
             </div>
             <small style={{ color: '#666' }}>
               {selectedTags.length > 0 ? `Đã chọn ${selectedTags.length} tag` : 'Chọn tags hoặc bỏ qua để xem tất cả quán'}
