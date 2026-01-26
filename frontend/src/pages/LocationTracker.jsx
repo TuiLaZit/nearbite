@@ -1,69 +1,198 @@
 import { useState, useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { BASE_URL, LANGUAGES } from '../config'
+
+const POI_THRESHOLD = 0.03 // 30m
+
+// Fix cho Leaflet default marker icons
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
+
+// Custom icons
+const userIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" fill="#4285F4" stroke="white" stroke-width="3"/>
+    </svg>
+  `),
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+})
+
+const restaurantIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="14" fill="#FBBC04" stroke="white" stroke-width="2"/>
+      <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">🍜</text>
+    </svg>
+  `),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+})
+
+const activeRestaurantIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="14" fill="#EA4335" stroke="white" stroke-width="2"/>
+      <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">🍜</text>
+    </svg>
+  `),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+})
+
+// Component để tự động center map khi user di chuyển
+function MapUpdater({ center }) {
+  const map = useMap()
+  useEffect(() => {
+    if (center) {
+      map.setView(center, map.getZoom())
+    }
+  }, [center, map])
+  return null
+}
 
 function LocationTracker() {
   const [isTracking, setIsTracking] = useState(false)
   const [language, setLanguage] = useState(localStorage.getItem('language') || 'vi')
-  const [result, setResult] = useState(null)
+  const [userLocation, setUserLocation] = useState(null)
+  const [restaurants, setRestaurants] = useState([])
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null)
+  const [currentNarration, setCurrentNarration] = useState(null)
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
   const lastRestaurantIdRef = useRef(null)
 
-  // Hàm gọi backend để lấy thông tin location
-  const fetchAndUpdateLocation = () => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      fetch(`${BASE_URL}/location`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          language: language
-        })
+  // Fetch danh sách quán khi load
+  useEffect(() => {
+    fetch(`${BASE_URL}/restaurants`)
+      .then(res => res.json())
+      .then(data => {
+        setRestaurants(data.restaurants)
       })
-        .then(res => res.json())
-        .then(data => {
-          const newId = data.nearest_place.id
+      .catch(err => console.error('Error fetching restaurants:', err))
+  }, [])
 
-          if (newId !== lastRestaurantIdRef.current) {
-            lastRestaurantIdRef.current = newId
+  // Hàm tính khoảng cách
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c
+  }
 
-            // Dừng audio cũ
-            if (audioRef.current) {
-              audioRef.current.pause()
-              audioRef.current = null
-            }
+  // Hàm fetch và cập nhật thuyết minh khi di chuyển
+  const fetchAndUpdateLocation = (pos) => {
+    const userLat = pos.coords.latitude
+    const userLng = pos.coords.longitude
+    setUserLocation([userLat, userLng])
 
-            // Cập nhật kết quả
-            setResult({
+    fetch(`${BASE_URL}/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: userLat,
+        longitude: userLng,
+        language: language
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        const newId = data.nearest_place.id
+        const distance = data.distance_km
+
+        if (newId !== lastRestaurantIdRef.current) {
+          lastRestaurantIdRef.current = newId
+
+          // Dừng audio cũ
+          if (audioRef.current) {
+            audioRef.current.pause()
+            audioRef.current = null
+            setIsAudioPlaying(false)
+          }
+
+          // Kiểm tra khoảng cách
+          if (distance > POI_THRESHOLD) {
+            setCurrentNarration({
+              restaurantId: newId,
+              name: data.nearest_place.name,
+              narration: `🚶 Bạn hãy tới gần quán "${data.nearest_place.name}" để nghe thuyết minh`,
+              distance: distance,
+              audioUrl: null
+            })
+          } else {
+            setCurrentNarration({
+              restaurantId: newId,
               name: data.nearest_place.name,
               narration: data.narration,
-              distance: data.distance_km,
+              distance: distance,
               audioUrl: data.audio_url
             })
 
-            // Phát audio mới
+            // Phát audio tự động
             if (data.audio_url) {
-              const audio = new Audio(`${BASE_URL}${data.audio_url}`)
-              audioRef.current = audio
-              audio.play()
-              setIsAudioPlaying(true)
-
-              audio.onended = () => {
-                setIsAudioPlaying(false)
-              }
+              playAudio(`${BASE_URL}${data.audio_url}`)
             }
           }
-        })
-        .catch(err => {
-          console.error('Error fetching location:', err)
-        })
-    }, (error) => {
-      console.error('Geolocation error:', error)
-      alert('Không thể lấy vị trí GPS. Vui lòng bật GPS và cho phép truy cập.')
-    })
+        } else {
+          // Cập nhật khoảng cách
+          if (distance > POI_THRESHOLD && currentNarration?.audioUrl) {
+            // Ra khỏi POI
+            if (audioRef.current) {
+              audioRef.current.pause()
+              audioRef.current = null
+              setIsAudioPlaying(false)
+            }
+            setCurrentNarration(prev => ({
+              ...prev,
+              narration: `🚶 Bạn hãy tới gần quán "${data.nearest_place.name}" để nghe thuyết minh`,
+              distance: distance,
+              audioUrl: null
+            }))
+          } else if (distance <= POI_THRESHOLD && !currentNarration?.audioUrl) {
+            // Vào trong POI
+            setCurrentNarration({
+              restaurantId: newId,
+              name: data.nearest_place.name,
+              narration: data.narration,
+              distance: distance,
+              audioUrl: data.audio_url
+            })
+            if (data.audio_url) {
+              playAudio(`${BASE_URL}${data.audio_url}`)
+            }
+          } else {
+            setCurrentNarration(prev => ({ ...prev, distance: distance }))
+          }
+        }
+      })
+      .catch(err => console.error('Error fetching location:', err))
+  }
+
+  // Phát audio
+  const playAudio = (url) => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+    const audio = new Audio(url)
+    audioRef.current = audio
+    audio.play()
+    setIsAudioPlaying(true)
+    audio.onended = () => setIsAudioPlaying(false)
   }
 
   // Bắt đầu tracking
@@ -74,8 +203,18 @@ function LocationTracker() {
     }
 
     setIsTracking(true)
-    fetchAndUpdateLocation()
-    watchTimerRef.current = setInterval(fetchAndUpdateLocation, 5000)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        fetchAndUpdateLocation(pos)
+        watchTimerRef.current = setInterval(() => {
+          navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
+        }, 5000)
+      },
+      (error) => {
+        console.error('Geolocation error:', error)
+        alert('Không thể lấy vị trí GPS. Vui lòng bật GPS và cho phép truy cập.')
+      }
+    )
   }
 
   // Dừng tracking
@@ -85,33 +224,24 @@ function LocationTracker() {
       clearInterval(watchTimerRef.current)
       watchTimerRef.current = null
     }
-    lastRestaurantIdRef.current = null
-
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
-    }
-  }
-
-  // Toggle tracking
-  const handleToggleTracking = () => {
-    if (isTracking) {
-      stopTracking()
-    } else {
-      startTracking()
-    }
-  }
-
-  // Toggle audio play/pause
-  const handleToggleAudio = () => {
-    if (!audioRef.current) return
-
-    if (audioRef.current.paused) {
-      audioRef.current.play()
-      setIsAudioPlaying(true)
-    } else {
-      audioRef.current.pause()
       setIsAudioPlaying(false)
+    }
+  }
+
+  // Toggle audio
+  const handleToggleAudio = (audioUrl) => {
+    if (!audioUrl) return
+
+    if (isAudioPlaying && audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current = null
+      setIsAudioPlaying(false)
+    } else {
+      playAudio(audioUrl)
     }
   }
 
@@ -121,60 +251,245 @@ function LocationTracker() {
     setLanguage(newLang)
     localStorage.setItem('language', newLang)
 
-    // Dừng tracking và reset
-    if (isTracking) {
-      stopTracking()
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+      setIsAudioPlaying(false)
     }
-    setResult(null)
+
     lastRestaurantIdRef.current = null
+    if (isTracking && userLocation) {
+      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } })
+    }
   }
 
-  // Auto start khi load trang
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      startTracking()
-    }, 500)
+  // Xử lý click vào marker quán
+  const handleRestaurantClick = (restaurant) => {
+    if (userLocation) {
+      const distance = calculateDistance(
+        userLocation[0], userLocation[1],
+        restaurant.lat, restaurant.lng
+      )
+      
+      fetch(`${BASE_URL}/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: restaurant.lat,
+          longitude: restaurant.lng,
+          language: language
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setSelectedRestaurant({
+            ...restaurant,
+            narration: data.narration,
+            audioUrl: data.audio_url,
+            distance: distance
+          })
+        })
+        .catch(err => console.error('Error:', err))
+    }
+  }
 
+  // Mở Google Maps directions
+  const openDirections = (restaurant) => {
+    if (userLocation) {
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation[0]},${userLocation[1]}&destination=${restaurant.lat},${restaurant.lng}`
+      window.open(url, '_blank')
+    }
+  }
+
+  // Auto start
+  useEffect(() => {
+    const timer = setTimeout(startTracking, 500)
     return () => {
       clearTimeout(timer)
-      if (watchTimerRef.current) {
-        clearInterval(watchTimerRef.current)
-      }
-      if (audioRef.current) {
-        audioRef.current.pause()
-      }
+      if (watchTimerRef.current) clearInterval(watchTimerRef.current)
+      if (audioRef.current) audioRef.current.pause()
     }
   }, [])
 
+  const mapCenter = userLocation || [10.762622, 106.660172] // Default: Saigon
+
   return (
-    <div className="container">
-      <h1>🍜 Food Street PoC</h1>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '15px', background: '#fff', borderBottom: '2px solid #ddd', zIndex: 1000 }}>
+        <h1 style={{ margin: 0, fontSize: '24px' }}>🍜 Food Street PoC</h1>
+      </div>
 
-      <button onClick={handleToggleTracking} type="button">
-        {isTracking ? '⏹ Đang theo dõi... (bấm để dừng)' : '▶️ Bắt đầu theo dõi'}
-      </button>
+      {/* Leaflet Map */}
+      <div style={{ flex: 1, position: 'relative' }}>
+        <MapContainer
+          center={mapCenter}
+          zoom={16}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={true}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          
+          <MapUpdater center={userLocation} />
 
-      <select value={language} onChange={handleLanguageChange}>
-        {LANGUAGES.map(lang => (
-          <option key={lang.code} value={lang.code}>
-            {lang.label}
-          </option>
-        ))}
-      </select>
-
-      {result && (
-        <div>
-          <h2>{result.name}</h2>
-          <p>{result.narration}</p>
-          {result.audioUrl && (
-            <button onClick={handleToggleAudio} type="button">
-              {isAudioPlaying ? '⏸' : '🔊'}
-            </button>
+          {/* Marker vị trí user */}
+          {userLocation && (
+            <Marker position={userLocation} icon={userIcon}>
+              <Popup>
+                <strong>📍 Vị trí của bạn</strong>
+              </Popup>
+            </Marker>
           )}
-          <br />
-          <small>Khoảng cách: {result.distance} km</small>
+
+          {/* Marker các quán */}
+          {restaurants.map(restaurant => (
+            <Marker
+              key={restaurant.id}
+              position={[restaurant.lat, restaurant.lng]}
+              icon={currentNarration?.restaurantId === restaurant.id ? activeRestaurantIcon : restaurantIcon}
+              eventHandlers={{
+                click: () => handleRestaurantClick(restaurant)
+              }}
+            >
+              <Popup maxWidth={300}>
+                <div style={{ padding: '5px' }}>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                  {restaurant.description && (
+                    <p style={{ margin: '5px 0', fontSize: '13px' }}>{restaurant.description}</p>
+                  )}
+                  {selectedRestaurant?.id === restaurant.id && (
+                    <>
+                      {selectedRestaurant.distance !== undefined && (
+                        <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
+                          📍 Khoảng cách: {selectedRestaurant.distance.toFixed(3)} km
+                        </p>
+                      )}
+                      {selectedRestaurant.narration && (
+                        <p style={{ margin: '10px 0', fontSize: '13px', fontStyle: 'italic' }}>
+                          {selectedRestaurant.narration}
+                        </p>
+                      )}
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                        {selectedRestaurant.audioUrl && (
+                          <button 
+                            onClick={() => handleToggleAudio(`${BASE_URL}${selectedRestaurant.audioUrl}`)}
+                            style={{
+                              padding: '8px 12px',
+                              background: '#4285F4',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '5px',
+                              cursor: 'pointer',
+                              fontSize: '14px'
+                            }}
+                          >
+                            {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openDirections(selectedRestaurant)}
+                          style={{
+                            padding: '8px 12px',
+                            background: '#34A853',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                          }}
+                        >
+                          🧭 Chỉ đường
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+
+      {/* Control Panel - Bottom */}
+      <div style={{ 
+        padding: '20px', 
+        background: '#fff', 
+        borderTop: '2px solid #ddd',
+        boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
+        zIndex: 1000
+      }}>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => isTracking ? stopTracking() : startTracking()}
+            style={{
+              flex: '1',
+              padding: '12px 20px',
+              background: isTracking ? '#EA4335' : '#34A853',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            {isTracking ? '⏹ Dừng theo dõi' : '▶️ Bắt đầu theo dõi'}
+          </button>
+
+          <select 
+            value={language} 
+            onChange={handleLanguageChange}
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              border: '2px solid #ddd',
+              fontSize: '14px',
+              cursor: 'pointer'
+            }}
+          >
+            {LANGUAGES.map(lang => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
+          </select>
         </div>
-      )}
+
+        {/* Thông tin quán hiện tại */}
+        {currentNarration && (
+          <div style={{ 
+            padding: '15px', 
+            background: '#f8f9fa', 
+            borderRadius: '8px',
+            border: '1px solid #ddd'
+          }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>{currentNarration.name}</h3>
+            <p style={{ margin: '8px 0', fontSize: '14px' }}>{currentNarration.narration}</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+              <span style={{ fontSize: '13px', color: '#666' }}>
+                📍 {currentNarration.distance.toFixed(3)} km
+              </span>
+              {currentNarration.audioUrl && (
+                <button
+                  onClick={() => handleToggleAudio(`${BASE_URL}${currentNarration.audioUrl}`)}
+                  style={{
+                    padding: '8px 16px',
+                    background: isAudioPlaying ? '#EA4335' : '#4285F4',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe thuyết minh'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
