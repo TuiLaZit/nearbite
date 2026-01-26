@@ -12,7 +12,7 @@ def register_admin_routes(app):
 
     @app.route("/admin/restaurants", methods=["GET"])
     @admin_required
-    def get_restaurants():
+    def get_restaurants_admin():
         return jsonify([
             r.to_dict() for r in Restaurant.query.filter_by(is_active=True).all()
         ])
