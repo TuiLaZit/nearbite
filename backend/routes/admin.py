@@ -3,6 +3,9 @@ from models import Restaurant, MenuItem, Tag, RestaurantImage, restaurant_tags
 from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
+from supabase_client import upload_image, delete_image, supabase_client
+import uuid
+from datetime import datetime
 
 def register_admin_routes(app):
 
@@ -414,4 +417,59 @@ def register_admin_routes(app):
         """Get complete restaurant details including menu, tags, and images"""
         restaurant = Restaurant.query.get_or_404(id)
         return jsonify(restaurant.to_dict(include_details=True))
+
+    # ======================
+    # IMAGE UPLOAD
+    # ======================
+
+    @app.route("/admin/upload-image", methods=["POST"])
+    @admin_required
+    def upload_restaurant_image_file():
+        """Upload image file to Supabase Storage and return URL"""
+        if not supabase_client:
+            return jsonify({
+                "error": "Image upload is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env"
+            }), 500
+        
+        # Check if file is present
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Check file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        if file_ext not in allowed_extensions:
+            return jsonify({
+                "error": f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
+            }), 400
+        
+        try:
+            # Generate unique filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            unique_id = str(uuid.uuid4())[:8]
+            filename = f"{timestamp}_{unique_id}.{file_ext}"
+            
+            # Read file bytes
+            file_bytes = file.read()
+            
+            # Upload to Supabase
+            public_url = upload_image(file_bytes, filename)
+            
+            return jsonify({
+                "status": "success",
+                "url": public_url,
+                "filename": filename
+            })
+        
+        except Exception as e:
+            return jsonify({
+                "error": f"Failed to upload image: {str(e)}"
+            }), 500
+
 

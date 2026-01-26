@@ -4,3 +4,5 @@ flask-sqlalchemy
 gtts
 deep-translator
 psycopg2-binary
+supabase
+python-dotenv
