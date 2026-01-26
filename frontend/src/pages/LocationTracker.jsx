@@ -406,11 +406,9 @@ function LocationTracker() {
     }
   }
 
-  // Auto start
+  // Cleanup khi component unmount
   useEffect(() => {
-    const timer = setTimeout(startTracking, 500)
     return () => {
-      clearTimeout(timer)
       if (watchTimerRef.current) clearInterval(watchTimerRef.current)
       if (audioRef.current) {
         audioRef.current.pause()
