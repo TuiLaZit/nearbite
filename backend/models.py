@@ -13,6 +13,7 @@ class Restaurant(db.Model):
     name = db.Column(db.String(100), nullable=False)
     lat = db.Column(db.Float, nullable=False)
     lng = db.Column(db.Float, nullable=False)
+    address = db.Column(db.String(255))
     description = db.Column(db.Text)
     avg_eat_time = db.Column(db.Integer)
     is_active = db.Column(db.Boolean, default=True)
@@ -45,6 +46,7 @@ class Restaurant(db.Model):
             "name": self.name,
             "lat": self.lat,
             "lng": self.lng,
+            "address": self.address,
             "description": self.description,
             "avg_eat_time": self.avg_eat_time,
             "is_active": self.is_active

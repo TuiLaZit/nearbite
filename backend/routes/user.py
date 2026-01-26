@@ -84,67 +84,69 @@ def register_user_routes(app):
         
         Trả về 3 tour hợp lý
         """
-        data = request.get_json()
-        time_limit = data.get("time_limit", 120)  # Default 2 giờ
-        budget = data.get("budget", 500000)  # Default 500k
-        selected_tag_ids = data.get("tags", [])  # List of tag IDs
-        user_lat = data.get("user_lat")
-        user_lng = data.get("user_lng")
-        
-        # Bước 1: Lọc quán (Filter)
-        query = Restaurant.query.filter_by(is_active=True)
-        
-        if selected_tag_ids:
-            # Lọc quán có ít nhất 1 tag trong danh sách
-            query = query.filter(
-                Restaurant.tags.any(Tag.id.in_(selected_tag_ids))
-            )
-        
-        restaurants = query.all()
-        
-        if not restaurants:
-            return jsonify({
-                "status": "error",
-                "message": "Không tìm thấy quán phù hợp với tiêu chí"
-            })
-        
-        # Bước 2: Gán điểm cho từng quán (Scoring)
-        scored_restaurants = []
-        for restaurant in restaurants:
-            score = 0
+        try:
+            data = request.get_json()
+            time_limit = data.get("time_limit", 120)  # Default 2 giờ
+            budget = data.get("budget", 500000)  # Default 500k
+            selected_tag_ids = data.get("tags", [])  # List of tag IDs
+            user_lat = data.get("user_lat")
+            user_lng = data.get("user_lng")
             
-            # Match preference: số lượng tags khớp
-            matching_tags = len([tag for tag in restaurant.tags if tag.id in selected_tag_ids])
-            score += matching_tags * 10
+            # Bước 1: Lọc quán (Filter)
+            query = Restaurant.query.filter_by(is_active=True)
             
-            # Price fit: ưu tiên quán rẻ hơn (giả sử avg price từ menu)
-            avg_price = db.session.query(
-                db.func.avg(db.text('price'))
-            ).select_from(db.text('menu_item')).filter(
-                db.text('restaurant_id = :rid')
-            ).params(rid=restaurant.id).scalar() or 50000
+            if selected_tag_ids:
+                # Lọc quán có ít nhất 1 tag trong danh sách
+                query = query.filter(
+                    Restaurant.tags.any(Tag.id.in_(selected_tag_ids))
+                )
             
-            if avg_price < budget / 3:
-                score += 5
-            elif avg_price < budget / 2:
-                score += 3
+            restaurants = query.all()
             
-            # Time fit: ưu tiên quán gần (tính khoảng cách nếu có vị trí user)
-            if user_lat and user_lng:
-                distance = calculate_distance(user_lat, user_lng, restaurant.lat, restaurant.lng)
-                if distance < 0.5:  # < 500m
-                    score += 8
-                elif distance < 1:  # < 1km
+            if not restaurants:
+                return jsonify({
+                    "status": "error",
+                    "message": "Không tìm thấy quán phù hợp với tiêu chí"
+                })
+            
+            # Bước 2: Gán điểm cho từng quán (Scoring)
+            scored_restaurants = []
+            for restaurant in restaurants:
+                score = 0
+                
+                # Match preference: số lượng tags khớp
+                matching_tags = len([tag for tag in restaurant.tags if tag.id in selected_tag_ids])
+                score += matching_tags * 10
+                
+                # Price fit: ưu tiên quán rẻ hơn (tính avg price từ menu)
+                from models import MenuItem
+                menu_items = MenuItem.query.filter_by(restaurant_id=restaurant.id).all()
+                if menu_items:
+                    avg_price = sum(item.price for item in menu_items) / len(menu_items)
+                else:
+                    avg_price = 50000  # Default nếu không có menu
+                
+                if avg_price < budget / 3:
                     score += 5
-                elif distance < 2:  # < 2km
-                    score += 2
-            
-            scored_restaurants.append({
-                "restaurant": restaurant,
-                "score": score,
-                "avg_price": avg_price,
-                "matching_tags": matching_tags
-            })
+                elif avg_price < budget / 2:
+                    score += 3
+                
+                # Time fit: ưu tiên quán gần (tính khoảng cách nếu có vị trí user)
+                if user_lat and user_lng:
+                    distance = calculate_distance(user_lat, user_lng, restaurant.lat, restaurant.lng)
+                    if distance < 0.5:  # < 500m
+                        score += 8
+                    elif distance < 1:  # < 1km
+                        score += 5
+                    elif distance < 2:  # < 2km
+                        score += 2
+                
+                scored_restaurants.append({
+                    "restaurant": restaurant,
+                    "score": score,
+                    "avg_price": avg_price,
+                    "matching_tags": matching_tags
+                })
         
         # Bước 3: Sắp xếp theo điểm (Sort)
         scored_restaurants.sort(key=lambda x: x["score"], reverse=True)
@@ -201,6 +203,15 @@ def register_user_routes(app):
             "tours": tours[:3],
             "total_restaurants": len(restaurants)
         })
+        
+        except Exception as e:
+            print(f"Error in plan_tour: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
 
 
 def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score"):

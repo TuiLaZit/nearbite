@@ -458,7 +458,16 @@ function LocationTracker() {
         gap: '15px'
       }}>
         {/* Logo */}
-        <div style={{ fontSize: '32px' }}>🍜</div>
+        <div style={{ 
+          fontSize: '28px', 
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: '#EA4335'
+        }}>
+          🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
+        </div>
         
         {/* Navigation buttons */}
         <div style={{ display: 'flex', gap: '10px', flex: 1 }}>
