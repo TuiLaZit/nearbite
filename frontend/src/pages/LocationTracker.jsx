@@ -78,6 +78,7 @@ function LocationTracker() {
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
   const lastRestaurantIdRef = useRef(null)
+  const lastDistanceRef = useRef(null) // Track khoảng cách để tránh update liên tục
   const languageRef = useRef(language) // Track current language
   const audioUnlockedRef = useRef(false) // Track nếu audio đã được unlock
   
@@ -143,6 +144,7 @@ function LocationTracker() {
 
         if (newId !== lastRestaurantIdRef.current) {
           lastRestaurantIdRef.current = newId
+          lastDistanceRef.current = distance // Reset distance tracking
 
           // Dừng audio cũ hoàn toàn
           stopAudio()
@@ -176,9 +178,13 @@ function LocationTracker() {
           }
         } else {
           // Cập nhật khoảng cách khi vẫn ở cùng quán
+          const lastDistance = lastDistanceRef.current
+          const distanceChanged = lastDistance === null || Math.abs(distance - lastDistance) > 0.005 // Chỉ update khi thay đổi > 5m
+          
           if (distance > POI_THRESHOLD && currentNarration?.audioUrl) {
             // Ra khỏi POI - dừng audio hoàn toàn
             stopAudio()
+            lastDistanceRef.current = distance
             setCurrentNarration(prev => ({
               ...prev,
               narration: data.out_of_range_message,
@@ -187,6 +193,7 @@ function LocationTracker() {
             }))
           } else if (distance <= POI_THRESHOLD && !currentNarration?.audioUrl) {
             // Vào trong POI
+            lastDistanceRef.current = distance
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
@@ -199,10 +206,12 @@ function LocationTracker() {
             if (data.audio_url && !isAudioPlaying) {
               playAudio(`${BASE_URL}${data.audio_url}`)
             }
-          } else {
-            // Chỉ cập nhật khoảng cách, KHÔNG động vào audio
+          } else if (distanceChanged) {
+            // Chỉ cập nhật khoảng cách nếu thay đổi đáng kể, KHÔNG động vào audio
+            lastDistanceRef.current = distance
             setCurrentNarration(prev => prev ? { ...prev, distance: distance } : prev)
           }
+          // Nếu distance không thay đổi đáng kể, không làm gì cả - tránh re-render
         }
       })
       .catch(err => console.error('Error fetching location:', err))
