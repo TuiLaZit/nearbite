@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { BASE_URL, LANGUAGES } from '../config'
@@ -61,6 +62,7 @@ function MapUpdater({ center }) {
 }
 
 function LocationTracker() {
+  const navigate = useNavigate()
   const [isTracking, setIsTracking] = useState(false)
   const [language, setLanguage] = useState(() => {
     const saved = localStorage.getItem('language')
@@ -446,15 +448,56 @@ function LocationTracker() {
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{ 
-        padding: '15px', 
+        padding: '10px 20px', 
         background: '#fff', 
         borderBottom: '2px solid #ddd', 
         zIndex: 1000,
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '15px'
       }}>
-        <h1 style={{ margin: 0, fontSize: '24px' }}>🍜 Food Street PoC</h1>
+        {/* Logo */}
+        <div style={{ fontSize: '32px' }}>🍜</div>
+        
+        {/* Navigation buttons */}
+        <div style={{ display: 'flex', gap: '10px', flex: 1 }}>
+          <button
+            onClick={() => isTracking ? stopTracking() : startTracking()}
+            style={{
+              padding: '10px 20px',
+              background: isTracking ? '#EA4335' : '#34A853',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+          >
+            {isTracking ? '⏸️ Dừng theo dõi' : '▶️ Theo dõi'}
+          </button>
+          
+          <button
+            onClick={() => navigate('/tour-planner')}
+            style={{
+              padding: '10px 20px',
+              background: '#ff9800',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+          >
+            🗺️ Xếp Tour
+          </button>
+        </div>
+        
+        {/* Language selector */}
         <select 
           value={language} 
           onChange={handleLanguageChange}
@@ -462,9 +505,10 @@ function LocationTracker() {
             padding: '10px 15px',
             borderRadius: '8px',
             border: '2px solid #ddd',
-            fontSize: '14px',
+            fontSize: '13px',
             cursor: 'pointer',
-            background: 'white'
+            background: 'white',
+            minWidth: '100px'
           }}
         >
           {LANGUAGES.map(lang => (
