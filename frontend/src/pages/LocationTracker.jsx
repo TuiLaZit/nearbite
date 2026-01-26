@@ -96,7 +96,8 @@ function LocationTracker() {
   }
 
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
-  const fetchAndUpdateLocation = (pos) => {
+  const fetchAndUpdateLocation = (pos, lang = null) => {
+    const currentLang = lang || language
     const userLat = pos.coords.latitude
     const userLng = pos.coords.longitude
     setUserLocation([userLat, userLng])
@@ -107,7 +108,7 @@ function LocationTracker() {
       body: JSON.stringify({
         latitude: userLat,
         longitude: userLng,
-        language: language
+        language: currentLang
       })
     })
       .then(res => res.json())
@@ -261,9 +262,10 @@ function LocationTracker() {
     // Reset selectedRestaurant để đóng popup cũ
     setSelectedRestaurant(null)
 
+    // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
     if (isTracking && userLocation) {
-      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } })
+      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
     }
   }
 
@@ -327,6 +329,14 @@ function LocationTracker() {
       if (audioRef.current) audioRef.current.pause()
     }
   }, [])
+
+  // Tự động fetch lại khi language thay đổi và đang tracking
+  useEffect(() => {
+    if (isTracking && userLocation) {
+      lastRestaurantIdRef.current = null
+      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, language)
+    }
+  }, [language])
 
   const mapCenter = userLocation || [10.762622, 106.660172] // Default: Saigon
 
