@@ -496,7 +496,11 @@ function LocationTracker() {
         
         {/* Xếp Tour button */}
         <button
-          onClick={() => navigate('/tour-planner')}
+          onClick={() => {
+            console.log('Current language:', language)
+            console.log('planTour translation:', t('planTour'))
+            navigate('/tour-planner')
+          }}
           style={{
             padding: '10px 20px',
             background: '#ff9800',
