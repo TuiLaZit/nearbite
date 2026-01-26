@@ -92,8 +92,6 @@ def register_user_routes(app):
                     translations[text] = text  # Fallback
                     
             print(f"Translation completed: {len(translations)}/{len(texts)} texts")
-                else:
-                    translations[text] = text  # Fallback
         except Exception as e:
             print(f"Batch translation error: {e}")
             import traceback
