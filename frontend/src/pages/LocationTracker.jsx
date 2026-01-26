@@ -144,12 +144,8 @@ function LocationTracker() {
         if (newId !== lastRestaurantIdRef.current) {
           lastRestaurantIdRef.current = newId
 
-          // Dừng audio cũ
-          if (audioRef.current) {
-            audioRef.current.pause()
-            audioRef.current = null
-            setIsAudioPlaying(false)
-          }
+          // Dừng audio cũ hoàn toàn
+          stopAudio()
 
           // Kiểm tra khoảng cách
           if (distance > POI_THRESHOLD) {
@@ -177,17 +173,8 @@ function LocationTracker() {
         } else {
           // Cập nhật khoảng cách khi vẫn ở cùng quán
           if (distance > POI_THRESHOLD && currentNarration?.audioUrl) {
-            // Ra khỏi POI - chỉ dừng audio nếu đang phát
-            if (audioRef.current && isAudioPlaying) {
-              audioRef.current.pause()
-              audioRef.current.currentTime = 0
-              audioRef.current.src = ''
-              audioRef.current.load()
-              audioRef.current = null
-              setIsAudioPlaying(false)
-              setAudioBlocked(false)
-              setPendingAudioUrl(null)
-            }
+            // Ra khỏi POI - dừng audio hoàn toàn
+            stopAudio()
             setCurrentNarration(prev => ({
               ...prev,
               narration: data.out_of_range_message,
@@ -213,6 +200,20 @@ function LocationTracker() {
         }
       })
       .catch(err => console.error('Error fetching location:', err))
+  }
+
+  // Dừng audio hoàn toàn
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current.src = ''
+      audioRef.current.load()
+      audioRef.current = null
+    }
+    setIsAudioPlaying(false)
+    setAudioBlocked(false)
+    setPendingAudioUrl(null)
   }
 
   // Phát audio
@@ -305,16 +306,7 @@ function LocationTracker() {
       clearInterval(watchTimerRef.current)
       watchTimerRef.current = null
     }
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current.src = ''
-      audioRef.current.load()
-      audioRef.current = null
-    }
-    setIsAudioPlaying(false)
-    setAudioBlocked(false)
-    setPendingAudioUrl(null)
+    stopAudio()
   }
 
   // Toggle audio
@@ -322,11 +314,25 @@ function LocationTracker() {
     if (!audioUrl) return
 
     if (isAudioPlaying && audioRef.current) {
+      // Chỉ pause, KHÔNG xóa src
       audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current = null
       setIsAudioPlaying(false)
+    } else if (audioRef.current && audioRef.current.src && !isAudioPlaying) {
+      // Nếu đã có audio từ trước, chỉ cần play lại
+      audioRef.current.play()
+        .then(() => {
+          setIsAudioPlaying(true)
+          setAudioBlocked(false)
+        })
+        .catch(err => {
+          console.error('Error resuming audio:', err)
+          if (err.name === 'NotAllowedError') {
+            setAudioBlocked(true)
+            setPendingAudioUrl(audioUrl)
+          }
+        })
     } else {
+      // Tạo audio mới
       playAudio(audioUrl)
     }
   }
@@ -343,16 +349,7 @@ function LocationTracker() {
     languageRef.current = newLang // Update ref ngay lập tức
 
     // Dừng audio và reset hoàn toàn
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current.src = '' // Clear audio source
-      audioRef.current.load() // Force unload
-      audioRef.current = null
-    }
-    setIsAudioPlaying(false)
-    setAudioBlocked(false)
-    setPendingAudioUrl(null)
+    stopAudio()
     
     // Reset selectedRestaurant để đóng popup cũ
     setSelectedRestaurant(null)
@@ -376,16 +373,7 @@ function LocationTracker() {
     setSelectedRestaurant(null)
     
     // Dừng audio cũ nếu đang phát
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current.src = ''
-      audioRef.current.load()
-      audioRef.current = null
-    }
-    setIsAudioPlaying(false)
-    setAudioBlocked(false)
-    setPendingAudioUrl(null)
+    stopAudio()
 
     if (userLocation) {
       const distance = calculateDistance(
