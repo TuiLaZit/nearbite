@@ -95,9 +95,8 @@ function TourPlanner() {
       let currentLocation = userLocation
       try {
         currentLocation = await getUserLocation()
-        console.log('✅ Đã lấy vị trí GPS:', currentLocation)
       } catch (locError) {
-        console.warn('⚠️ Không lấy được GPS, dùng vị trí cũ (nếu có)')
+        // Không lấy được GPS, dùng vị trí cũ (nếu có)
       }
 
       const response = await fetch(`${BASE_URL}/plan-tour`, {
