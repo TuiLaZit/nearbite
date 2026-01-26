@@ -121,6 +121,9 @@ function LocationTracker() {
     const userLng = pos.coords.longitude
     setUserLocation([userLat, userLng])
 
+    console.log('Fetching location with language:', currentLang)
+    console.log('BASE_URL:', BASE_URL)
+
     fetch(`${BASE_URL}/location`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -130,8 +133,15 @@ function LocationTracker() {
         language: currentLang
       })
     })
-      .then(res => res.json())
+      .then(res => {
+        console.log('Response status:', res.status)
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`)
+        }
+        return res.json()
+      })
       .then(data => {
+        console.log('Received data:', data)
         const newId = data.nearest_place.id
         const distance = data.distance_km
 
@@ -205,6 +215,7 @@ function LocationTracker() {
 
   // Phát audio
   const playAudio = (url) => {
+    console.log('Attempting to play audio:', url)
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.src = '' // Clear old source
@@ -212,13 +223,36 @@ function LocationTracker() {
     }
     // Thêm timestamp để tránh cache browser
     const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
+    console.log('Final audio URL:', audioUrl)
+    
     const audio = new Audio(audioUrl)
+    audio.crossOrigin = "anonymous" // Cho phép CORS
     audioRef.current = audio
-    setIsAudioPlaying(true)
-    audio.play().catch(err => {
-      console.error('Error playing audio:', err)
+    
+    // Sự kiện load thành công
+    audio.onloadeddata = () => {
+      console.log('Audio loaded successfully')
+    }
+    
+    audio.onerror = (e) => {
+      console.error('Audio error:', e)
+      console.error('Audio error details:', audio.error)
       setIsAudioPlaying(false)
-    })
+    }
+    
+    setIsAudioPlaying(true)
+    audio.play()
+      .then(() => {
+        console.log('Audio playing')
+      })
+      .catch(err => {
+        console.error('Error playing audio:', err)
+        setIsAudioPlaying(false)
+        // Nếu lỗi autoplay, chờ user tương tác
+        if (err.name === 'NotAllowedError') {
+          console.warn('Autoplay blocked. User interaction required.')
+        }
+      })
     audio.onended = () => setIsAudioPlaying(false)
     audio.onerror = () => setIsAudioPlaying(false)
   }
@@ -276,7 +310,10 @@ function LocationTracker() {
   // Xử lý thay đổi ngôn ngữ
   const handleLanguageChange = (e) => {
     const newLang = e.target.value
-    console.log('Changing language to:', newLang)
+    console.log('===== CHANGING LANGUAGE =====')
+    console.log('From:', language, 'To:', newLang)
+    console.log('isTracking:', isTracking)
+    console.log('userLocation:', userLocation)
     
     // Lưu vào localStorage TRƯỚC khi setState
     localStorage.setItem('language', newLang)
