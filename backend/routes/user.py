@@ -132,20 +132,22 @@ def register_user_routes(app):
                     score += 3
                 
                 # Time fit: ưu tiên quán gần (tính khoảng cách nếu có vị trí user)
+                distance_from_user = None
                 if user_lat and user_lng:
-                    distance = calculate_distance(user_lat, user_lng, restaurant.lat, restaurant.lng)
-                    if distance < 0.5:  # < 500m
+                    distance_from_user = calculate_distance(user_lat, user_lng, restaurant.lat, restaurant.lng)
+                    if distance_from_user < 0.5:  # < 500m
                         score += 8
-                    elif distance < 1:  # < 1km
+                    elif distance_from_user < 1:  # < 1km
                         score += 5
-                    elif distance < 2:  # < 2km
+                    elif distance_from_user < 2:  # < 2km
                         score += 2
                 
                 scored_restaurants.append({
                     "restaurant": restaurant,
                     "score": score,
                     "avg_price": avg_price,
-                    "matching_tags": matching_tags
+                    "matching_tags": matching_tags,
+                    "distance_from_user": distance_from_user  # Lưu khoảng cách để dùng sau
                 })
             
             # Bước 3: Sắp xếp theo điểm (Sort)
@@ -166,10 +168,10 @@ def register_user_routes(app):
             
             # Tour 2: Ưu tiên quán gần nhất (nếu có vị trí)
             if user_lat and user_lng:
-                # Sắp xếp lại theo khoảng cách
+                # Sắp xếp lại theo khoảng cách, ưu tiên quán gần user
                 sorted_by_distance = sorted(
                     scored_restaurants,
-                    key=lambda x: calculate_distance(user_lat, user_lng, x["restaurant"].lat, x["restaurant"].lng)
+                    key=lambda x: x["distance_from_user"] if x["distance_from_user"] is not None else float('inf')
                 )
                 tour2 = build_greedy_tour(
                     sorted_by_distance,
@@ -241,7 +243,6 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
             tour.append({
                 "id": restaurant.id,
                 "name": restaurant.name,
-                "address": restaurant.address,
                 "lat": restaurant.lat,
                 "lng": restaurant.lng,
                 "avg_price": round(avg_price),
