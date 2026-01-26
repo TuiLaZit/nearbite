@@ -7,6 +7,15 @@ from tts import text_to_speech
 
 def register_user_routes(app):
 
+    @app.route("/restaurants", methods=["GET"])
+    def get_restaurants():
+        """Lấy danh sách tất cả quán đang active"""
+        restaurants = Restaurant.query.filter_by(is_active=True).all()
+        return jsonify({
+            "status": "success",
+            "restaurants": [r.to_dict() for r in restaurants]
+        })
+
     @app.route("/location", methods=["POST"])
     def receive_location():
         if request.method == "OPTIONS":
