@@ -188,12 +188,18 @@ function LocationTracker() {
   const playAudio = (url) => {
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.src = '' // Clear old source
+      audioRef.current = null
     }
     const audio = new Audio(url)
     audioRef.current = audio
-    audio.play()
     setIsAudioPlaying(true)
+    audio.play().catch(err => {
+      console.error('Error playing audio:', err)
+      setIsAudioPlaying(false)
+    })
     audio.onended = () => setIsAudioPlaying(false)
+    audio.onerror = () => setIsAudioPlaying(false)
   }
 
   // Bắt đầu tracking
@@ -252,15 +258,19 @@ function LocationTracker() {
     setLanguage(newLang)
     localStorage.setItem('language', newLang)
 
-    // Dừng audio và reset
+    // Dừng audio và reset hoàn toàn
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.src = '' // Clear audio source
       audioRef.current = null
       setIsAudioPlaying(false)
     }
     
     // Reset selectedRestaurant để đóng popup cũ
     setSelectedRestaurant(null)
+    
+    // Reset currentNarration hoàn toàn
+    setCurrentNarration(null)
 
     // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
@@ -326,17 +336,12 @@ function LocationTracker() {
     return () => {
       clearTimeout(timer)
       if (watchTimerRef.current) clearInterval(watchTimerRef.current)
-      if (audioRef.current) audioRef.current.pause()
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
     }
   }, [])
-
-  // Tự động fetch lại khi language thay đổi và đang tracking
-  useEffect(() => {
-    if (isTracking && userLocation) {
-      lastRestaurantIdRef.current = null
-      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, language)
-    }
-  }, [language])
 
   const mapCenter = userLocation || [10.762622, 106.660172] // Default: Saigon
 
