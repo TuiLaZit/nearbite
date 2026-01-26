@@ -223,7 +223,7 @@ function TourPlanner() {
               min="30"
               max="480"
             />
-            <small style={{ color: '#666' }}>Từ 30 phút đến 8 giờ</small>
+            <small style={{ color: '#666' }}>{t('timeRangeHint')}</small>
           </div>
 
           {/* Ngân sách */}

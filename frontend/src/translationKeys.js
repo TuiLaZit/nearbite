@@ -68,7 +68,10 @@ export const TRANSLATION_KEYS = {
   vnd: 'đ',
   minutes: 'phút',
   minute: 'phút',
-  meter: 'm'
+  meter: 'm',
+  
+  // Time hints
+  timeRangeHint: 'Từ 30 phút đến 8 giờ'
 }
 
 // Helper để lấy tất cả values cần dịch
