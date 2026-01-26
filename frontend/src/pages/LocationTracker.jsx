@@ -175,13 +175,18 @@ function LocationTracker() {
             }
           }
         } else {
-          // Cập nhật khoảng cách
+          // Cập nhật khoảng cách khi vẫn ở cùng quán
           if (distance > POI_THRESHOLD && currentNarration?.audioUrl) {
-            // Ra khỏi POI
-            if (audioRef.current) {
+            // Ra khỏi POI - chỉ dừng audio nếu đang phát
+            if (audioRef.current && isAudioPlaying) {
               audioRef.current.pause()
+              audioRef.current.currentTime = 0
+              audioRef.current.src = ''
+              audioRef.current.load()
               audioRef.current = null
               setIsAudioPlaying(false)
+              setAudioBlocked(false)
+              setPendingAudioUrl(null)
             }
             setCurrentNarration(prev => ({
               ...prev,
@@ -198,11 +203,12 @@ function LocationTracker() {
               distance: distance,
               audioUrl: data.audio_url
             })
-            if (data.audio_url) {
+            if (data.audio_url && !isAudioPlaying) {
               playAudio(`${BASE_URL}${data.audio_url}`)
             }
           } else {
-            setCurrentNarration(prev => ({ ...prev, distance: distance }))
+            // Chỉ cập nhật khoảng cách, KHÔNG động vào audio
+            setCurrentNarration(prev => prev ? { ...prev, distance: distance } : prev)
           }
         }
       })
