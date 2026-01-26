@@ -147,63 +147,63 @@ def register_user_routes(app):
                     "avg_price": avg_price,
                     "matching_tags": matching_tags
                 })
-        
-        # Bước 3: Sắp xếp theo điểm (Sort)
-        scored_restaurants.sort(key=lambda x: x["score"], reverse=True)
-        
-        # Bước 4: Build 3 tours khác nhau (Greedy)
-        tours = []
-        
-        # Tour 1: Ưu tiên điểm cao nhất
-        tour1 = build_greedy_tour(
-            scored_restaurants, 
-            time_limit, 
-            budget,
-            strategy="best_score"
-        )
-        if tour1:
-            tours.append(tour1)
-        
-        # Tour 2: Ưu tiên quán gần nhất (nếu có vị trí)
-        if user_lat and user_lng:
-            # Sắp xếp lại theo khoảng cách
-            sorted_by_distance = sorted(
-                scored_restaurants,
-                key=lambda x: calculate_distance(user_lat, user_lng, x["restaurant"].lat, x["restaurant"].lng)
+            
+            # Bước 3: Sắp xếp theo điểm (Sort)
+            scored_restaurants.sort(key=lambda x: x["score"], reverse=True)
+            
+            # Bước 4: Build 3 tours khác nhau (Greedy)
+            tours = []
+            
+            # Tour 1: Ưu tiên điểm cao nhất
+            tour1 = build_greedy_tour(
+                scored_restaurants, 
+                time_limit, 
+                budget,
+                strategy="best_score"
             )
-            tour2 = build_greedy_tour(
-                sorted_by_distance,
+            if tour1:
+                tours.append(tour1)
+            
+            # Tour 2: Ưu tiên quán gần nhất (nếu có vị trí)
+            if user_lat and user_lng:
+                # Sắp xếp lại theo khoảng cách
+                sorted_by_distance = sorted(
+                    scored_restaurants,
+                    key=lambda x: calculate_distance(user_lat, user_lng, x["restaurant"].lat, x["restaurant"].lng)
+                )
+                tour2 = build_greedy_tour(
+                    sorted_by_distance,
+                    time_limit,
+                    budget,
+                    strategy="nearest"
+                )
+                if tour2 and tour2 != tour1:
+                    tours.append(tour2)
+            
+            # Tour 3: Ưu tiên giá rẻ nhất
+            sorted_by_price = sorted(
+                scored_restaurants,
+                key=lambda x: x["avg_price"]
+            )
+            tour3 = build_greedy_tour(
+                sorted_by_price,
                 time_limit,
                 budget,
-                strategy="nearest"
+                strategy="cheapest"
             )
-            if tour2 and tour2 != tour1:
-                tours.append(tour2)
-        
-        # Tour 3: Ưu tiên giá rẻ nhất
-        sorted_by_price = sorted(
-            scored_restaurants,
-            key=lambda x: x["avg_price"]
-        )
-        tour3 = build_greedy_tour(
-            sorted_by_price,
-            time_limit,
-            budget,
-            strategy="cheapest"
-        )
-        if tour3 and tour3 not in tours:
-            tours.append(tour3)
-        
-        # Đảm bảo trả về đúng 3 tours (nếu ít hơn thì lặp lại)
-        while len(tours) < 3 and tours:
-            tours.append(tours[0])
-        
-        return jsonify({
-            "status": "success",
-            "tours": tours[:3],
-            "total_restaurants": len(restaurants)
-        })
-        
+            if tour3 and tour3 not in tours:
+                tours.append(tour3)
+            
+            # Đảm bảo trả về đúng 3 tours (nếu ít hơn thì lặp lại)
+            while len(tours) < 3 and tours:
+                tours.append(tours[0])
+            
+            return jsonify({
+                "status": "success",
+                "tours": tours[:3],
+                "total_restaurants": len(restaurants)
+            })
+            
         except Exception as e:
             print(f"Error in plan_tour: {e}")
             import traceback
