@@ -192,7 +192,7 @@ function RestaurantDetails() {
       const data = {
         image_url: imageUrl,
         caption: imageFormData.caption,
-        display_order: parseInt(imageFormData.display_order),
+        display_order: editingImageId ? parseInt(imageFormData.display_order) : images.length, // Auto: số ảnh hiện tại
         is_primary: imageFormData.is_primary
       }
 
@@ -529,13 +529,6 @@ function RestaurantDetails() {
               value={imageFormData.caption}
               onChange={handleImageFormChange}
             />
-            <input
-              name="display_order"
-              placeholder="Thứ tự hiển thị (0, 1, 2...)"
-              value={imageFormData.display_order}
-              onChange={handleImageFormChange}
-              type="number"
-            />
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
               <input
                 name="is_primary"
@@ -604,9 +597,6 @@ function RestaurantDetails() {
                       {image.caption}
                     </p>
                   )}
-                  <div style={{ fontSize: '12px', color: '#999', marginBottom: '10px' }}>
-                    Thứ tự: {image.display_order}
-                  </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => handleEditImage(image)} style={{ flex: 1, fontSize: '14px' }}>
                       ✏️ Sửa
