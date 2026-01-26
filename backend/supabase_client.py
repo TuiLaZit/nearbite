@@ -7,11 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def extract_supabase_url_from_database_url(database_url):
-    """
-    Tự động lấy SUPABASE_URL từ DATABASE_URL
-    VD: postgresql://postgres.frukwijesoibjwexwalm:pass@aws-1-ap-south-1.pooler.supabase.com:6543/postgres
-    → https://frukwijesoibjwexwalm.supabase.co
-    """
     if not database_url:
         return None
     
@@ -47,6 +42,25 @@ if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
         print("✅ Supabase Storage đã sẵn sàng - có thể upload ảnh")
+        
+        # Tự động tạo bucket nếu chưa có
+        try:
+            buckets = supabase_client.storage.list_buckets()
+            bucket_names = [b['name'] for b in buckets]
+            
+            if 'restaurant-images' not in bucket_names:
+                print("📦 Bucket 'restaurant-images' chưa tồn tại, đang tạo...")
+                supabase_client.storage.create_bucket(
+                    'restaurant-images',
+                    options={'public': True}
+                )
+                print("✅ Đã tạo bucket 'restaurant-images' thành công")
+            else:
+                print("✅ Bucket 'restaurant-images' đã tồn tại")
+        except Exception as bucket_error:
+            print(f"⚠️  Không thể kiểm tra/tạo bucket: {bucket_error}")
+            print("   Bucket có thể đã tồn tại hoặc cần tạo thủ công")
+            
     except Exception as e:
         print(f"❌ Lỗi khi kết nối Supabase Storage: {e}")
 else:
