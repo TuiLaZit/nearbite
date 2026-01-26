@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
 
 // Custom icons
 const userIcon = new L.Icon({
-  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+  iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="8" fill="#4285F4" stroke="white" stroke-width="3"/>
     </svg>
@@ -26,7 +26,7 @@ const userIcon = new L.Icon({
 })
 
 const restaurantIcon = new L.Icon({
-  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+  iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
       <circle cx="16" cy="16" r="14" fill="#FBBC04" stroke="white" stroke-width="2"/>
       <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">🍜</text>
@@ -38,7 +38,7 @@ const restaurantIcon = new L.Icon({
 })
 
 const activeRestaurantIcon = new L.Icon({
-  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+  iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
       <circle cx="16" cy="16" r="14" fill="#EA4335" stroke="white" stroke-width="2"/>
       <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">🍜</text>
