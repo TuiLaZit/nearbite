@@ -36,9 +36,27 @@ def register_user_routes(app):
         
         # Batch dịch - gộp tất cả texts vào một string, dịch 1 lần
         try:
-            # Nối texts bằng separator đặc biệt (dùng ký tự Unicode không dịch được)
-            separator = " ███ "  # Block characters
-            combined_text = separator.join(texts)
+            # Bảo vệ placeholders {variable} trước khi dịch
+            import re
+            placeholder_pattern = re.compile(r'\{([^}]+)\}')
+            
+            # Lưu mapping placeholders
+            placeholder_map = {}
+            protected_texts = []
+            
+            for text in texts:
+                # Thay thế {placeholder} bằng __PHXX__ (XX là index)
+                def replace_placeholder(match):
+                    placeholder_id = f"__PH{len(placeholder_map)}__"
+                    placeholder_map[placeholder_id] = match.group(0)  # Lưu {count}, {variable}...
+                    return placeholder_id
+                
+                protected_text = placeholder_pattern.sub(replace_placeholder, text)
+                protected_texts.append(protected_text)
+            
+            # Nối texts bằng separator (dùng newline + marker)
+            separator = "\n■■■\n"
+            combined_text = separator.join(protected_texts)
             
             # Dịch 1 lần duy nhất
             translated_combined = translate_text(combined_text, target_lang)
@@ -46,15 +64,21 @@ def register_user_routes(app):
             # Tách lại thành array
             translated_parts = translated_combined.split(separator)
             
-            # Map lại với original texts
+            # Khôi phục placeholders và map lại với original texts
             translations = {}
             for i, text in enumerate(texts):
                 if i < len(translated_parts):
-                    translations[text] = translated_parts[i].strip()
+                    translated_text = translated_parts[i].strip()
+                    # Khôi phục các placeholders
+                    for placeholder_id, original_placeholder in placeholder_map.items():
+                        translated_text = translated_text.replace(placeholder_id, original_placeholder)
+                    translations[text] = translated_text
                 else:
                     translations[text] = text  # Fallback
         except Exception as e:
             print(f"Batch translation error: {e}")
+            import traceback
+            traceback.print_exc()
             # Fallback: trả về text gốc
             translations = {text: text for text in texts}
         
