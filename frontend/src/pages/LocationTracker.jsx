@@ -131,7 +131,7 @@ function LocationTracker() {
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
-              narration: `🚶 Bạn hãy tới gần quán "${data.nearest_place.name}" để nghe thuyết minh`,
+              narration: data.out_of_range_message,
               distance: distance,
               audioUrl: null
             })
@@ -160,7 +160,7 @@ function LocationTracker() {
             }
             setCurrentNarration(prev => ({
               ...prev,
-              narration: `🚶 Bạn hãy tới gần quán "${data.nearest_place.name}" để nghe thuyết minh`,
+              narration: data.out_of_range_message,
               distance: distance,
               audioUrl: null
             }))
