@@ -26,6 +26,9 @@ function RestaurantDetails() {
     display_order: 0,
     is_primary: false
   })
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
     loadRestaurantDetails()
@@ -144,33 +147,79 @@ function RestaurantDetails() {
     })
   }
 
-  const handleImageSubmit = (e) => {
-    e.preventDefault()
-
-    const data = {
-      image_url: imageFormData.image_url,
-      caption: imageFormData.caption,
-      display_order: parseInt(imageFormData.display_order),
-      is_primary: imageFormData.is_primary
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setSelectedFile(file)
+      // Create preview URL
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result)
+      }
+      reader.readAsDataURL(file)
     }
+  }
 
-    const method = editingImageId ? 'PUT' : 'POST'
-    const url = editingImageId
-      ? `${BASE_URL}/admin/images/${editingImageId}`
-      : `${BASE_URL}/admin/restaurants/${restaurantId}/images`
+  const handleImageSubmit = async (e) => {
+    e.preventDefault()
+    
+    setUploading(true)
+    
+    try {
+      let imageUrl = imageFormData.image_url
 
-    fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data)
-    })
-      .then(() => {
-        setEditingImageId(null)
-        setImageFormData({ image_url: '', caption: '', display_order: 0, is_primary: false })
-        loadRestaurantDetails()
+      // If new file is selected, upload it first
+      if (selectedFile && !editingImageId) {
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+
+        const uploadRes = await fetch(`${BASE_URL}/admin/upload-image`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData
+        })
+
+        if (!uploadRes.ok) {
+          const error = await uploadRes.json()
+          throw new Error(error.error || 'Upload failed')
+        }
+
+        const uploadData = await uploadRes.json()
+        imageUrl = uploadData.url
+      }
+
+      // Now save the image record
+      const data = {
+        image_url: imageUrl,
+        caption: imageFormData.caption,
+        display_order: parseInt(imageFormData.display_order),
+        is_primary: imageFormData.is_primary
+      }
+
+      const method = editingImageId ? 'PUT' : 'POST'
+      const url = editingImageId
+        ? `${BASE_URL}/admin/images/${editingImageId}`
+        : `${BASE_URL}/admin/restaurants/${restaurantId}/images`
+
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
       })
-      .catch(err => console.error('Error saving image:', err))
+
+      // Reset form
+      setEditingImageId(null)
+      setImageFormData({ image_url: '', caption: '', display_order: 0, is_primary: false })
+      setSelectedFile(null)
+      setPreviewUrl(null)
+      loadRestaurantDetails()
+    } catch (err) {
+      console.error('Error saving image:', err)
+      alert(err.message || 'Lỗi khi lưu hình ảnh')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleEditImage = (image) => {
@@ -181,6 +230,15 @@ function RestaurantDetails() {
       display_order: image.display_order.toString(),
       is_primary: image.is_primary
     })
+    setSelectedFile(null)
+    setPreviewUrl(null)
+  }
+
+  const handleCancelEditImage = () => {
+    setEditingImageId(null)
+    setImageFormData({ image_url: '', caption: '', display_order: 0, is_primary: false })
+    setSelectedFile(null)
+    setPreviewUrl(null)
   }
 
   const handleDeleteImage = (id) => {
@@ -409,15 +467,62 @@ function RestaurantDetails() {
       {/* IMAGES TAB */}
       {activeTab === 'images' && (
         <div>
-          <h3>Thêm / sửa hình ảnh</h3>
+          <h3>{editingImageId ? '✏️ Sửa hình ảnh' : '➕ Thêm hình ảnh mới'}</h3>
           <form onSubmit={handleImageSubmit}>
-            <input
-              name="image_url"
-              placeholder="URL hình ảnh"
-              value={imageFormData.image_url}
-              onChange={handleImageFormChange}
-              required
-            />
+            {!editingImageId && (
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px',
+                  fontWeight: 'bold'
+                }}>
+                  Chọn file hình ảnh *
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  required={!editingImageId}
+                  style={{
+                    padding: '10px',
+                    border: '2px dashed #ccc',
+                    borderRadius: '8px',
+                    width: '100%',
+                    cursor: 'pointer'
+                  }}
+                />
+                {previewUrl && (
+                  <div style={{ marginTop: '10px' }}>
+                    <img 
+                      src={previewUrl} 
+                      alt="Preview" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '300px',
+                        borderRadius: '8px',
+                        border: '2px solid #ddd'
+                      }} 
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {editingImageId && (
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '8px' }}>
+                  URL hình ảnh hiện tại
+                </label>
+                <input
+                  name="image_url"
+                  value={imageFormData.image_url}
+                  onChange={handleImageFormChange}
+                  disabled
+                  style={{ backgroundColor: '#f0f0f0' }}
+                />
+              </div>
+            )}
+            
             <input
               name="caption"
               placeholder="Mô tả hình (tùy chọn)"
@@ -426,31 +531,30 @@ function RestaurantDetails() {
             />
             <input
               name="display_order"
-              placeholder="Thứ tự hiển thị"
+              placeholder="Thứ tự hiển thị (0, 1, 2...)"
               value={imageFormData.display_order}
               onChange={handleImageFormChange}
               type="number"
             />
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
               <input
                 name="is_primary"
                 type="checkbox"
                 checked={imageFormData.is_primary}
                 onChange={handleImageFormChange}
               />
-              <span>Đặt làm ảnh chính</span>
+              <span>⭐ Đặt làm ảnh chính</span>
             </label>
-            <button type="submit">
-              {editingImageId ? '💾 Cập nhật' : '➕ Thêm hình'}
-            </button>
-            {editingImageId && (
-              <button type="button" onClick={() => {
-                setEditingImageId(null)
-                setImageFormData({ image_url: '', caption: '', display_order: 0, is_primary: false })
-              }}>
-                ❌ Hủy
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="submit" disabled={uploading} style={{ flex: 1 }}>
+                {uploading ? '⏳ Đang xử lý...' : (editingImageId ? '💾 Cập nhật' : '➕ Thêm hình')}
               </button>
-            )}
+              {editingImageId && (
+                <button type="button" onClick={handleCancelEditImage} style={{ backgroundColor: '#6c757d' }}>
+                  ❌ Hủy
+                </button>
+              )}
+            </div>
           </form>
 
           <hr />
