@@ -76,6 +76,7 @@ function LocationTracker() {
   const [restaurants, setRestaurants] = useState([])
   const [selectedRestaurant, setSelectedRestaurant] = useState(null)
   const [currentNarration, setCurrentNarration] = useState(null)
+  const [currentDistance, setCurrentDistance] = useState(null) // State riêng cho distance
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
   const [pendingAudioUrl, setPendingAudioUrl] = useState(null)
@@ -181,21 +182,21 @@ function LocationTracker() {
               restaurantId: newId,
               name: data.nearest_place.name,
               narration: data.out_of_range_message,
-              distance: distance,
               audioUrl: null,
               tags: data.nearest_place.tags || [],
               images: data.nearest_place.images || []
             })
+            setCurrentDistance(distance)
           } else {
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
               narration: data.narration,
-              distance: distance,
               audioUrl: data.audio_url,
               tags: data.nearest_place.tags || [],
               images: data.nearest_place.images || []
             })
+            setCurrentDistance(distance)
 
             // Phát audio tự động
             if (data.audio_url && !isAudioPlaying) {
@@ -214,9 +215,9 @@ function LocationTracker() {
             setCurrentNarration(prev => ({
               ...prev,
               narration: data.out_of_range_message,
-              distance: distance,
               audioUrl: null
             }))
+            setCurrentDistance(distance)
           } else if (distance <= POI_THRESHOLD && !currentNarration?.audioUrl) {
             // Vào trong POI
             lastDistanceRef.current = distance
@@ -224,18 +225,18 @@ function LocationTracker() {
               restaurantId: newId,
               name: data.nearest_place.name,
               narration: data.narration,
-              distance: distance,
               audioUrl: data.audio_url,
               tags: data.nearest_place.tags || [],
               images: data.nearest_place.images || []
             })
+            setCurrentDistance(distance)
             if (data.audio_url && !isAudioPlaying) {
               playAudio(`${BASE_URL}${data.audio_url}`)
             }
           } else if (distanceChanged) {
-            // Chỉ cập nhật khoảng cách nếu thay đổi đáng kể, KHÔNG động vào audio
+            // CHỈ cập nhật distance state, KHÔNG động vào currentNarration - audio không bị ngắt
             lastDistanceRef.current = distance
-            setCurrentNarration(prev => prev ? { ...prev, distance: distance } : prev)
+            setCurrentDistance(distance)
           }
           // Nếu distance không thay đổi đáng kể, không làm gì cả - tránh re-render
         }
@@ -849,7 +850,7 @@ function LocationTracker() {
             <p style={{ margin: '8px 0', fontSize: '14px' }}>{currentNarration.narration}</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', gap: '10px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '13px', color: '#666' }}>
-                📍 {currentNarration.distance.toFixed(3)} km
+                📍 {currentDistance?.toFixed(3) || '0.000'} km
               </span>
               {currentNarration.audioUrl && (
                 <button
