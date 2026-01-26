@@ -122,6 +122,16 @@ function TourPlanner() {
         alignItems: 'center',
         gap: '20px'
       }}>
+        <div style={{ 
+          fontSize: '28px', 
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: '#EA4335'
+        }}>
+          🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
+        </div>
         <button
           onClick={() => navigate('/')}
           style={{
@@ -135,7 +145,7 @@ function TourPlanner() {
         >
           ← Quay lại
         </button>
-        <h1 style={{ margin: 0, fontSize: '24px' }}>🗺️ Xếp Tour Ăn Uống</h1>
+        <h1 style={{ margin: 0, fontSize: '24px', flex: 1 }}>🗺️ Xếp Tour Ăn Uống</h1>
       </div>
 
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
