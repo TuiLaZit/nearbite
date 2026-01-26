@@ -23,7 +23,7 @@ def generate_narration(restaurant, distance_km):
         menu_text = "Quán có thực đơn đa dạng."
 
     return (
-        f"Bạn đang đứng gần {restaurant.name}. "
+        f"{restaurant.name}. "
         f"{restaurant.description}. "
         f"{menu_text} "
     )
