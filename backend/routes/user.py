@@ -17,6 +17,15 @@ def register_user_routes(app):
             "restaurants": [r.to_dict(include_details=True) for r in restaurants]
         })
 
+    @app.route("/tags", methods=["GET"])
+    def get_tags():
+        """Lấy danh sách tất cả tags (public endpoint)"""
+        tags = Tag.query.all()
+        return jsonify({
+            "status": "success",
+            "tags": [tag.to_dict() for tag in tags]
+        })
+
     @app.route("/location", methods=["POST"])
     def receive_location():
         if request.method == "OPTIONS":
