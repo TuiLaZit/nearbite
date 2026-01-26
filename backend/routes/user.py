@@ -36,8 +36,8 @@ def register_user_routes(app):
         
         # Batch dịch - gộp tất cả texts vào một string, dịch 1 lần
         try:
-            # Nối texts bằng separator đặc biệt
-            separator = " ||| "
+            # Nối texts bằng separator đặc biệt (dùng ký tự Unicode không dịch được)
+            separator = " ███ "  # Block characters
             combined_text = separator.join(texts)
             
             # Dịch 1 lần duy nhất
