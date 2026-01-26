@@ -67,7 +67,6 @@ function LocationTracker() {
   const [isTracking, setIsTracking] = useState(false)
   const [language, setLanguage] = useState(() => {
     const saved = localStorage.getItem('language')
-    console.log('Initial language from localStorage:', saved)
     return saved || 'vi'
   })
   const { t, loading: translationLoading } = useTranslation(language)
@@ -96,7 +95,6 @@ function LocationTracker() {
   useEffect(() => {
     languageRef.current = language
     localStorage.setItem('language', language)
-    console.log('Language synced:', language)
   }, [language])
 
   // Lưu state collapse panel
@@ -145,9 +143,6 @@ function LocationTracker() {
     const userLng = pos.coords.longitude
     setUserLocation([userLat, userLng])
 
-    console.log('Fetching location with language:', currentLang)
-    console.log('BASE_URL:', BASE_URL)
-
     fetch(`${BASE_URL}/location`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -158,14 +153,12 @@ function LocationTracker() {
       })
     })
       .then(res => {
-        console.log('Response status:', res.status)
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`)
         }
         return res.json()
       })
       .then(data => {
-        console.log('Received data:', data)
         const newId = data.nearest_place.id
         const distance = data.distance_km
 
@@ -260,7 +253,6 @@ function LocationTracker() {
 
   // Phát audio
   const playAudio = (url) => {
-    console.log('Attempting to play audio:', url)
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.src = '' // Clear old source
@@ -268,7 +260,6 @@ function LocationTracker() {
     }
     // Thêm timestamp để tránh cache browser
     const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
-    console.log('Final audio URL:', audioUrl)
     
     const audio = new Audio(audioUrl)
     audio.crossOrigin = "anonymous" // Cho phép CORS
@@ -287,7 +278,6 @@ function LocationTracker() {
     }
     
     audio.onended = () => {
-      console.log('Audio ended')
       setIsAudioPlaying(false)
       setAudioBlocked(false)
     }
@@ -496,11 +486,7 @@ function LocationTracker() {
         
         {/* Xếp Tour button */}
         <button
-          onClick={() => {
-            console.log('Current language:', language)
-            console.log('planTour translation:', t('planTour'))
-            navigate('/tour-planner')
-          }}
+          onClick={() => navigate('/tour-planner')}
           style={{
             padding: '10px 20px',
             background: '#ff9800',
