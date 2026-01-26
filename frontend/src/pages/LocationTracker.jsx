@@ -79,6 +79,10 @@ function LocationTracker() {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
   const [pendingAudioUrl, setPendingAudioUrl] = useState(null)
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
+    const saved = localStorage.getItem('narrationPanelCollapsed')
+    return saved === 'true'
+  })
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
@@ -93,6 +97,11 @@ function LocationTracker() {
     localStorage.setItem('language', language)
     console.log('Language synced:', language)
   }, [language])
+
+  // Lưu state collapse panel
+  useEffect(() => {
+    localStorage.setItem('narrationPanelCollapsed', isPanelCollapsed)
+  }, [isPanelCollapsed])
 
   // Fetch danh sách ngôn ngữ từ API
   useEffect(() => {
@@ -716,14 +725,53 @@ function LocationTracker() {
         {/* Thông tin quán hiện tại */}
         {currentNarration && (
           <div style={{ 
-            padding: '15px', 
+            position: 'relative',
             background: '#f8f9fa', 
             borderRadius: '8px',
             border: '1px solid #ddd',
-            maxHeight: '400px',
-            overflowY: 'auto'
+            overflow: 'hidden',
+            transition: 'all 0.3s ease'
           }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>{currentNarration.name}</h3>
+            {/* Header với nút collapse */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 15px',
+              background: '#e9ecef',
+              borderBottom: isPanelCollapsed ? 'none' : '1px solid #ddd',
+              cursor: 'pointer'
+            }}
+            onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+            >
+              <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>{currentNarration.name}</h3>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  padding: '5px',
+                  transition: 'transform 0.3s ease',
+                  transform: isPanelCollapsed ? 'rotate(180deg)' : 'rotate(0deg)'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsPanelCollapsed(!isPanelCollapsed)
+                }}
+              >
+                ▲
+              </button>
+            </div>
+
+            {/* Nội dung panel - collapse/expand */}
+            <div style={{
+              maxHeight: isPanelCollapsed ? '0' : '400px',
+              overflowY: isPanelCollapsed ? 'hidden' : 'auto',
+              transition: 'max-height 0.3s ease',
+              padding: isPanelCollapsed ? '0 15px' : '15px'
+            }}>
+
             
             {/* Hiển thị ảnh chính */}
             {currentNarration.images && currentNarration.images.length > 0 && (
@@ -837,6 +885,7 @@ function LocationTracker() {
                   🔊 Bật âm thanh
                 </button>
               )}
+            </div>
             </div>
           </div>
         )}
