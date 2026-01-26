@@ -65,7 +65,7 @@ def text_to_speech(text, lang):
     cleanup_old_files()
 
     try:
-        tts = gTTS(text=text, lang=mapped_lang, slow=False)
+        tts = gTTS(text=text, lang=mapped_lang, slow=False, tld='com')
         tts.save(filepath)
         print(f"TTS created for language '{lang}' (mapped to '{mapped_lang}'): {filename}")
         return f"/static/tts/{filename}"
@@ -73,7 +73,7 @@ def text_to_speech(text, lang):
         print(f"TTS error for language '{lang}' (mapped to '{mapped_lang}'):", e)
         # Fallback: tạo TTS tiếng Việt
         try:
-            tts = gTTS(text=text, lang="vi", slow=False)
+            tts = gTTS(text=text, lang="vi", slow=False, tld='com')
             tts.save(filepath)
             print(f"TTS fallback to Vietnamese: {filename}")
             return f"/static/tts/{filename}"

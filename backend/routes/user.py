@@ -39,6 +39,10 @@ def register_user_routes(app):
         narration_vi = generate_narration(nearest, min_dist)
         narration_final = translate_text(narration_vi, language)
         audio_url = text_to_speech(narration_final, language)
+        
+        # Message khi chưa đến gần quán
+        out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
+        out_of_range_msg = translate_text(out_of_range_msg_vi, language)
 
         return jsonify({
             "status": "success",
@@ -46,5 +50,6 @@ def register_user_routes(app):
             "narration": narration_final,
             "audio_url": audio_url,
             "distance_km": round(min_dist, 3),
-            "nearest_place": nearest.to_dict()
+            "nearest_place": nearest.to_dict(),
+            "out_of_range_message": out_of_range_msg
         })
