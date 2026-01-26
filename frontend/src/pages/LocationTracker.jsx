@@ -75,9 +75,12 @@ function LocationTracker() {
 
   // Fetch danh sách quán khi load
   useEffect(() => {
+    console.log('Fetching restaurants from:', `${BASE_URL}/restaurants`)
     fetch(`${BASE_URL}/restaurants`)
       .then(res => res.json())
       .then(data => {
+        console.log('Restaurants data:', data)
+        console.log('Number of restaurants:', data.restaurants?.length)
         setRestaurants(data.restaurants)
       })
       .catch(err => console.error('Error fetching restaurants:', err))
@@ -345,40 +348,57 @@ function LocationTracker() {
           )}
 
           {/* Marker các quán */}
-          {restaurants.map(restaurant => (
-            <Marker
-              key={restaurant.id}
-              position={[restaurant.lat, restaurant.lng]}
-              icon={currentNarration?.restaurantId === restaurant.id ? activeRestaurantIcon : restaurantIcon}
-              eventHandlers={{
-                click: () => handleRestaurantClick(restaurant)
-              }}
-            >
-              <Popup maxWidth={300}>
-                <div style={{ padding: '5px' }}>
-                  <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{restaurant.name}</h3>
-                  {restaurant.description && (
-                    <p style={{ margin: '5px 0', fontSize: '13px' }}>{restaurant.description}</p>
-                  )}
-                  {selectedRestaurant?.id === restaurant.id && (
-                    <>
-                      {selectedRestaurant.distance !== undefined && (
-                        <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
-                          📍 Khoảng cách: {selectedRestaurant.distance.toFixed(3)} km
-                        </p>
-                      )}
-                      {selectedRestaurant.narration && (
-                        <p style={{ margin: '10px 0', fontSize: '13px', fontStyle: 'italic' }}>
-                          {selectedRestaurant.narration}
-                        </p>
-                      )}
-                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
-                        {selectedRestaurant.audioUrl && (
-                          <button 
-                            onClick={() => handleToggleAudio(`${BASE_URL}${selectedRestaurant.audioUrl}`)}
+          {restaurants.map(restaurant => {
+            console.log('Rendering marker for:', restaurant.name, 'at', restaurant.lat, restaurant.lng)
+            return (
+              <Marker
+                key={restaurant.id}
+                position={[restaurant.lat, restaurant.lng]}
+                icon={currentNarration?.restaurantId === restaurant.id ? activeRestaurantIcon : restaurantIcon}
+                eventHandlers={{
+                  click: () => handleRestaurantClick(restaurant)
+                }}
+              >
+                <Popup maxWidth={300}>
+                  <div style={{ padding: '5px' }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                    {restaurant.description && (
+                      <p style={{ margin: '5px 0', fontSize: '13px' }}>{restaurant.description}</p>
+                    )}
+                    {selectedRestaurant?.id === restaurant.id && (
+                      <>
+                        {selectedRestaurant.distance !== undefined && (
+                          <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
+                            📍 Khoảng cách: {selectedRestaurant.distance.toFixed(3)} km
+                          </p>
+                        )}
+                        {selectedRestaurant.narration && (
+                          <p style={{ margin: '10px 0', fontSize: '13px', fontStyle: 'italic' }}>
+                            {selectedRestaurant.narration}
+                          </p>
+                        )}
+                        <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                          {selectedRestaurant.audioUrl && (
+                            <button 
+                              onClick={() => handleToggleAudio(`${BASE_URL}${selectedRestaurant.audioUrl}`)}
+                              style={{
+                                padding: '8px 12px',
+                                background: '#4285F4',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                              }}
+                            >
+                              {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openDirections(selectedRestaurant)}
                             style={{
                               padding: '8px 12px',
-                              background: '#4285F4',
+                              background: '#34A853',
                               color: 'white',
                               border: 'none',
                               borderRadius: '5px',
@@ -386,30 +406,16 @@ function LocationTracker() {
                               fontSize: '14px'
                             }}
                           >
-                            {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
+                            🧭 Chỉ đường
                           </button>
-                        )}
-                        <button
-                          onClick={() => openDirections(selectedRestaurant)}
-                          style={{
-                            padding: '8px 12px',
-                            background: '#34A853',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '5px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                          }}
-                        >
-                          🧭 Chỉ đường
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
         </MapContainer>
       </div>
 
