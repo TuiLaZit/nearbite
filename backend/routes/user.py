@@ -34,15 +34,29 @@ def register_user_routes(app):
                 "translations": {text: text for text in texts}
             })
         
-        # Dịch từng text
-        translations = {}
-        for text in texts:
-            try:
-                translated = translate_text(text, target_lang)
-                translations[text] = translated
-            except Exception as e:
-                print(f"Translation error for '{text}': {e}")
-                translations[text] = text  # Fallback to original
+        # Batch dịch - gộp tất cả texts vào một string, dịch 1 lần
+        try:
+            # Nối texts bằng separator đặc biệt
+            separator = " ||| "
+            combined_text = separator.join(texts)
+            
+            # Dịch 1 lần duy nhất
+            translated_combined = translate_text(combined_text, target_lang)
+            
+            # Tách lại thành array
+            translated_parts = translated_combined.split(separator)
+            
+            # Map lại với original texts
+            translations = {}
+            for i, text in enumerate(texts):
+                if i < len(translated_parts):
+                    translations[text] = translated_parts[i].strip()
+                else:
+                    translations[text] = text  # Fallback
+        except Exception as e:
+            print(f"Batch translation error: {e}")
+            # Fallback: trả về text gốc
+            translations = {text: text for text in texts}
         
         return jsonify({
             "status": "success",
