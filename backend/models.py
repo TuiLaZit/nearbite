@@ -15,6 +15,7 @@ class Restaurant(db.Model):
     lng = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
     avg_eat_time = db.Column(db.Integer)
+    poi_radius_km = db.Column(db.Float, default=0.015, nullable=False)  # POI activation radius in km (default 15m)
     is_active = db.Column(db.Boolean, default=True)
 
     menu_items = db.relationship(
@@ -47,6 +48,7 @@ class Restaurant(db.Model):
             "lng": self.lng,
             "description": self.description,
             "avg_eat_time": self.avg_eat_time,
+            "poi_radius_km": self.poi_radius_km,
             "is_active": self.is_active
         }
         

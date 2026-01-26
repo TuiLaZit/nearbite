@@ -166,12 +166,16 @@ def register_user_routes(app):
         narration_final = translate_text(narration_vi, language)
         audio_url = text_to_speech(narration_final, language)
         
+        # Lấy bán kính POI từ database (mặc định 0.015 km nếu không có)
+        poi_radius = nearest.poi_radius_km if hasattr(nearest, 'poi_radius_km') and nearest.poi_radius_km else 0.015
+        
         # Message khi chưa đến gần quán
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
         out_of_range_msg = translate_text(out_of_range_msg_vi, language)
         
         print(f"Nearest: {nearest.name}")
         print(f"Distance: {min_dist}")
+        print(f"POI Radius: {poi_radius} km ({poi_radius * 1000}m)")
         print(f"Audio URL: {audio_url}")
         print(f"Language used: {language}")
 
@@ -181,6 +185,7 @@ def register_user_routes(app):
             "narration": narration_final,
             "audio_url": audio_url,
             "distance_km": round(min_dist, 3),
+            "poi_radius_km": poi_radius,
             "nearest_place": nearest.to_dict(include_details=True),
             "out_of_range_message": out_of_range_msg
         })

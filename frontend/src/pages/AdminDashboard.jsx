@@ -12,6 +12,7 @@ function AdminDashboard() {
     lat: '',
     lng: '',
     avg_eat_time: '',
+    poi_radius_km: '0.015',
     description: ''
   })
 
@@ -84,6 +85,7 @@ function AdminDashboard() {
       lat: parseFloat(formData.lat),
       lng: parseFloat(formData.lng),
       avg_eat_time: parseInt(formData.avg_eat_time),
+      poi_radius_km: parseFloat(formData.poi_radius_km),
       description: formData.description
     }
 
@@ -105,6 +107,7 @@ function AdminDashboard() {
           lat: '',
           lng: '',
           avg_eat_time: '',
+          poi_radius_km: '0.015',
           description: ''
         })
         loadActive()
@@ -119,6 +122,7 @@ function AdminDashboard() {
       lat: restaurant.lat.toString(),
       lng: restaurant.lng.toString(),
       avg_eat_time: restaurant.avg_eat_time.toString(),
+      poi_radius_km: (restaurant.poi_radius_km || 0.015).toString(),
       description: restaurant.description
     })
     setEditingId(restaurant.id)
@@ -223,6 +227,17 @@ function AdminDashboard() {
           type="number"
           required
         />
+        <input
+          name="poi_radius_km"
+          placeholder="Bán kính POI (km) - VD: 0.015 = 15m"
+          value={formData.poi_radius_km}
+          onChange={handleFormChange}
+          type="number"
+          step="0.001"
+          min="0.001"
+          max="1"
+          required
+        />
         <textarea
           name="description"
           placeholder="Mô tả"
@@ -242,6 +257,7 @@ function AdminDashboard() {
           <tr>
             <th>Tên quán</th>
             <th>Thời gian ăn</th>
+            <th>Bán kính POI</th>
             <th>Hành động</th>
           </tr>
         </thead>
@@ -250,6 +266,7 @@ function AdminDashboard() {
             <tr key={r.id}>
               <td>{r.name}</td>
               <td>{r.avg_eat_time} phút</td>
+              <td>{((r.poi_radius_km || 0.015) * 1000).toFixed(0)}m</td>
               <td>
                 <button onClick={() => handleEdit(r)}>✏️ Sửa</button>
                 <button onClick={() => handleHide(r.id)}>🙈 Ẩn</button>

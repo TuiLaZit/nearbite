@@ -14,6 +14,13 @@ def validate_restaurant(data):
 
     if not isinstance(data.get("avg_eat_time"), int) or data["avg_eat_time"] <= 0:
         return "Thời gian ăn phải là số nguyên > 0"
+    
+    # Validate poi_radius_km if provided
+    if "poi_radius_km" in data:
+        if not is_number(data.get("poi_radius_km")):
+            return "Bán kính POI phải là số"
+        if data["poi_radius_km"] <= 0 or data["poi_radius_km"] > 1:
+            return "Bán kính POI phải từ 0 đến 1 km (0-1000m)"
 
     return None
 

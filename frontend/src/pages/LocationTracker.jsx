@@ -6,8 +6,6 @@ import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 
-const POI_THRESHOLD = 0.03 // 30m
-
 // Fix cho Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -90,6 +88,9 @@ function LocationTracker() {
   const lastDistanceRef = useRef(null) // Track khoảng cách để tránh update liên tục
   const languageRef = useRef(language) // Track current language
   const audioUnlockedRef = useRef(false) // Track nếu audio đã được unlock
+  const poiEntryTimeRef = useRef(null) // Track thời điểm bước vào POI
+  const poiDebounceTimerRef = useRef(null) // Timer cho debouncer 3s
+  const playedRestaurantsRef = useRef(new Map()) // Track quán đã phát: {restaurantId: timestamp}
 
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -138,6 +139,12 @@ function LocationTracker() {
 
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
   const fetchAndUpdateLocation = (pos, lang = null) => {
+    // NẾU ĐANG PHÁT AUDIO, TẠM DỪNG GPS UPDATE
+    if (isAudioPlaying) {
+      console.log('⏸ Audio đang phát, bỏ qua GPS update')
+      return
+    }
+
     const currentLang = lang || languageRef.current
     const userLat = pos.coords.latitude
     const userLng = pos.coords.longitude
@@ -166,11 +173,21 @@ function LocationTracker() {
           lastRestaurantIdRef.current = newId
           lastDistanceRef.current = distance // Reset distance tracking
 
+          // Hủy debounce timer cũ
+          if (poiDebounceTimerRef.current) {
+            clearTimeout(poiDebounceTimerRef.current)
+            poiDebounceTimerRef.current = null
+          }
+
           // Dừng audio cũ hoàn toàn
           stopAudio()
 
+          // Lấy bán kính POI từ API (mặc định 0.015 = 15m)
+          const poiRadius = data.poi_radius_km || 0.015
+          console.log(`📍 POI Radius for ${data.nearest_place.name}: ${poiRadius * 1000}m`)
+
           // Kiểm tra khoảng cách
-          if (distance > POI_THRESHOLD) {
+          if (distance > poiRadius) {
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
@@ -180,7 +197,9 @@ function LocationTracker() {
               images: data.nearest_place.images || []
             })
             setCurrentDistance(distance)
+            poiEntryTimeRef.current = null
           } else {
+            // VÀO POI - BẮT ĐẦU DEBOUNCER 3 GIÂY
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
@@ -191,9 +210,31 @@ function LocationTracker() {
             })
             setCurrentDistance(distance)
 
-            // Phát audio tự động
-            if (data.audio_url && !isAudioPlaying) {
-              playAudio(`${BASE_URL}${data.audio_url}`)
+            // Kiểm tra cooldown 5 phút
+            const lastPlayedTime = playedRestaurantsRef.current.get(newId)
+            const now = Date.now()
+            const cooldownPeriod = 5 * 60 * 1000 // 5 phút
+            const inCooldown = lastPlayedTime && (now - lastPlayedTime < cooldownPeriod)
+
+            if (inCooldown) {
+              console.log('🔇 Quán đã phát trong 5 phút qua, không tự động phát')
+              // Không tự động phát, chỉ hiện nút bấm
+              return
+            }
+
+            // DEBOUNCER: Đợi 3 giây trước khi phát audio
+            if (data.audio_url) {
+              console.log('⏱ Bắt đầu debouncer 3 giây...')
+              poiEntryTimeRef.current = now
+              poiDebounceTimerRef.current = setTimeout(() => {
+                // Kiểm tra xem user vẫn còn trong POI không
+                if (poiEntryTimeRef.current === now && !isAudioPlaying) {
+                  console.log('✅ 3 giây đã qua, bắt đầu phát audio')
+                  playAudio(`${BASE_URL}${data.audio_url}`)
+                  // Lưu timestamp đã phát
+                  playedRestaurantsRef.current.set(newId, Date.now())
+                }
+              }, 3000) // 3 giây
             }
           }
         } else {
@@ -201,17 +242,25 @@ function LocationTracker() {
           const lastDistance = lastDistanceRef.current
           const distanceChanged = lastDistance === null || Math.abs(distance - lastDistance) > 0.005 // Chỉ update khi thay đổi > 5m
           
-          if (distance > POI_THRESHOLD && currentNarration?.audioUrl) {
-            // Ra khỏi POI - dừng audio hoàn toàn
+          // Lấy bán kính POI từ API (mặc định 0.015 = 15m)
+          const poiRadius = data.poi_radius_km || 0.015
+          
+          if (distance > poiRadius && currentNarration?.audioUrl) {
+            // Ra khỏi POI - dừng audio hoàn toàn và hủy debouncer
+            if (poiDebounceTimerRef.current) {
+              clearTimeout(poiDebounceTimerRef.current)
+              poiDebounceTimerRef.current = null
+            }
             stopAudio()
             lastDistanceRef.current = distance
+            poiEntryTimeRef.current = null
             setCurrentNarration(prev => ({
               ...prev,
               narration: data.out_of_range_message,
               audioUrl: null
             }))
             setCurrentDistance(distance)
-          } else if (distance <= POI_THRESHOLD && !currentNarration?.audioUrl) {
+          } else if (distance <= poiRadius && !currentNarration?.audioUrl) {
             // Vào trong POI
             lastDistanceRef.current = distance
             setCurrentNarration({
@@ -223,8 +272,29 @@ function LocationTracker() {
               images: data.nearest_place.images || []
             })
             setCurrentDistance(distance)
+
+            // Kiểm tra cooldown 5 phút
+            const lastPlayedTime = playedRestaurantsRef.current.get(newId)
+            const now = Date.now()
+            const cooldownPeriod = 5 * 60 * 1000 // 5 phút
+            const inCooldown = lastPlayedTime && (now - lastPlayedTime < cooldownPeriod)
+
+            if (inCooldown) {
+              console.log('🔇 Quán đã phát trong 5 phút qua, không tự động phát')
+              return
+            }
+
+            // DEBOUNCER: Đợi 3 giây trước khi phát audio
             if (data.audio_url && !isAudioPlaying) {
-              playAudio(`${BASE_URL}${data.audio_url}`)
+              console.log('⏱ Bắt đầu debouncer 3 giây...')
+              poiEntryTimeRef.current = now
+              poiDebounceTimerRef.current = setTimeout(() => {
+                if (poiEntryTimeRef.current === now && !isAudioPlaying) {
+                  console.log('✅ 3 giây đã qua, bắt đầu phát audio')
+                  playAudio(`${BASE_URL}${data.audio_url}`)
+                  playedRestaurantsRef.current.set(newId, Date.now())
+                }
+              }, 3000)
             }
           } else if (distanceChanged) {
             // CHỈ cập nhật distance state, KHÔNG động vào currentNarration - audio không bị ngắt
@@ -249,6 +319,12 @@ function LocationTracker() {
     setIsAudioPlaying(false)
     setAudioBlocked(false)
     setPendingAudioUrl(null)
+    
+    // Hủy debounce timer nếu có
+    if (poiDebounceTimerRef.current) {
+      clearTimeout(poiDebounceTimerRef.current)
+      poiDebounceTimerRef.current = null
+    }
   }
 
   // Phát audio
@@ -355,6 +431,10 @@ function LocationTracker() {
         .then(() => {
           setIsAudioPlaying(true)
           setAudioBlocked(false)
+          // Lưu timestamp khi user tự bấm
+          if (currentNarration?.restaurantId) {
+            playedRestaurantsRef.current.set(currentNarration.restaurantId, Date.now())
+          }
         })
         .catch(err => {
           console.error('Error resuming audio:', err)
@@ -366,6 +446,10 @@ function LocationTracker() {
     } else {
       // Tạo audio mới
       playAudio(audioUrl)
+      // Lưu timestamp khi user tự bấm
+      if (currentNarration?.restaurantId) {
+        playedRestaurantsRef.current.set(currentNarration.restaurantId, Date.now())
+      }
     }
   }
 
@@ -391,6 +475,10 @@ function LocationTracker() {
 
     // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
+    
+    // Reset cooldown map khi đổi ngôn ngữ
+    playedRestaurantsRef.current.clear()
+    
     if (isTracking && userLocation) {
       // Dùng setTimeout để đảm bảo audio đã dừng hẳn
       setTimeout(() => {
@@ -450,6 +538,7 @@ function LocationTracker() {
   useEffect(() => {
     return () => {
       if (watchTimerRef.current) clearInterval(watchTimerRef.current)
+      if (poiDebounceTimerRef.current) clearTimeout(poiDebounceTimerRef.current)
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
