@@ -753,7 +753,7 @@ function LocationTracker() {
                   cursor: 'pointer',
                   padding: '5px',
                   transition: 'transform 0.3s ease',
-                  transform: isPanelCollapsed ? 'rotate(180deg)' : 'rotate(0deg)'
+                  transform: isPanelCollapsed ? 'rotate(0deg)' : 'rotate(180deg)'
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
