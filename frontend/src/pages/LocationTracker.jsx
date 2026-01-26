@@ -154,7 +154,9 @@ function LocationTracker() {
               name: data.nearest_place.name,
               narration: data.out_of_range_message,
               distance: distance,
-              audioUrl: null
+              audioUrl: null,
+              tags: data.nearest_place.tags || [],
+              images: data.nearest_place.images || []
             })
           } else {
             setCurrentNarration({
@@ -162,7 +164,9 @@ function LocationTracker() {
               name: data.nearest_place.name,
               narration: data.narration,
               distance: distance,
-              audioUrl: data.audio_url
+              audioUrl: data.audio_url,
+              tags: data.nearest_place.tags || [],
+              images: data.nearest_place.images || []
             })
 
             // Phát audio tự động
@@ -188,7 +192,9 @@ function LocationTracker() {
               name: data.nearest_place.name,
               narration: data.narration,
               distance: distance,
-              audioUrl: data.audio_url
+              audioUrl: data.audio_url,
+              tags: data.nearest_place.tags || [],
+              images: data.nearest_place.images || []
             })
             if (data.audio_url && !isAudioPlaying) {
               playAudio(`${BASE_URL}${data.audio_url}`)
@@ -492,11 +498,83 @@ function LocationTracker() {
                 click: () => handleRestaurantClick(restaurant)
               }}
             >
-                <Popup maxWidth={300}>
-                  <div style={{ padding: '5px' }}>
+              <Popup maxWidth={350}>
+                  <div style={{ padding: '5px', maxHeight: '500px', overflowY: 'auto' }}>
                     <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                    
+                    {/* Hiển thị ảnh chính */}
+                    {restaurant.images && restaurant.images.length > 0 && (
+                      <div style={{ marginBottom: '10px' }}>
+                        {(() => {
+                          const primaryImage = restaurant.images.find(img => img.is_primary) || restaurant.images[0]
+                          return (
+                            <img 
+                              src={primaryImage.image_url} 
+                              alt={primaryImage.caption || restaurant.name}
+                              style={{ 
+                                width: '100%', 
+                                height: '150px', 
+                                objectFit: 'cover', 
+                                borderRadius: '8px',
+                                marginBottom: '8px'
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none'
+                              }}
+                            />
+                          )
+                        })()}
+                        {restaurant.images.length > 1 && (
+                          <div style={{ display: 'flex', gap: '5px', overflowX: 'auto' }}>
+                            {restaurant.images.slice(0, 4).map((img, idx) => (
+                              <img 
+                                key={idx}
+                                src={img.image_url} 
+                                alt={img.caption || `Image ${idx+1}`}
+                                style={{ 
+                                  width: '60px', 
+                                  height: '60px', 
+                                  objectFit: 'cover', 
+                                  borderRadius: '5px',
+                                  cursor: 'pointer'
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none'
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Hiển thị tags */}
+                    {restaurant.tags && restaurant.tags.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                        {restaurant.tags.map(tag => (
+                          <span
+                            key={tag.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 8px',
+                              backgroundColor: tag.color || '#3498db',
+                              color: '#fff',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: '500'
+                            }}
+                          >
+                            {tag.icon && <span>{tag.icon}</span>}
+                            <span>{tag.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
                     {restaurant.description && (
-                      <p style={{ margin: '5px 0', fontSize: '13px' }}>{restaurant.description}</p>
+                      <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>{restaurant.description}</p>
                     )}
                     {selectedRestaurant?.id === restaurant.id && (
                       <>
@@ -583,9 +661,85 @@ function LocationTracker() {
             padding: '15px', 
             background: '#f8f9fa', 
             borderRadius: '8px',
-            border: '1px solid #ddd'
+            border: '1px solid #ddd',
+            maxHeight: '400px',
+            overflowY: 'auto'
           }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>{currentNarration.name}</h3>
+            
+            {/* Hiển thị ảnh chính */}
+            {currentNarration.images && currentNarration.images.length > 0 && (
+              <div style={{ marginBottom: '10px' }}>
+                {(() => {
+                  const primaryImage = currentNarration.images.find(img => img.is_primary) || currentNarration.images[0]
+                  return (
+                    <img 
+                      src={primaryImage.image_url} 
+                      alt={primaryImage.caption || currentNarration.name}
+                      style={{ 
+                        width: '100%', 
+                        maxHeight: '200px', 
+                        objectFit: 'cover', 
+                        borderRadius: '8px',
+                        marginBottom: '8px'
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                      }}
+                    />
+                  )
+                })()}
+                {currentNarration.images.length > 1 && (
+                  <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '5px' }}>
+                    {currentNarration.images.map((img, idx) => (
+                      <img 
+                        key={idx}
+                        src={img.image_url} 
+                        alt={img.caption || `Image ${idx+1}`}
+                        style={{ 
+                          minWidth: '80px',
+                          width: '80px', 
+                          height: '80px', 
+                          objectFit: 'cover', 
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          border: '2px solid #ddd'
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Hiển thị tags */}
+            {currentNarration.tags && currentNarration.tags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                {currentNarration.tags.map(tag => (
+                  <span
+                    key={tag.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '5px 10px',
+                      backgroundColor: tag.color || '#3498db',
+                      color: '#fff',
+                      borderRadius: '15px',
+                      fontSize: '12px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    {tag.icon && <span>{tag.icon}</span>}
+                    <span>{tag.name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            
             <p style={{ margin: '8px 0', fontSize: '14px' }}>{currentNarration.narration}</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', gap: '10px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '13px', color: '#666' }}>

@@ -9,11 +9,11 @@ def register_user_routes(app):
 
     @app.route("/restaurants", methods=["GET"])
     def get_restaurants():
-        """Lấy danh sách tất cả quán đang active"""
+        """Lấy danh sách tất cả quán đang active với tags và images"""
         restaurants = Restaurant.query.filter_by(is_active=True).all()
         return jsonify({
             "status": "success",
-            "restaurants": [r.to_dict() for r in restaurants]
+            "restaurants": [r.to_dict(include_details=True) for r in restaurants]
         })
 
     @app.route("/location", methods=["POST"])
@@ -59,6 +59,6 @@ def register_user_routes(app):
             "narration": narration_final,
             "audio_url": audio_url,
             "distance_km": round(min_dist, 3),
-            "nearest_place": nearest.to_dict(),
+            "nearest_place": nearest.to_dict(include_details=True),
             "out_of_range_message": out_of_range_msg
         })
