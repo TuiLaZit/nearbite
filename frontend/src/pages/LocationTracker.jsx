@@ -301,9 +301,14 @@ function LocationTracker() {
     }
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current.src = ''
+      audioRef.current.load()
       audioRef.current = null
-      setIsAudioPlaying(false)
     }
+    setIsAudioPlaying(false)
+    setAudioBlocked(false)
+    setPendingAudioUrl(null)
   }
 
   // Toggle audio
@@ -334,10 +339,14 @@ function LocationTracker() {
     // Dừng audio và reset hoàn toàn
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.currentTime = 0
       audioRef.current.src = '' // Clear audio source
+      audioRef.current.load() // Force unload
       audioRef.current = null
-      setIsAudioPlaying(false)
     }
+    setIsAudioPlaying(false)
+    setAudioBlocked(false)
+    setPendingAudioUrl(null)
     
     // Reset selectedRestaurant để đóng popup cũ
     setSelectedRestaurant(null)
@@ -348,10 +357,10 @@ function LocationTracker() {
     // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
     if (isTracking && userLocation) {
-      // Dùng setTimeout để đảm bảo languageRef đã update
+      // Dùng setTimeout để đảm bảo audio đã dừng hẳn
       setTimeout(() => {
         fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
-      }, 100)
+      }, 200)
     }
   }
 
@@ -363,9 +372,14 @@ function LocationTracker() {
     // Dừng audio cũ nếu đang phát
     if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current.src = ''
+      audioRef.current.load()
       audioRef.current = null
-      setIsAudioPlaying(false)
     }
+    setIsAudioPlaying(false)
+    setAudioBlocked(false)
+    setPendingAudioUrl(null)
 
     if (userLocation) {
       const distance = calculateDistance(
