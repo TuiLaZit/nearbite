@@ -76,20 +76,13 @@ function LocationTracker() {
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
   const lastRestaurantIdRef = useRef(null)
-
-  // Đảm bảo language được load đúng khi PWA khởi động
+  const languageRef = useRef(language) // Track current language
+  
+  // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
-    const savedLang = localStorage.getItem('language')
-    console.log('PWA Language check:', savedLang)
-    if (savedLang && savedLang !== language) {
-      setLanguage(savedLang)
-    }
-  }, [])
-
-  // Persist language mỗi khi thay đổi
-  useEffect(() => {
-    console.log('Language changed to:', language)
+    languageRef.current = language
     localStorage.setItem('language', language)
+    console.log('Language synced:', language)
   }, [language])
 
   // Fetch danh sách quán khi load
@@ -116,7 +109,7 @@ function LocationTracker() {
 
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
   const fetchAndUpdateLocation = (pos, lang = null) => {
-    const currentLang = lang || language
+    const currentLang = lang || languageRef.current
     const userLat = pos.coords.latitude
     const userLng = pos.coords.longitude
     setUserLocation([userLat, userLng])
@@ -174,7 +167,7 @@ function LocationTracker() {
             })
 
             // Phát audio tự động
-            if (data.audio_url) {
+            if (data.audio_url && !isAudioPlaying) {
               playAudio(`${BASE_URL}${data.audio_url}`)
             }
           }
@@ -240,6 +233,11 @@ function LocationTracker() {
       setIsAudioPlaying(false)
     }
     
+    audio.onended = () => {
+      console.log('Audio ended')
+      setIsAudioPlaying(false)
+    }
+    
     setIsAudioPlaying(true)
     audio.play()
       .then(() => {
@@ -253,8 +251,6 @@ function LocationTracker() {
           console.warn('Autoplay blocked. User interaction required.')
         }
       })
-    audio.onended = () => setIsAudioPlaying(false)
-    audio.onerror = () => setIsAudioPlaying(false)
   }
 
   // Bắt đầu tracking
@@ -312,12 +308,11 @@ function LocationTracker() {
     const newLang = e.target.value
     console.log('===== CHANGING LANGUAGE =====')
     console.log('From:', language, 'To:', newLang)
-    console.log('isTracking:', isTracking)
-    console.log('userLocation:', userLocation)
     
-    // Lưu vào localStorage TRƯỚC khi setState
+    // Lưu vào localStorage và update state
     localStorage.setItem('language', newLang)
     setLanguage(newLang)
+    languageRef.current = newLang // Update ref ngay lập tức
 
     // Dừng audio và reset hoàn toàn
     if (audioRef.current) {
@@ -336,7 +331,10 @@ function LocationTracker() {
     // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
     if (isTracking && userLocation) {
-      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
+      // Dùng setTimeout để đảm bảo languageRef đã update
+      setTimeout(() => {
+        fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
+      }, 100)
     }
   }
 
@@ -365,7 +363,7 @@ function LocationTracker() {
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: language
+          language: languageRef.current
         })
       })
         .then(res => res.json())
