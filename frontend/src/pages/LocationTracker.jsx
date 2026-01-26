@@ -191,7 +191,9 @@ function LocationTracker() {
       audioRef.current.src = '' // Clear old source
       audioRef.current = null
     }
-    const audio = new Audio(url)
+    // Thêm timestamp để tránh cache browser
+    const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
+    const audio = new Audio(audioUrl)
     audioRef.current = audio
     setIsAudioPlaying(true)
     audio.play().catch(err => {
