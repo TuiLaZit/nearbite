@@ -169,14 +169,24 @@ function AdminDashboard() {
   }
 
   // Open menu page
-  const handleOpenMenu = (id) => {
-    navigate(`/admin/menu/${id}`)
+  const handleOpenDetails = (id) => {
+    navigate(`/admin/restaurant/${id}`)
+  }
+
+  // Open tags management
+  const handleOpenTags = () => {
+    navigate('/admin/tags')
   }
 
   return (
     <div className="container">
       <h1>🍜 Admin - Quản lý quán</h1>
-      <button onClick={handleLogout}>Logout</button>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <button onClick={handleLogout}>🚪 Logout</button>
+        <button onClick={handleOpenTags} style={{ backgroundColor: '#9b59b6' }}>
+          🏷️ Quản lý Tags
+        </button>
+      </div>
 
       <h2>Thêm quán mới</h2>
       <form onSubmit={handleSubmit}>
@@ -243,7 +253,7 @@ function AdminDashboard() {
               <td>
                 <button onClick={() => handleEdit(r)}>✏️ Sửa</button>
                 <button onClick={() => handleHide(r.id)}>🙈 Ẩn</button>
-                <button onClick={() => handleOpenMenu(r.id)}>🍽 Menu</button>
+                <button onClick={() => handleOpenDetails(r.id)}>📋 Chi tiết</button>
               </td>
             </tr>
           ))}

@@ -2,7 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import LocationTracker from './pages/LocationTracker'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
-import MenuManagement from './pages/MenuManagement'
+import RestaurantDetails from './pages/RestaurantDetails'
+import TagManagement from './pages/TagManagement'
 
 function App() {
   return (
@@ -10,7 +11,8 @@ function App() {
       <Route path="/" element={<LocationTracker />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/menu/:restaurantId" element={<MenuManagement />} />
+      <Route path="/admin/restaurant/:restaurantId" element={<RestaurantDetails />} />
+      <Route path="/admin/tags" element={<TagManagement />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
