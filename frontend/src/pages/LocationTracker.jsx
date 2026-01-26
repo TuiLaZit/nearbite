@@ -75,12 +75,9 @@ function LocationTracker() {
 
   // Fetch danh sách quán khi load
   useEffect(() => {
-    console.log('Fetching restaurants from:', `${BASE_URL}/restaurants`)
     fetch(`${BASE_URL}/restaurants`)
       .then(res => res.json())
       .then(data => {
-        console.log('Restaurants data:', data)
-        console.log('Number of restaurants:', data.restaurants?.length)
         setRestaurants(data.restaurants)
       })
       .catch(err => console.error('Error fetching restaurants:', err))
@@ -268,6 +265,13 @@ function LocationTracker() {
 
   // Xử lý click vào marker quán
   const handleRestaurantClick = (restaurant) => {
+    // Dừng audio cũ nếu đang phát
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+      setIsAudioPlaying(false)
+    }
+
     if (userLocation) {
       const distance = calculateDistance(
         userLocation[0], userLocation[1],
@@ -373,17 +377,15 @@ function LocationTracker() {
           )}
 
           {/* Marker các quán */}
-          {restaurants.map(restaurant => {
-            console.log('Rendering marker for:', restaurant.name, 'at', restaurant.lat, restaurant.lng)
-            return (
-              <Marker
-                key={restaurant.id}
-                position={[restaurant.lat, restaurant.lng]}
-                icon={currentNarration?.restaurantId === restaurant.id ? activeRestaurantIcon : restaurantIcon}
-                eventHandlers={{
-                  click: () => handleRestaurantClick(restaurant)
-                }}
-              >
+          {restaurants.map(restaurant => (
+            <Marker
+              key={restaurant.id}
+              position={[restaurant.lat, restaurant.lng]}
+              icon={currentNarration?.restaurantId === restaurant.id ? activeRestaurantIcon : restaurantIcon}
+              eventHandlers={{
+                click: () => handleRestaurantClick(restaurant)
+              }}
+            >
                 <Popup maxWidth={300}>
                   <div style={{ padding: '5px' }}>
                     <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{restaurant.name}</h3>
@@ -439,8 +441,7 @@ function LocationTracker() {
                   </div>
                 </Popup>
               </Marker>
-            )
-          })}
+          ))}
         </MapContainer>
       </div>
 
