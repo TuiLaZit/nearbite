@@ -32,24 +32,27 @@ function TourPlanner() {
 
   // Lấy vị trí user
   const getUserLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          })
-        },
-        (error) => {
-          console.error('Error getting location:', error)
-        }
-      )
-    }
+    return new Promise((resolve, reject) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const location = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude
+            }
+            setUserLocation(location)
+            resolve(location)
+          },
+          (error) => {
+            console.error('Error getting location:', error)
+            reject(error)
+          }
+        )
+      } else {
+        reject(new Error('Geolocation not supported'))
+      }
+    })
   }
-
-  useEffect(() => {
-    getUserLocation()
-  }, [])
 
   // Toggle tag selection
   const toggleTag = (tagId) => {
@@ -67,6 +70,15 @@ function TourPlanner() {
     setTours([])
 
     try {
+      // Lấy vị trí GPS ngay lúc này
+      let currentLocation = userLocation
+      try {
+        currentLocation = await getUserLocation()
+        console.log('✅ Đã lấy vị trí GPS:', currentLocation)
+      } catch (locError) {
+        console.warn('⚠️ Không lấy được GPS, dùng vị trí cũ (nếu có)')
+      }
+
       const response = await fetch(`${BASE_URL}/plan-tour`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,8 +86,8 @@ function TourPlanner() {
           time_limit: timeLimit,
           budget: budget,
           tags: selectedTags,
-          user_lat: userLocation?.lat,
-          user_lng: userLocation?.lng
+          user_lat: currentLocation?.lat,
+          user_lng: currentLocation?.lng
         })
       })
 
@@ -122,16 +134,6 @@ function TourPlanner() {
         alignItems: 'center',
         gap: '20px'
       }}>
-        <div style={{ 
-          fontSize: '28px', 
-          fontWeight: 'bold',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          color: '#EA4335'
-        }}>
-          🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
-        </div>
         <button
           onClick={() => navigate('/')}
           style={{
@@ -140,10 +142,13 @@ function TourPlanner() {
             border: '2px solid #ddd',
             borderRadius: '8px',
             cursor: 'pointer',
-            fontSize: '14px'
+            fontSize: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
-          ← Quay lại
+          🍜
         </button>
         <h1 style={{ margin: 0, fontSize: '24px', flex: 1 }}>🗺️ Xếp Tour Ăn Uống</h1>
       </div>
