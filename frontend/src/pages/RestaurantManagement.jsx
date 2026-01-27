@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
-function RestaurantManagement() {
+function RestaurantManagement({ isHidden = false }) {
   const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState([])
   const [tags, setTags] = useState([])
@@ -62,23 +62,39 @@ function RestaurantManagement() {
   const loadRestaurants = () => {
     if (!isAuthenticated) return
     
-    const params = new URLSearchParams()
-    if (searchTerm) params.append('search', searchTerm)
-    if (sortBy) params.append('sort', sortBy)
-    selectedTags.forEach(tagId => params.append('tags', tagId))
+    // Load hidden restaurants or active restaurants
+    if (isHidden) {
+      fetch(`${BASE_URL}/admin/restaurants/hidden`, {
+        credentials: 'include'
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to load hidden restaurants')
+          return res.json()
+        })
+        .then(data => setRestaurants(data || []))
+        .catch(err => {
+          console.error('Error loading hidden restaurants:', err)
+          setRestaurants([])
+        })
+    } else {
+      const params = new URLSearchParams()
+      if (searchTerm) params.append('search', searchTerm)
+      if (sortBy) params.append('sort', sortBy)
+      selectedTags.forEach(tagId => params.append('tags', tagId))
 
-    fetch(`${BASE_URL}/admin/restaurants/analytics?${params.toString()}`, {
-      credentials: 'include'
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load restaurants')
-        return res.json()
+      fetch(`${BASE_URL}/admin/restaurants/analytics?${params.toString()}`, {
+        credentials: 'include'
       })
-      .then(data => setRestaurants(data || []))
-      .catch(err => {
-        console.error('Error loading restaurants:', err)
-        setRestaurants([])
-      })
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to load restaurants')
+          return res.json()
+        })
+        .then(data => setRestaurants(data || []))
+        .catch(err => {
+          console.error('Error loading restaurants:', err)
+          setRestaurants([])
+        })
+    }
   }
 
   const handleFormChange = (e) => {
@@ -154,20 +170,66 @@ function RestaurantManagement() {
   }
 
   const handleDelete = (id, name) => {
-    const confirmName = prompt(`Gõ chính xác tên quán để xoá:\n${name}`)
-    if (confirmName !== name) {
-      alert('Tên không khớp!')
+    if (isHidden) {
+      // Permanent delete from hidden list
+      if (!confirm(`XÓA VĨNH VIỄN quán "${name}"?\n\nHành động này không thể hoàn tác!\nTất cả menu, hình ảnh, tags sẽ bị xóa.`)) {
+        return
+      }
+
+      fetch(`${BASE_URL}/admin/restaurants/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ permanent: true })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'permanently_deleted') {
+            alert('✅ Đã xóa vĩnh viễn!')
+            loadRestaurants()
+          }
+        })
+        .catch(err => console.error('Error permanently deleting restaurant:', err))
+    } else {
+      // Soft delete - move to hidden
+      if (!confirm(`Ẩn quán "${name}"?\n\nQuán sẽ được chuyển vào mục "Quán đã ẩn" và có thể khôi phục sau.`)) {
+        return
+      }
+
+      fetch(`${BASE_URL}/admin/restaurants/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ permanent: false })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'hidden') {
+            alert('✅ Đã ẩn quán!')
+            loadRestaurants()
+          }
+        })
+        .catch(err => console.error('Error hiding restaurant:', err))
+    }
+  }
+
+  const handleRestore = (id, name) => {
+    if (!confirm(`Khôi phục quán "${name}"?\n\nQuán sẽ được hiển thị trở lại trong danh sách quán đang hoạt động.`)) {
       return
     }
 
-    fetch(`${BASE_URL}/admin/restaurants/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ confirm_name: confirmName })
+    fetch(`${BASE_URL}/admin/restaurants/${id}/restore`, {
+      method: 'PUT',
+      credentials: 'include'
     })
-      .then(() => loadRestaurants())
-      .catch(err => console.error('Error deleting restaurant:', err))
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'restored') {
+          alert('✅ Đã khôi phục!')
+          loadRestaurants()
+        }
+      })
+      .catch(err => console.error('Error restoring restaurant:', err))
   }
 
   const handleOpenDetails = (id) => {
@@ -197,24 +259,29 @@ function RestaurantManagement() {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>🍽️ Quản lý Quán Ăn</h1>
-        <button style={styles.addButton} onClick={handleAdd}>
-          ➕ Thêm quán mới
-        </button>
+        <h1 style={styles.title}>
+          {isHidden ? '👻 Quán đã ẩn' : '🍽️ Quản lý Quán Ăn'}
+        </h1>
+        {!isHidden && (
+          <button style={styles.addButton} onClick={handleAdd}>
+            ➕ Thêm quán mới
+          </button>
+        )}
       </div>
 
-      {/* Filters */}
-      <div style={styles.filtersCard}>
-        <div style={styles.filterSection}>
-          <label style={styles.filterLabel}>🔍 Tìm kiếm:</label>
-          <input
-            type="text"
-            placeholder="Nhập tên quán..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={styles.searchInput}
-          />
-        </div>
+      {/* Filters - only show for active restaurants */}
+      {!isHidden && (
+        <div style={styles.filtersCard}>
+          <div style={styles.filterSection}>
+            <label style={styles.filterLabel}>🔍 Tìm kiếm:</label>
+            <input
+              type="text"
+              placeholder="Nhập tên quán..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={styles.searchInput}
+            />
+          </div>
 
         <div style={styles.filterSection}>
           <label style={styles.filterLabel}>🏷️ Lọc theo Tags:</label>
@@ -249,6 +316,21 @@ function RestaurantManagement() {
           </select>
         </div>
       </div>
+      )}
+
+      {/* Info message for hidden restaurants */}
+      {isHidden && (
+        <div style={styles.infoBox}>
+          <p style={{ margin: 0, marginBottom: '8px' }}>
+            <strong>ℹ️ Lưu ý:</strong>
+          </p>
+          <ul style={{ margin: 0, paddingLeft: '20px' }}>
+            <li>Các quán ở đây đã bị ẩn và không hiển thị cho user</li>
+            <li>Có thể <strong>khôi phục</strong> quán bất kỳ lúc nào</li>
+            <li><strong style={{ color: '#ef4444' }}>XÓA VĨNH VIỄN</strong> sẽ xóa toàn bộ dữ liệu liên quan (không thể hoàn tác)</li>
+          </ul>
+        </div>
+      )}
 
       {/* Table */}
       <div style={styles.tableContainer}>
@@ -256,10 +338,10 @@ function RestaurantManagement() {
           <thead>
             <tr>
               <th style={styles.th}>Tên quán</th>
-              <th style={styles.th}>Lượt ghé</th>
-              <th style={styles.th}>TG ghé TB (phút)</th>
-              <th style={styles.th}>TG nghe TB (giây)</th>
-              <th style={styles.th}>TG ăn (phút)</th>
+              {!isHidden && <th style={styles.th}>Lượt ghé</th>}
+              {!isHidden && <th style={styles.th}>TG ghé TB (phút)</th>}
+              {!isHidden && <th style={styles.th}>TG nghe TB (giây)</th>}
+              {!isHidden && <th style={styles.th}>TG ăn (phút)</th>}
               <th style={styles.th}>Hành động</th>
             </tr>
           </thead>
@@ -279,15 +361,42 @@ function RestaurantManagement() {
                     ))}
                   </div>
                 </td>
-                <td style={styles.td}>{r.visit_count || 0}</td>
-                <td style={styles.td}>{r.avg_visit_duration || 0}</td>
-                <td style={styles.td}>{r.avg_audio_duration || 0}</td>
-                <td style={styles.td}>{r.avg_eat_time}</td>
+                {!isHidden && <td style={styles.td}>{r.visit_count || 0}</td>}
+                {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
+                {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
+                {!isHidden && <td style={styles.td}>{r.avg_eat_time}</td>}
                 <td style={styles.td}>
                   <div style={styles.actionButtons}>
-                    <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
-                    <button style={styles.btnDetails} onClick={() => handleOpenDetails(r.id)}>📋</button>
-                    <button style={styles.btnDelete} onClick={() => handleDelete(r.id, r.name)}>🗑️</button>
+                    {isHidden ? (
+                      <>
+                        <button 
+                          style={styles.btnRestore} 
+                          onClick={() => handleRestore(r.id, r.name)}
+                          title="Khôi phục quán"
+                        >
+                          ♻️ Khôi phục
+                        </button>
+                        <button 
+                          style={styles.btnDeletePermanent} 
+                          onClick={() => handleDelete(r.id, r.name)}
+                          title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
+                        >
+                          ⚠️ Xóa vĩnh viễn
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
+                        <button style={styles.btnDetails} onClick={() => handleOpenDetails(r.id)}>📋</button>
+                        <button 
+                          style={styles.btnDelete} 
+                          onClick={() => handleDelete(r.id, r.name)}
+                          title="Ẩn quán"
+                        >
+                          👻 Ẩn
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -544,9 +653,38 @@ const styles = {
     padding: '6px 12px',
     border: 'none',
     borderRadius: '6px',
-    backgroundColor: '#ef4444',
+    backgroundColor: '#f97316',
     color: 'white',
     cursor: 'pointer',
+    fontSize: '14px'
+  },
+  btnRestore: {
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600'
+  },
+  btnDeletePermanent: {
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    backgroundColor: '#dc2626',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600'
+  },
+  infoBox: {
+    backgroundColor: '#fef3c7',
+    border: '1px solid #fbbf24',
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '20px',
+    color: '#92400e',
     fontSize: '14px'
   },
   modalOverlay: {
