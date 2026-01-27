@@ -652,7 +652,12 @@ function LocationTracker() {
   // Mở Google Maps directions
   const openDirections = (restaurant) => {
     if (userLocation) {
+      // Có vị trí user, mở với origin
       const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation[0]},${userLocation[1]}&destination=${restaurant.lat},${restaurant.lng}`
+      window.open(url, '_blank')
+    } else {
+      // Không có vị trí user, mở trực tiếp đến quán (Google Maps sẽ tự lấy vị trí hiện tại)
+      const url = `https://www.google.com/maps/search/?api=1&query=${restaurant.lat},${restaurant.lng}`
       window.open(url, '_blank')
     }
   }
@@ -890,24 +895,22 @@ function LocationTracker() {
                                   {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
                                 </button>
                               )}
-                              {userLocation && (
-                                <button
-                                  onClick={() => openDirections(selectedRestaurant)}
-                                  style={{
-                                    padding: '8px 12px',
-                                    background: '#34A853',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '5px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    flex: '1',
-                                    minWidth: '100px'
-                                  }}
-                                >
-                                  🧭 Chỉ đường
-                                </button>
-                              )}
+                              <button
+                                onClick={() => openDirections(selectedRestaurant)}
+                                style={{
+                                  padding: '8px 12px',
+                                  background: '#34A853',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  flex: '1',
+                                  minWidth: '100px'
+                                }}
+                              >
+                                🧭 Chỉ đường
+                              </button>
                             </div>
                           </>
                         )}
