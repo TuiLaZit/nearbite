@@ -8,13 +8,34 @@ function MenuManagement() {
   const [menuItems, setMenuItems] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [editingItemId, setEditingItemId] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     price: ''
   })
 
   useEffect(() => {
-    loadMenu()
+    // Check authentication first
+    fetch(`${BASE_URL}/admin/check`, {
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) {
+          navigate('/admin/login', { replace: true })
+          return null
+        }
+        return res.json()
+      })
+      .then(data => {
+        if (data) {
+          setIsAuthenticated(true)
+          loadMenu()
+        }
+      })
+      .catch(err => {
+        console.error('Auth check failed:', err)
+        navigate('/admin/login', { replace: true })
+      })
   }, [restaurantId])
 
   const loadMenu = () => {
@@ -89,6 +110,18 @@ function MenuManagement() {
 
   const handleGoBack = () => {
     navigate('/admin')
+  }
+
+  // Show loading state while checking auth
+  if (!isAuthenticated) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div style={{ textAlign: 'center', color: '#64748b' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔄</div>
+          <div>Đang kiểm tra đăng nhập...</div>
+        </div>
+      </div>
+    )
   }
 
   return (

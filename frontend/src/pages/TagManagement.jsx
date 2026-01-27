@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
 function TagManagement() {
+  const navigate = useNavigate()
   const [tags, setTags] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     icon: '',
@@ -13,7 +16,27 @@ function TagManagement() {
   })
 
   useEffect(() => {
-    loadTags()
+    // Check authentication first
+    fetch(`${BASE_URL}/admin/check`, {
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) {
+          navigate('/admin/login', { replace: true })
+          return null
+        }
+        return res.json()
+      })
+      .then(data => {
+        if (data) {
+          setIsAuthenticated(true)
+          loadTags()
+        }
+      })
+      .catch(err => {
+        console.error('Auth check failed:', err)
+        navigate('/admin/login', { replace: true })
+      })
   }, [])
 
   const loadTags = () => {
@@ -102,6 +125,18 @@ function TagManagement() {
     })
       .then(() => loadTags())
       .catch(err => console.error('Error deleting tag:', err))
+  }
+
+  // Show loading state while checking auth
+  if (!isAuthenticated) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <div style={{ textAlign: 'center', color: '#64748b' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔄</div>
+          <div>Đang kiểm tra đăng nhập...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
