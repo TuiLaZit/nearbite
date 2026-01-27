@@ -8,6 +8,7 @@ function AdminDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('dashboard') // dashboard, restaurants, hidden, tags
   const [heatmapData, setHeatmapData] = useState([])
+  const [restaurants, setRestaurants] = useState([])
   const [map, setMap] = useState(null)
   const [heatmapLayer, setHeatmapLayer] = useState(null)
 
@@ -76,6 +77,7 @@ function AdminDashboard() {
   }, [activeTab, heatmapData])
 
   const loadHeatmapData = () => {
+    // Load heatmap data
     fetch(`${BASE_URL}/admin/heatmap`, {
       credentials: 'include'
     })
@@ -91,6 +93,17 @@ function AdminDashboard() {
       .catch(err => {
         console.error('Error loading heatmap:', err)
         setHeatmapData([])
+      })
+
+    // Load restaurants
+    fetch(`${BASE_URL}/restaurants`)
+      .then(res => res.json())
+      .then(data => {
+        setRestaurants(data.restaurants || [])
+      })
+      .catch(err => {
+        console.error('Error loading restaurants:', err)
+        setRestaurants([])
       })
   }
 
@@ -128,31 +141,39 @@ function AdminDashboard() {
       maxZoom: 19
     }).addTo(newMap)
 
-    // Add heatmap layer if plugin is available and data exists
-    if (L.heatLayer && heatmapData.length > 0) {
-      const heatPoints = heatmapData.map(point => [
-        point.lat,
-        point.lng,
-        point.intensity
-      ])
+    // Add restaurant markers
+    restaurants.forEach(restaurant => {
+      // Create custom icon for restaurant
+      const restaurantIcon = L.divIcon({
+        className: 'restaurant-marker',
+        html: `<div style="
+          background-color: #FBBC04;
+          color: white;
+          border: 2px solid white;
+          border-radius: 50%;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        ">🍜</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32]
+      })
 
-      const heat = L.heatLayer(heatPoints, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 17,
-        max: Math.max(...heatmapData.map(p => p.intensity)),
-        gradient: {
-          0.0: 'blue',
-          0.5: 'lime',
-          0.7: 'yellow',
-          1.0: 'red'
-        }
-      }).addTo(newMap)
+      const marker = L.marker([restaurant.lat, restaurant.lng], { icon: restaurantIcon })
+        .addTo(newMap)
 
-      setHeatmapLayer(heat)
-    } else if (!L.heatLayer) {
-      console.error('Leaflet.heat plugin not loaded')
-    }
+      // Add popup with restaurant info
+      marker.bindPopup(`
+        <div style="min-width: 200px;">
+          <strong style="font-size: 16px;">${restaurant.name}</strong><br/>
+          <span style="color: #666; font-size: 14px;">${restaurant.address || ''}</span>
+        </div>
+      `)
+    })
 
     setMap(newMap)
   }
@@ -224,13 +245,13 @@ function AdminDashboard() {
       <div style={styles.mainContent}>
         {activeTab === 'dashboard' && (
           <div style={styles.dashboardContent}>
-            <h1 style={styles.pageTitle}>📍 Heatmap - Điểm nóng User</h1>
+            <h1 style={styles.pageTitle}>�️ Bản đồ Quán ăn</h1>
             <p style={styles.pageDescription}>
-              Bản đồ nhiệt hiển thị các khu vực mà người dùng hay ghé thăm (dừng lại hơn 1 phút)
+              Hiển thị vị trí các quán ăn trong hệ thống
             </p>
-            {heatmapData.length === 0 && (
+            {restaurants.length === 0 && (
               <div style={styles.noDataMessage}>
-                ℹ️ Chưa có dữ liệu heatmap. Dữ liệu sẽ được thu thập khi user sử dụng app.
+                ℹ️ Chưa có quán ăn nào trong hệ thống.
               </div>
             )}
             <div id="heatmap-container" style={styles.heatmapContainer}></div>
