@@ -77,3 +77,13 @@ h1, h2, h3 {
     box-shadow: 0 0 0 10px rgba(251, 188, 4, 0);
   }
 }
+
+/* Animation for loading spinner */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

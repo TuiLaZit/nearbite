@@ -1,6 +1,6 @@
 {
-  "name": "Food Street PoC",
-  "short_name": "Food Street",
+  "name": "NearBite Multilingual Food Guide",
+  "short_name": "NearBite",
   "description": "Ứng dụng thuyết minh ẩm thực tự động dựa trên vị trí GPS",
   "start_url": "/",
   "display": "standalone",
