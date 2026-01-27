@@ -204,8 +204,15 @@ function RestaurantManagement({ isHidden = false }) {
 
   const handleDelete = (id, name) => {
     if (isHidden) {
-      // Permanent delete from hidden list
-      if (!confirm(`XÓA VĨNH VIỄN quán "${name}"?\n\nHành động này không thể hoàn tác!\nTất cả menu, hình ảnh, tags sẽ bị xóa.`)) {
+      // Permanent delete from hidden list - require name confirmation
+      const confirmName = prompt(`⚠️ XÓA VĨNH VIỄN quán "${name}"?\n\nHành động này KHÔNG THỂ HOÀN TÁC!\nTất cả menu, hình ảnh, tags sẽ bị xóa.\n\nVui lòng nhập chính xác tên quán để xác nhận:`)
+      
+      if (!confirmName) {
+        return // User cancelled
+      }
+      
+      if (confirmName.trim() !== name.trim()) {
+        alert('❌ Tên quán không khớp! Vui lòng nhập chính xác tên quán.')
         return
       }
 
@@ -483,8 +490,8 @@ function RestaurantManagement({ isHidden = false }) {
 
       {/* Modal */}
       {showModal && (
-        <div style={styles.modalOverlay} onClick={() => setShowModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
             <h2 style={styles.modalTitle}>
               {editingId ? '✏️ Sửa quán' : '➕ Thêm quán mới'}
             </h2>
