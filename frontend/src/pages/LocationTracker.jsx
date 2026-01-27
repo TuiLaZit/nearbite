@@ -571,11 +571,14 @@ function LocationTracker() {
 
   // Xử lý click vào marker quán
   const handleRestaurantClick = (restaurant) => {
-    // Reset selectedRestaurant trước
-    setSelectedRestaurant(null)
-    
     // Dừng audio cũ nếu đang phát
     stopAudio()
+
+    // Set loading state ngay lập tức để popup hiển thị "Đang tải..."
+    setSelectedRestaurant({
+      ...restaurant,
+      loading: true
+    })
 
     if (userLocation) {
       const distance = calculateDistance(
@@ -600,11 +603,49 @@ function LocationTracker() {
             ...restaurant,
             narration: data.narration,
             audioUrl: data.audio_url,
-            distance: distance
+            distance: distance,
+            loading: false
           }
           setSelectedRestaurant(newData)
         })
-        .catch(err => console.error('Error:', err))
+        .catch(err => {
+          console.error('Error:', err)
+          // Vẫn hiển thị thông tin cơ bản nếu fetch thất bại
+          setSelectedRestaurant({
+            ...restaurant,
+            distance: distance,
+            loading: false,
+            error: true
+          })
+        })
+    } else {
+      // Nếu không có userLocation, vẫn hiển thị thông tin cơ bản
+      fetch(`${BASE_URL}/location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: restaurant.lat,
+          longitude: restaurant.lng,
+          language: languageRef.current
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setSelectedRestaurant({
+            ...restaurant,
+            narration: data.narration,
+            audioUrl: data.audio_url,
+            loading: false
+          })
+        })
+        .catch(err => {
+          console.error('Error:', err)
+          setSelectedRestaurant({
+            ...restaurant,
+            loading: false,
+            error: true
+          })
+        })
     }
   }
 
@@ -807,48 +848,69 @@ function LocationTracker() {
                     )}
                     {selectedRestaurant?.id === restaurant.id && (
                       <>
-                        {selectedRestaurant.distance !== undefined && (
-                          <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
-                            📍 Khoảng cách: {selectedRestaurant.distance.toFixed(3)} km
-                          </p>
+                        {selectedRestaurant.loading ? (
+                          <div style={{ margin: '10px 0', textAlign: 'center', padding: '15px' }}>
+                            <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
+                            <p style={{ fontSize: '13px', color: '#666' }}>Đang tải thông tin...</p>
+                          </div>
+                        ) : selectedRestaurant.error ? (
+                          <div style={{ margin: '10px 0', padding: '10px', background: '#ffebee', borderRadius: '5px' }}>
+                            <p style={{ fontSize: '13px', color: '#c62828', margin: 0 }}>
+                              ⚠️ Không thể tải thông tin. Vui lòng thử lại.
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            {selectedRestaurant.distance !== undefined && (
+                              <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
+                                📍 Khoảng cách: {selectedRestaurant.distance.toFixed(3)} km
+                              </p>
+                            )}
+                            {selectedRestaurant.narration && (
+                              <p style={{ margin: '10px 0', fontSize: '13px', fontStyle: 'italic' }}>
+                                {selectedRestaurant.narration}
+                              </p>
+                            )}
+                            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {selectedRestaurant.audioUrl && (
+                                <button 
+                                  onClick={() => handleToggleAudio(`${BASE_URL}${selectedRestaurant.audioUrl}`)}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: '#4285F4',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    flex: '1',
+                                    minWidth: '100px'
+                                  }}
+                                >
+                                  {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
+                                </button>
+                              )}
+                              {userLocation && (
+                                <button
+                                  onClick={() => openDirections(selectedRestaurant)}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: '#34A853',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    flex: '1',
+                                    minWidth: '100px'
+                                  }}
+                                >
+                                  🧭 Chỉ đường
+                                </button>
+                              )}
+                            </div>
+                          </>
                         )}
-                        {selectedRestaurant.narration && (
-                          <p style={{ margin: '10px 0', fontSize: '13px', fontStyle: 'italic' }}>
-                            {selectedRestaurant.narration}
-                          </p>
-                        )}
-                        <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
-                          {selectedRestaurant.audioUrl && (
-                            <button 
-                              onClick={() => handleToggleAudio(`${BASE_URL}${selectedRestaurant.audioUrl}`)}
-                              style={{
-                                padding: '8px 12px',
-                                background: '#4285F4',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                              }}
-                            >
-                              {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => openDirections(selectedRestaurant)}
-                            style={{
-                              padding: '8px 12px',
-                              background: '#34A853',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '5px',
-                              cursor: 'pointer',
-                              fontSize: '14px'
-                            }}
-                          >
-                            🧭 Chỉ đường
-                          </button>
-                        </div>
                       </>
                     )}
                   </div>
