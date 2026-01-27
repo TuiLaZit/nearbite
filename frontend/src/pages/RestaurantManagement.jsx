@@ -44,7 +44,6 @@ function RestaurantManagement({ isHidden = false }) {
         if (data) {
           setIsAuthenticated(true)
           loadTags()
-          loadRestaurants()
         }
       })
       .catch(err => {
@@ -53,14 +52,19 @@ function RestaurantManagement({ isHidden = false }) {
       })
   }, [])
 
+  // Load restaurants when authenticated or filters change
   useEffect(() => {
-    // Reset về trang 1 khi thay đổi filter
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }, [searchTerm, selectedTags, sortBy])
+    if (isAuthenticated) {
+      loadRestaurants()
+    }
+  }, [isAuthenticated, pagination.page, searchTerm, selectedTags, sortBy])
 
   useEffect(() => {
-    loadRestaurants()
-  }, [pagination.page, searchTerm, selectedTags, sortBy])
+    // Reset về trang 1 khi thay đổi filter
+    if (isAuthenticated) {
+      setPagination(prev => ({ ...prev, page: 1 }))
+    }
+  }, [searchTerm, selectedTags, sortBy, isAuthenticated])
 
   const loadTags = () => {
     fetch(`${BASE_URL}/admin/tags`, {
