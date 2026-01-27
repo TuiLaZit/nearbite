@@ -487,17 +487,18 @@ def register_admin_routes(app):
     @app.route("/admin/heatmap", methods=["GET"])
     @admin_required
     def get_heatmap_data():
-        """Get heatmap data for admin dashboard"""
+        """Get heatmap data for admin dashboard with duration-based intensity"""
         try:
-            # Get all location visits where duration >= 60 seconds
-            visits = LocationVisit.query.filter(LocationVisit.duration_seconds >= 60).all()
+            # Get all location visits
+            visits = LocationVisit.query.all()
             
-            # Aggregate data by location (rounded to 5 decimal places for clustering)
+            # Aggregate data by location (rounded to 4 decimal places for clustering)
+            # Use duration to calculate intensity
             heatmap_data = {}
             for visit in visits:
                 # Round to create clusters
-                lat_key = round(visit.lat, 5)
-                lng_key = round(visit.lng, 5)
+                lat_key = round(visit.lat, 4)
+                lng_key = round(visit.lng, 4)
                 key = (lat_key, lng_key)
                 
                 if key not in heatmap_data:
@@ -506,12 +507,102 @@ def register_admin_routes(app):
                         "lng": lng_key,
                         "intensity": 0
                     }
-                heatmap_data[key]["intensity"] += 1
+                # Add duration to intensity (normalized by dividing by 60 to get minutes)
+                # Cap at 60 minutes max per visit for reasonable scaling
+                duration_weight = min(visit.duration_seconds / 60.0, 60.0)
+                heatmap_data[key]["intensity"] += duration_weight
             
             return jsonify(list(heatmap_data.values()))
         except Exception as e:
             print(f"Error in get_heatmap_data: {str(e)}")
             # Return empty array if table doesn't exist yet
+            return jsonify([])
+
+    @app.route("/admin/restaurants/top", methods=["GET"])
+    @admin_required
+    def get_top_restaurants():
+        """Get top restaurants by different metrics calculated from location_visit table"""
+        try:
+            metric = request.args.get('metric', 'visits')  # visits, duration, audio
+            limit = int(request.args.get('limit', 5))
+            
+            # Base query for active restaurants with visits
+            base_query = db.session.query(
+                Restaurant.id,
+                Restaurant.name,
+                Restaurant.lat,
+                Restaurant.lng
+            ).filter(Restaurant.is_active == True)
+            
+            if metric == 'visits':
+                # Top by visit count (number of location_visit records)
+                results = db.session.query(
+                    Restaurant.id,
+                    Restaurant.name,
+                    func.count(LocationVisit.id).label('visit_count')
+                ).join(
+                    LocationVisit, Restaurant.id == LocationVisit.restaurant_id
+                ).filter(
+                    Restaurant.is_active == True
+                ).group_by(
+                    Restaurant.id, Restaurant.name
+                ).order_by(
+                    func.count(LocationVisit.id).desc()
+                ).limit(limit).all()
+                
+                return jsonify([{
+                    'id': r.id,
+                    'name': r.name,
+                    'visit_count': r.visit_count
+                } for r in results])
+                
+            elif metric == 'duration':
+                # Top by average visit duration (in minutes)
+                results = db.session.query(
+                    Restaurant.id,
+                    Restaurant.name,
+                    func.avg(LocationVisit.duration_seconds).label('avg_duration_seconds')
+                ).join(
+                    LocationVisit, Restaurant.id == LocationVisit.restaurant_id
+                ).filter(
+                    Restaurant.is_active == True
+                ).group_by(
+                    Restaurant.id, Restaurant.name
+                ).order_by(
+                    func.avg(LocationVisit.duration_seconds).desc()
+                ).limit(limit).all()
+                
+                return jsonify([{
+                    'id': r.id,
+                    'name': r.name,
+                    'avg_visit_duration': round(r.avg_duration_seconds / 60.0, 1) if r.avg_duration_seconds else 0
+                } for r in results])
+                
+            elif metric == 'audio':
+                # Top by average audio duration (from restaurant table)
+                results = db.session.query(
+                    Restaurant.id,
+                    Restaurant.name,
+                    Restaurant.avg_audio_duration
+                ).filter(
+                    Restaurant.is_active == True,
+                    Restaurant.avg_audio_duration > 0
+                ).order_by(
+                    Restaurant.avg_audio_duration.desc()
+                ).limit(limit).all()
+                
+                return jsonify([{
+                    'id': r.id,
+                    'name': r.name,
+                    'avg_audio_duration': r.avg_audio_duration
+                } for r in results])
+            
+            return jsonify([])
+            
+        except Exception as e:
+            print(f"Error in get_top_restaurants: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return jsonify([])
 
     @app.route("/admin/restaurants/analytics", methods=["GET"])
