@@ -90,8 +90,8 @@ function AdminDashboard() {
       // Still create map but without heatmap layer
     }
 
-    // Create map centered on Vietnam (adjust as needed)
-    const newMap = L.map('heatmap-container').setView([16.047079, 108.206230], 13)
+    // Create map centered on default location (SGU area)
+    const newMap = L.map('heatmap-container').setView([10.760426862777551, 106.68198430250096], 15)
 
     // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
