@@ -91,6 +91,8 @@ function LocationTracker() {
   const poiEntryTimeRef = useRef(null) // Track thời điểm bước vào POI
   const poiDebounceTimerRef = useRef(null) // Timer cho debouncer 3s
   const playedRestaurantsRef = useRef(new Map()) // Track quán đã phát: {restaurantId: timestamp}
+  const visitStartTimeRef = useRef(null) // Track thời điểm bắt đầu visit (đứng gần quán > 10s)
+  const audioStartTimeRef = useRef(null) // Track thời điểm bắt đầu nghe audio
 
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -124,6 +126,42 @@ function LocationTracker() {
       })
       .catch(err => console.error('Error fetching restaurants:', err))
   }, [])
+
+  // Track location visit khi user ở gần quán
+  const trackLocationVisit = (lat, lng, durationSeconds, restaurantId = null) => {
+    fetch(`${BASE_URL}/track-location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat,
+        lng,
+        duration_seconds: durationSeconds,
+        restaurant_id: restaurantId
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        console.log('✅ Location visit tracked:', data)
+      })
+      .catch(err => console.error('Error tracking location:', err))
+  }
+
+  // Track audio playback duration
+  const trackAudioDuration = (restaurantId, durationSeconds) => {
+    fetch(`${BASE_URL}/track-audio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        restaurant_id: restaurantId,
+        duration_seconds: durationSeconds
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        console.log('✅ Audio duration tracked:', data)
+      })
+      .catch(err => console.error('Error tracking audio:', err))
+  }
 
   // Hàm tính khoảng cách
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -198,8 +236,25 @@ function LocationTracker() {
             })
             setCurrentDistance(distance)
             poiEntryTimeRef.current = null
+            
+            // Reset visit tracking khi ra khỏi POI
+            if (visitStartTimeRef.current) {
+              const visitDuration = Math.floor((Date.now() - visitStartTimeRef.current) / 1000)
+              if (visitDuration >= 10) {
+                // Track location visit (chỉ khi đã ở >= 10s)
+                trackLocationVisit(userLat, userLng, visitDuration, newId)
+              }
+              visitStartTimeRef.current = null
+            }
           } else {
-            // VÀO POI - BẮT ĐẦU DEBOUNCER 3 GIÂY
+            // VÀO POI - BẮT ĐẦU TRACKING VISIT
+            // Kiểm tra nếu cách < 1m (~0.001 km) và đứng > 10s mới track
+            const veryClose = distance <= 0.001 // ~1m
+            if (veryClose && !visitStartTimeRef.current) {
+              visitStartTimeRef.current = Date.now()
+              console.log('📍 Bắt đầu đếm thời gian visit (đứng trong 1m)')
+            }
+            
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
@@ -260,9 +315,26 @@ function LocationTracker() {
               audioUrl: null
             }))
             setCurrentDistance(distance)
+            
+            // Track location visit khi ra khỏi POI
+            if (visitStartTimeRef.current) {
+              const visitDuration = Math.floor((Date.now() - visitStartTimeRef.current) / 1000)
+              if (visitDuration >= 10) {
+                trackLocationVisit(userLat, userLng, visitDuration, newId)
+              }
+              visitStartTimeRef.current = null
+            }
           } else if (distance <= poiRadius && !currentNarration?.audioUrl) {
             // Vào trong POI
             lastDistanceRef.current = distance
+            
+            // Bắt đầu tracking visit nếu ở rất gần (< 1m)
+            const veryClose = distance <= 0.001
+            if (veryClose && !visitStartTimeRef.current) {
+              visitStartTimeRef.current = Date.now()
+              console.log('📍 Bắt đầu đếm thời gian visit (đứng trong 1m)')
+            }
+            
             setCurrentNarration({
               restaurantId: newId,
               name: data.nearest_place.name,
@@ -310,6 +382,14 @@ function LocationTracker() {
   // Dừng audio hoàn toàn
   const stopAudio = () => {
     if (audioRef.current) {
+      // Track audio duration trước khi dừng
+      if (audioStartTimeRef.current && currentNarration?.restaurantId) {
+        const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
+        if (audioDuration >= 1) { // Chỉ track nếu nghe >= 1s
+          trackAudioDuration(currentNarration.restaurantId, audioDuration)
+        }
+      }
+      
       audioRef.current.pause()
       audioRef.current.currentTime = 0
       audioRef.current.src = ''
@@ -319,6 +399,7 @@ function LocationTracker() {
     setIsAudioPlaying(false)
     setAudioBlocked(false)
     setPendingAudioUrl(null)
+    audioStartTimeRef.current = null
     
     // Hủy debounce timer nếu có
     if (poiDebounceTimerRef.current) {
@@ -351,17 +432,26 @@ function LocationTracker() {
       console.error('Audio error details:', audio.error)
       setIsAudioPlaying(false)
       setAudioBlocked(false)
+      audioStartTimeRef.current = null
     }
     
     audio.onended = () => {
+      // Track audio duration khi nghe xong
+      if (audioStartTimeRef.current && currentNarration?.restaurantId) {
+        const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
+        trackAudioDuration(currentNarration.restaurantId, audioDuration)
+      }
+      
       setIsAudioPlaying(false)
       setAudioBlocked(false)
+      audioStartTimeRef.current = null
     }
     
     setIsAudioPlaying(true)
     audio.play()
       .then(() => {
         console.log('Audio playing')
+        audioStartTimeRef.current = Date.now() // Bắt đầu đếm thời gian nghe
         setAudioBlocked(false)
         setPendingAudioUrl(null)
         audioUnlockedRef.current = true
@@ -369,6 +459,7 @@ function LocationTracker() {
       .catch(err => {
         console.error('Error playing audio:', err)
         setIsAudioPlaying(false)
+        audioStartTimeRef.current = null
         // Nếu lỗi autoplay, lưu URL để chờ user tương tác
         if (err.name === 'NotAllowedError') {
           console.warn('Autoplay blocked. User interaction required.')
@@ -414,6 +505,16 @@ function LocationTracker() {
       clearInterval(watchTimerRef.current)
       watchTimerRef.current = null
     }
+    
+    // Track location visit nếu đang trong quá trình visit
+    if (visitStartTimeRef.current && currentNarration?.restaurantId && userLocation) {
+      const visitDuration = Math.floor((Date.now() - visitStartTimeRef.current) / 1000)
+      if (visitDuration >= 10) {
+        trackLocationVisit(userLocation[0], userLocation[1], visitDuration, currentNarration.restaurantId)
+      }
+      visitStartTimeRef.current = null
+    }
+    
     stopAudio()
   }
 

@@ -484,26 +484,31 @@ def register_admin_routes(app):
     @admin_required
     def get_heatmap_data():
         """Get heatmap data for admin dashboard"""
-        # Get all location visits where duration >= 60 seconds
-        visits = LocationVisit.query.filter(LocationVisit.duration_seconds >= 60).all()
-        
-        # Aggregate data by location (rounded to 5 decimal places for clustering)
-        heatmap_data = {}
-        for visit in visits:
-            # Round to create clusters
-            lat_key = round(visit.lat, 5)
-            lng_key = round(visit.lng, 5)
-            key = (lat_key, lng_key)
+        try:
+            # Get all location visits where duration >= 60 seconds
+            visits = LocationVisit.query.filter(LocationVisit.duration_seconds >= 60).all()
             
-            if key not in heatmap_data:
-                heatmap_data[key] = {
-                    "lat": lat_key,
-                    "lng": lng_key,
-                    "intensity": 0
-                }
-            heatmap_data[key]["intensity"] += 1
-        
-        return jsonify(list(heatmap_data.values()))
+            # Aggregate data by location (rounded to 5 decimal places for clustering)
+            heatmap_data = {}
+            for visit in visits:
+                # Round to create clusters
+                lat_key = round(visit.lat, 5)
+                lng_key = round(visit.lng, 5)
+                key = (lat_key, lng_key)
+                
+                if key not in heatmap_data:
+                    heatmap_data[key] = {
+                        "lat": lat_key,
+                        "lng": lng_key,
+                        "intensity": 0
+                    }
+                heatmap_data[key]["intensity"] += 1
+            
+            return jsonify(list(heatmap_data.values()))
+        except Exception as e:
+            print(f"Error in get_heatmap_data: {str(e)}")
+            # Return empty array if table doesn't exist yet
+            return jsonify([])
 
     @app.route("/admin/restaurants/analytics", methods=["GET"])
     @admin_required
