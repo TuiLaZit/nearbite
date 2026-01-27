@@ -180,6 +180,19 @@ def register_user_routes(app):
         print(f"Audio URL: {audio_url}")
         print(f"Language used: {language}")
 
+        # Get restaurant data with translated tags
+        restaurant_data = nearest.to_dict(include_details=True)
+        
+        # Translate tag names if not Vietnamese
+        if language != 'vi' and 'tags' in restaurant_data:
+            for tag in restaurant_data['tags']:
+                if tag.get('name'):
+                    try:
+                        tag['name'] = translate_text(tag['name'], language)
+                    except Exception as e:
+                        print(f"Error translating tag {tag.get('id')}: {e}")
+                        # Keep original Vietnamese if translation fails
+
         return jsonify({
             "status": "success",
             "language": language,
@@ -187,7 +200,7 @@ def register_user_routes(app):
             "audio_url": audio_url,
             "distance_km": round(min_dist, 3),
             "poi_radius_km": poi_radius,
-            "nearest_place": nearest.to_dict(include_details=True),
+            "nearest_place": restaurant_data,
             "out_of_range_message": out_of_range_msg
         })
 
