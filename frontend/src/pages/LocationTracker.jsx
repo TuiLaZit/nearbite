@@ -422,29 +422,10 @@ function LocationTracker() {
     if (!audioUrl) return
 
     if (isAudioPlaying && audioRef.current) {
-      // Chỉ pause, KHÔNG xóa src
-      audioRef.current.pause()
-      setIsAudioPlaying(false)
-    } else if (audioRef.current && audioRef.current.src && !isAudioPlaying) {
-      // Nếu đã có audio từ trước, chỉ cần play lại
-      audioRef.current.play()
-        .then(() => {
-          setIsAudioPlaying(true)
-          setAudioBlocked(false)
-          // Lưu timestamp khi user tự bấm
-          if (currentNarration?.restaurantId) {
-            playedRestaurantsRef.current.set(currentNarration.restaurantId, Date.now())
-          }
-        })
-        .catch(err => {
-          console.error('Error resuming audio:', err)
-          if (err.name === 'NotAllowedError') {
-            setAudioBlocked(true)
-            setPendingAudioUrl(audioUrl)
-          }
-        })
+      // DỪNG HOÀN TOÀN - Xóa audio để phát lại từ đầu
+      stopAudio()
     } else {
-      // Tạo audio mới
+      // Tạo audio mới và phát từ đầu
       playAudio(audioUrl)
       // Lưu timestamp khi user tự bấm
       if (currentNarration?.restaurantId) {

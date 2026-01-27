@@ -1,4 +1,5 @@
 from db import db
+from datetime import datetime
 
 # Association table for many-to-many relationship between Restaurant and Tag
 restaurant_tags = db.Table('restaurant_tag',
@@ -17,6 +18,11 @@ class Restaurant(db.Model):
     avg_eat_time = db.Column(db.Integer)
     poi_radius_km = db.Column(db.Float, default=0.015, nullable=False)  # POI activation radius in km (default 15m)
     is_active = db.Column(db.Boolean, default=True)
+    
+    # Analytics fields
+    visit_count = db.Column(db.Integer, default=0)  # Số lần ghé
+    avg_visit_duration = db.Column(db.Integer, default=0)  # Thời gian ghé trung bình (phút)
+    avg_audio_duration = db.Column(db.Integer, default=0)  # Thời gian nghe trung bình (giây)
 
     menu_items = db.relationship(
         "MenuItem",
@@ -49,7 +55,10 @@ class Restaurant(db.Model):
             "description": self.description,
             "avg_eat_time": self.avg_eat_time,
             "poi_radius_km": self.poi_radius_km,
-            "is_active": self.is_active
+            "is_active": self.is_active,
+            "visit_count": self.visit_count,
+            "avg_visit_duration": self.avg_visit_duration,
+            "avg_audio_duration": self.avg_audio_duration
         }
         
         if include_details:
@@ -99,6 +108,35 @@ class RestaurantImage(db.Model):
     image_url = db.Column(db.Text, nullable=False)
     caption = db.Column(db.Text)
     display_order = db.Column(db.Integer, default=0)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "restaurant_id": self.restaurant_id,
+            "image_url": self.image_url,
+            "caption": self.caption,
+            "display_order": self.display_order
+        }
+
+
+# Model for tracking user location visits (for heatmap)
+class LocationVisit(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lat = db.Column(db.Float, nullable=False)
+    lng = db.Column(db.Float, nullable=False)
+    duration_seconds = db.Column(db.Integer, nullable=False)  # Thời gian ở vị trí (giây)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.id"), nullable=True)  # Nullable for general visits
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "lat": self.lat,
+            "lng": self.lng,
+            "duration_seconds": self.duration_seconds,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "restaurant_id": self.restaurant_id
+        }
     is_primary = db.Column(db.Boolean, default=False)
     
     def to_dict(self):

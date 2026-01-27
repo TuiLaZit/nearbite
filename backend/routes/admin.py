@@ -1,11 +1,12 @@
 from flask import request, jsonify
-from models import Restaurant, MenuItem, Tag, RestaurantImage, restaurant_tags
+from models import Restaurant, MenuItem, Tag, RestaurantImage, restaurant_tags, LocationVisit
 from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
 from supabase_client import upload_image, delete_image, supabase_client
 import uuid
 from datetime import datetime
+from sqlalchemy import func
 
 def register_admin_routes(app):
 
@@ -473,5 +474,66 @@ def register_admin_routes(app):
             return jsonify({
                 "error": f"Failed to upload image: {str(e)}"
             }), 500
+
+
+    # ======================
+    # HEATMAP & ANALYTICS
+    # ======================
+
+    @app.route("/admin/heatmap", methods=["GET"])
+    @admin_required
+    def get_heatmap_data():
+        """Get heatmap data for admin dashboard"""
+        # Get all location visits where duration >= 60 seconds
+        visits = LocationVisit.query.filter(LocationVisit.duration_seconds >= 60).all()
+        
+        # Aggregate data by location (rounded to 5 decimal places for clustering)
+        heatmap_data = {}
+        for visit in visits:
+            # Round to create clusters
+            lat_key = round(visit.lat, 5)
+            lng_key = round(visit.lng, 5)
+            key = (lat_key, lng_key)
+            
+            if key not in heatmap_data:
+                heatmap_data[key] = {
+                    "lat": lat_key,
+                    "lng": lng_key,
+                    "intensity": 0
+                }
+            heatmap_data[key]["intensity"] += 1
+        
+        return jsonify(list(heatmap_data.values()))
+
+    @app.route("/admin/restaurants/analytics", methods=["GET"])
+    @admin_required
+    def get_restaurants_analytics():
+        """Get restaurants with analytics data for management page"""
+        search = request.args.get('search', '').strip()
+        tag_ids = request.args.getlist('tags')
+        sort_by = request.args.get('sort', 'name')  # name, visit_count, avg_visit_duration, avg_audio_duration
+        
+        query = Restaurant.query.filter_by(is_active=True)
+        
+        # Search by name
+        if search:
+            query = query.filter(Restaurant.name.ilike(f'%{search}%'))
+        
+        # Filter by tags
+        if tag_ids:
+            query = query.join(Restaurant.tags).filter(Tag.id.in_(tag_ids))
+        
+        # Sorting
+        if sort_by == 'visit_count':
+            query = query.order_by(Restaurant.visit_count.desc())
+        elif sort_by == 'avg_visit_duration':
+            query = query.order_by(Restaurant.avg_visit_duration.desc())
+        elif sort_by == 'avg_audio_duration':
+            query = query.order_by(Restaurant.avg_audio_duration.desc())
+        else:
+            query = query.order_by(Restaurant.name)
+        
+        restaurants = query.all()
+        return jsonify([r.to_dict(include_details=True) for r in restaurants])
 
 

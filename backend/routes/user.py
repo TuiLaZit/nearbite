@@ -1,9 +1,10 @@
 from flask import request, jsonify
-from models import Restaurant, Tag, db
+from models import Restaurant, Tag, LocationVisit, db
 from services import calculate_distance, generate_narration
 from translate import translate_text, LANGUAGE_LABELS
 from tts import text_to_speech
 from sqlalchemy import and_, or_
+from datetime import datetime
 
 
 def register_user_routes(app):
@@ -384,3 +385,70 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
         "total_cost": round(total_cost),
         "num_stops": len(tour)
     }
+
+
+    # ======================
+    # LOCATION TRACKING
+    # ======================
+
+    @app.route("/track-location", methods=["POST"])
+    def track_location():
+        """Track user location visits for heatmap"""
+        data = request.json
+        
+        lat = data.get("lat")
+        lng = data.get("lng")
+        duration_seconds = data.get("duration_seconds")
+        
+        if not all([lat, lng, duration_seconds]):
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        # Find if near any restaurant
+        restaurant_id = None
+        restaurants = Restaurant.query.filter_by(is_active=True).all()
+        for r in restaurants:
+            distance = calculate_distance(lat, lng, r.lat, r.lng)
+            if distance <= r.poi_radius_km:
+                restaurant_id = r.id
+                # Update restaurant analytics
+                if duration_seconds >= 60:
+                    r.visit_count += 1
+                    # Update average visit duration
+                    if r.avg_visit_duration == 0:
+                        r.avg_visit_duration = duration_seconds // 60
+                    else:
+                        r.avg_visit_duration = (r.avg_visit_duration + duration_seconds // 60) // 2
+                break
+        
+        # Save location visit
+        visit = LocationVisit(
+            lat=lat,
+            lng=lng,
+            duration_seconds=duration_seconds,
+            restaurant_id=restaurant_id
+        )
+        db.session.add(visit)
+        db.session.commit()
+        
+        return jsonify({"status": "success"})
+
+    @app.route("/track-audio", methods=["POST"])
+    def track_audio():
+        """Track audio playback duration"""
+        data = request.json
+        restaurant_id = data.get("restaurant_id")
+        duration_seconds = data.get("duration_seconds")
+        
+        if not all([restaurant_id, duration_seconds]):
+            return jsonify({"error": "Missing required fields"}), 400
+        
+        restaurant = Restaurant.query.get(restaurant_id)
+        if restaurant:
+            # Update average audio duration
+            if restaurant.avg_audio_duration == 0:
+                restaurant.avg_audio_duration = duration_seconds
+            else:
+                restaurant.avg_audio_duration = (restaurant.avg_audio_duration + duration_seconds) // 2
+            db.session.commit()
+        
+        return jsonify({"status": "success"})
