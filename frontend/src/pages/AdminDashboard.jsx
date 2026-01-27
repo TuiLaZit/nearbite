@@ -6,7 +6,7 @@ import TagManagement from './TagManagement'
 
 function AdminDashboard() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('dashboard') // dashboard, restaurants, tags
+  const [activeTab, setActiveTab] = useState('dashboard') // dashboard, restaurants, hidden, tags
   const [heatmapData, setHeatmapData] = useState([])
   const [map, setMap] = useState(null)
   const [heatmapLayer, setHeatmapLayer] = useState(null)
@@ -196,6 +196,15 @@ function AdminDashboard() {
           <button
             style={{
               ...styles.navButton,
+              ...(activeTab === 'hidden' ? styles.navButtonActive : {})
+            }}
+            onClick={() => setActiveTab('hidden')}
+          >
+            👻 Quán đã ẩn
+          </button>
+          <button
+            style={{
+              ...styles.navButton,
               ...(activeTab === 'tags' ? styles.navButtonActive : {})
             }}
             onClick={() => setActiveTab('tags')}
@@ -228,7 +237,8 @@ function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'restaurants' && <RestaurantManagement />}
+        {activeTab === 'restaurants' && <RestaurantManagement isHidden={false} />}
+        {activeTab === 'hidden' && <RestaurantManagement isHidden={true} />}
         {activeTab === 'tags' && <TagManagement />}
       </div>
     </div>

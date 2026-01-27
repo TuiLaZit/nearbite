@@ -77,31 +77,28 @@ def register_admin_routes(app):
         restaurant = Restaurant.query.get_or_404(id)
         data = request.get_json()
 
-        if not data or data.get("confirm_name") != restaurant.name:
+        # Check if this is a permanent delete request (from hidden list)
+        if data and data.get("permanent") == True:
+            # Permanent delete - remove everything
+            db.session.delete(restaurant)
+            db.session.commit()
             return jsonify({
-                "status": "error",
-                "message": "Tên quán xác nhận không đúng"
-            }), 400
-
-        db.session.delete(restaurant)
+                "status": "permanently_deleted",
+                "id": id
+            })
+        
+        # Otherwise, soft delete (hide the restaurant)
+        restaurant.is_active = False
         db.session.commit()
 
         return jsonify({
-            "status": "deleted",
+            "status": "hidden",
             "id": id
         })
 
     # ======================
-    # SOFT DELETE
+    # SOFT DELETE / RESTORE
     # ======================
-
-    @app.route("/admin/restaurants/<int:id>/hide", methods=["PUT"])
-    @admin_required
-    def hide_restaurant(id):
-        restaurant = Restaurant.query.get_or_404(id)
-        restaurant.is_active = False
-        db.session.commit()
-        return jsonify({"status": "hidden"})
 
     @app.route("/admin/restaurants/<int:id>/restore", methods=["PUT"])
     @admin_required
