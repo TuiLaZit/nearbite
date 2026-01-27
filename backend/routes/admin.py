@@ -111,7 +111,14 @@ def register_admin_routes(app):
     @app.route("/admin/restaurants/hidden", methods=["GET"])
     @admin_required
     def get_hidden_restaurants():
-        restaurants = Restaurant.query.filter_by(is_active=False).all()
+        from sqlalchemy.orm import joinedload
+        
+        # Use eager loading for better performance
+        restaurants = Restaurant.query.options(
+            joinedload(Restaurant.menu_items),
+            joinedload(Restaurant.tags),
+            joinedload(Restaurant.images)
+        ).filter_by(is_active=False).all()
         return jsonify([r.to_dict() for r in restaurants])
 
     # ======================
@@ -511,11 +518,20 @@ def register_admin_routes(app):
     @admin_required
     def get_restaurants_analytics():
         """Get restaurants with analytics data for management page"""
+        from sqlalchemy.orm import joinedload
+        
         search = request.args.get('search', '').strip()
         tag_ids = request.args.getlist('tags')
         sort_by = request.args.get('sort', 'name')  # name, visit_count, avg_visit_duration, avg_audio_duration
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 50))  # Default 50 items per page
         
-        query = Restaurant.query.filter_by(is_active=True)
+        # Use eager loading to avoid N+1 query problem
+        query = Restaurant.query.options(
+            joinedload(Restaurant.menu_items),
+            joinedload(Restaurant.tags),
+            joinedload(Restaurant.images)
+        ).filter_by(is_active=True)
         
         # Search by name
         if search:
@@ -535,7 +551,15 @@ def register_admin_routes(app):
         else:
             query = query.order_by(Restaurant.name)
         
-        restaurants = query.all()
-        return jsonify([r.to_dict(include_details=True) for r in restaurants])
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        return jsonify({
+            'restaurants': [r.to_dict(include_details=True) for r in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': pagination.pages
+        })
 
 

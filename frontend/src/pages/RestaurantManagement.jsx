@@ -12,6 +12,13 @@ function RestaurantManagement({ isHidden = false }) {
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    perPage: 50,
+    total: 0,
+    totalPages: 0
+  })
   const [formData, setFormData] = useState({
     name: '',
     lat: '',
@@ -47,8 +54,13 @@ function RestaurantManagement({ isHidden = false }) {
   }, [])
 
   useEffect(() => {
-    loadRestaurants()
+    // Reset về trang 1 khi thay đổi filter
+    setPagination(prev => ({ ...prev, page: 1 }))
   }, [searchTerm, selectedTags, sortBy])
+
+  useEffect(() => {
+    loadRestaurants()
+  }, [pagination.page, searchTerm, selectedTags, sortBy])
 
   const loadTags = () => {
     fetch(`${BASE_URL}/admin/tags`, {
@@ -62,6 +74,8 @@ function RestaurantManagement({ isHidden = false }) {
   const loadRestaurants = () => {
     if (!isAuthenticated) return
     
+    setLoading(true)
+    
     // Load hidden restaurants or active restaurants
     if (isHidden) {
       fetch(`${BASE_URL}/admin/restaurants/hidden`, {
@@ -71,15 +85,21 @@ function RestaurantManagement({ isHidden = false }) {
           if (!res.ok) throw new Error('Failed to load hidden restaurants')
           return res.json()
         })
-        .then(data => setRestaurants(data || []))
+        .then(data => {
+          setRestaurants(data || [])
+          setLoading(false)
+        })
         .catch(err => {
           console.error('Error loading hidden restaurants:', err)
           setRestaurants([])
+          setLoading(false)
         })
     } else {
       const params = new URLSearchParams()
       if (searchTerm) params.append('search', searchTerm)
       if (sortBy) params.append('sort', sortBy)
+      params.append('page', pagination.page)
+      params.append('per_page', pagination.perPage)
       selectedTags.forEach(tagId => params.append('tags', tagId))
 
       fetch(`${BASE_URL}/admin/restaurants/analytics?${params.toString()}`, {
@@ -89,10 +109,19 @@ function RestaurantManagement({ isHidden = false }) {
           if (!res.ok) throw new Error('Failed to load restaurants')
           return res.json()
         })
-        .then(data => setRestaurants(data || []))
+        .then(data => {
+          setRestaurants(data.restaurants || [])
+          setPagination(prev => ({
+            ...prev,
+            total: data.total,
+            totalPages: data.total_pages
+          }))
+          setLoading(false)
+        })
         .catch(err => {
           console.error('Error loading restaurants:', err)
           setRestaurants([])
+          setLoading(false)
         })
     }
   }
@@ -334,75 +363,118 @@ function RestaurantManagement({ isHidden = false }) {
 
       {/* Table */}
       <div style={styles.tableContainer}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Tên quán</th>
-              {!isHidden && <th style={styles.th}>Lượt ghé</th>}
-              {!isHidden && <th style={styles.th}>TG ghé TB (phút)</th>}
-              {!isHidden && <th style={styles.th}>TG nghe TB (giây)</th>}
-              {!isHidden && <th style={styles.th}>TG ăn (phút)</th>}
-              <th style={styles.th}>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {restaurants.map(r => (
-              <tr key={r.id} style={styles.tr}>
-                <td style={styles.td}>
-                  <div style={styles.restaurantName}>{r.name}</div>
-                  <div style={styles.restaurantTags}>
-                    {r.tags?.map(tag => (
-                      <span
-                        key={tag.id}
-                        style={{ ...styles.tagBadge, backgroundColor: tag.color }}
-                      >
-                        {tag.icon} {tag.name}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                {!isHidden && <td style={styles.td}>{r.visit_count || 0}</td>}
-                {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
-                {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
-                {!isHidden && <td style={styles.td}>{r.avg_eat_time}</td>}
-                <td style={styles.td}>
-                  <div style={styles.actionButtons}>
-                    {isHidden ? (
-                      <>
-                        <button 
-                          style={styles.btnRestore} 
-                          onClick={() => handleRestore(r.id, r.name)}
-                          title="Khôi phục quán"
-                        >
-                          ♻️ Khôi phục
-                        </button>
-                        <button 
-                          style={styles.btnDeletePermanent} 
-                          onClick={() => handleDelete(r.id, r.name)}
-                          title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
-                        >
-                          ⚠️ Xóa vĩnh viễn
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
-                        <button style={styles.btnDetails} onClick={() => handleOpenDetails(r.id)}>📋</button>
-                        <button 
-                          style={styles.btnDelete} 
-                          onClick={() => handleDelete(r.id, r.name)}
-                          title="Ẩn quán"
-                        >
-                          👻 Ẩn
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading ? (
+          <div style={styles.loadingContainer}>
+            <div style={styles.loadingSpinner}></div>
+            <p>Đang tải dữ liệu...</p>
+          </div>
+        ) : (
+          <>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Tên quán</th>
+                  {!isHidden && <th style={styles.th}>Lượt ghé</th>}
+                  {!isHidden && <th style={styles.th}>TG ghé TB (phút)</th>}
+                  {!isHidden && <th style={styles.th}>TG nghe TB (giây)</th>}
+                  {!isHidden && <th style={styles.th}>TG ăn (phút)</th>}
+                  <th style={styles.th}>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {restaurants.map(r => (
+                  <tr key={r.id} style={styles.tr}>
+                    <td style={styles.td}>
+                      <div style={styles.restaurantName}>{r.name}</div>
+                      <div style={styles.restaurantTags}>
+                        {r.tags?.map(tag => (
+                          <span
+                            key={tag.id}
+                            style={{ ...styles.tagBadge, backgroundColor: tag.color }}
+                          >
+                            {tag.icon} {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    {!isHidden && <td style={styles.td}>{r.visit_count || 0}</td>}
+                    {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
+                    {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
+                    {!isHidden && <td style={styles.td}>{r.avg_eat_time}</td>}
+                    <td style={styles.td}>
+                      <div style={styles.actionButtons}>
+                        {isHidden ? (
+                          <>
+                            <button 
+                              style={styles.btnRestore} 
+                              onClick={() => handleRestore(r.id, r.name)}
+                              title="Khôi phục quán"
+                            >
+                              ♻️ Khôi phục
+                            </button>
+                            <button 
+                              style={styles.btnDeletePermanent} 
+                              onClick={() => handleDelete(r.id, r.name)}
+                              title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
+                            >
+                              ⚠️ Xóa vĩnh viễn
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
+                            <button style={styles.btnDetails} onClick={() => handleOpenDetails(r.id)}>📋</button>
+                            <button 
+                              style={styles.btnDelete} 
+                              onClick={() => handleDelete(r.id, r.name)}
+                              title="Ẩn quán"
+                            >
+                              👻 Ẩn
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Pagination Controls */}
+            {!isHidden && pagination.totalPages > 1 && (
+              <div style={styles.paginationContainer}>
+                <button
+                  style={{
+                    ...styles.paginationButton,
+                    ...(pagination.page === 1 ? styles.paginationButtonDisabled : {})
+                  }}
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={pagination.page === 1}
+                >
+                  ← Trước
+                </button>
+                
+                <span style={styles.paginationInfo}>
+                  Trang {pagination.page} / {pagination.totalPages} 
+                  <span style={{ marginLeft: '10px', color: '#64748b' }}>
+                    (Tổng {pagination.total} quán)
+                  </span>
+                </span>
+                
+                <button
+                  style={{
+                    ...styles.paginationButton,
+                    ...(pagination.page === pagination.totalPages ? styles.paginationButtonDisabled : {})
+                  }}
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={pagination.page === pagination.totalPages}
+                >
+                  Sau →
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Modal */}
@@ -686,6 +758,54 @@ const styles = {
     marginBottom: '20px',
     color: '#92400e',
     fontSize: '14px'
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px 20px',
+    color: '#64748b'
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #e2e8f0',
+    borderTop: '4px solid #3b82f6',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    marginBottom: '16px'
+  },
+  paginationContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    padding: '20px',
+    borderTop: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc'
+  },
+  paginationButton: {
+    padding: '8px 16px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    backgroundColor: 'white',
+    color: '#1e293b',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s'
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f1f5f9',
+    color: '#94a3b8',
+    cursor: 'not-allowed',
+    opacity: 0.6
+  },
+  paginationInfo: {
+    fontSize: '14px',
+    color: '#1e293b',
+    fontWeight: '500'
   },
   modalOverlay: {
     position: 'fixed',
