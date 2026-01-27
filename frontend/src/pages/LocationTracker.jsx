@@ -628,7 +628,7 @@ function LocationTracker() {
     }
   }, [])
 
-  const mapCenter = userLocation || [10.762622, 106.660172] // Default: Saigon
+  const mapCenter = userLocation || [10.760426862777551, 106.68198430250096] // Default: SGU area
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
