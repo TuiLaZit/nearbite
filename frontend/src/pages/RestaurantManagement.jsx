@@ -11,6 +11,7 @@ function RestaurantManagement() {
   const [sortBy, setSortBy] = useState('name')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     lat: '',
@@ -21,8 +22,28 @@ function RestaurantManagement() {
   })
 
   useEffect(() => {
-    loadTags()
-    loadRestaurants()
+    // Check authentication first
+    fetch(`${BASE_URL}/admin/check`, {
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) {
+          navigate('/admin/login', { replace: true })
+          return null
+        }
+        return res.json()
+      })
+      .then(data => {
+        if (data) {
+          setIsAuthenticated(true)
+          loadTags()
+          loadRestaurants()
+        }
+      })
+      .catch(err => {
+        console.error('Auth check failed:', err)
+        navigate('/admin/login', { replace: true })
+      })
   }, [])
 
   useEffect(() => {
@@ -39,6 +60,8 @@ function RestaurantManagement() {
   }
 
   const loadRestaurants = () => {
+    if (!isAuthenticated) return
+    
     const params = new URLSearchParams()
     if (searchTerm) params.append('search', searchTerm)
     if (sortBy) params.append('sort', sortBy)
@@ -47,9 +70,15 @@ function RestaurantManagement() {
     fetch(`${BASE_URL}/admin/restaurants/analytics?${params.toString()}`, {
       credentials: 'include'
     })
-      .then(res => res.json())
-      .then(data => setRestaurants(data))
-      .catch(err => console.error('Error loading restaurants:', err))
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load restaurants')
+        return res.json()
+      })
+      .then(data => setRestaurants(data || []))
+      .catch(err => {
+        console.error('Error loading restaurants:', err)
+        setRestaurants([])
+      })
   }
 
   const handleFormChange = (e) => {

@@ -12,42 +12,65 @@ function AdminDashboard() {
   const [heatmapLayer, setHeatmapLayer] = useState(null)
 
   useEffect(() => {
+    let isMounted = true
+    
     // Check authentication
     fetch(`${BASE_URL}/admin/check`, {
       credentials: 'include'
     })
       .then(res => {
+        if (!isMounted) return null
         if (!res.ok) {
-          navigate('/admin/login')
+          navigate('/admin/login', { replace: true })
           return null
         }
         return res.json()
       })
       .then(data => {
-        if (data) {
-          // Load heatmap data only if authenticated
-          loadHeatmapData()
-        }
+        if (!isMounted || !data) return
+        // Load heatmap data only if authenticated
+        loadHeatmapData()
       })
       .catch(err => {
+        if (!isMounted) return
         console.error('Auth check failed:', err)
-        navigate('/admin/login')
+        navigate('/admin/login', { replace: true })
       })
+    
+    return () => { isMounted = false }
   }, [navigate])
 
   useEffect(() => {
-    if (activeTab === 'dashboard') {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
+    if (activeTab === 'dashboard' && heatmapData !== null) {
+      // Clean up existing map first
+      if (map) {
+        try {
+          map.remove()
+          setMap(null)
+        } catch (e) {
+          console.error('Error removing map:', e)
+        }
+      }
+      
+      // Small delay to ensure DOM is ready and cleanup complete
+      const timer = setTimeout(() => {
         initializeMap()
-      }, 100)
+      }, 150)
+      
+      return () => {
+        clearTimeout(timer)
+      }
     }
     
-    // Cleanup function
+    // Cleanup when leaving dashboard
     return () => {
-      if (map) {
-        map.remove()
-        setMap(null)
+      if (activeTab !== 'dashboard' && map) {
+        try {
+          map.remove()
+          setMap(null)
+        } catch (e) {
+          console.error('Error removing map:', e)
+        }
       }
     }
   }, [activeTab, heatmapData])
@@ -72,11 +95,6 @@ function AdminDashboard() {
   }
 
   const initializeMap = () => {
-    // Cleanup existing map
-    if (map) {
-      map.remove()
-    }
-
     // Initialize Leaflet map
     const L = window.L
     if (!L) {
@@ -84,10 +102,21 @@ function AdminDashboard() {
       return
     }
 
+    // Check if container exists
+    const container = document.getElementById('heatmap-container')
+    if (!container) {
+      console.error('Heatmap container not found')
+      return
+    }
+
+    // Remove any existing map instance from container
+    if (container._leaflet_id) {
+      container._leaflet_id = null
+    }
+
     // Check if we have data
     if (heatmapData.length === 0) {
       console.log('No heatmap data available yet')
-      // Still create map but without heatmap layer
     }
 
     // Create map centered on default location (SGU area)
