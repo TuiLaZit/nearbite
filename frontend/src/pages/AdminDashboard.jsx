@@ -1,16 +1,85 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import RestaurantManagement from './RestaurantManagement'
 import TagManagement from './TagManagement'
+
+// Fix cho Leaflet default marker icons
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
+
+// Custom icon cho restaurant
+const restaurantIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="14" fill="#FBBC04" stroke="white" stroke-width="2"/>
+      <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">🍜</text>
+    </svg>
+  `),
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+})
+
+// Component để thêm heatmap layer vào map
+function HeatmapLayer({ heatmapData }) {
+  const map = useMap()
+  const heatLayerRef = useRef(null)
+
+  useEffect(() => {
+    if (!map || !window.L || !window.L.heatLayer) return
+
+    // Remove existing heatmap layer
+    if (heatLayerRef.current) {
+      map.removeLayer(heatLayerRef.current)
+    }
+
+    // Add new heatmap layer if data exists
+    if (heatmapData && heatmapData.length > 0) {
+      const heatPoints = heatmapData.map(point => [
+        point.lat,
+        point.lng,
+        point.intensity
+      ])
+
+      const heat = window.L.heatLayer(heatPoints, {
+        radius: 25,
+        blur: 15,
+        maxZoom: 17,
+        max: Math.max(...heatmapData.map(p => p.intensity)),
+        gradient: {
+          0.0: 'blue',
+          0.5: 'lime',
+          0.7: 'yellow',
+          1.0: 'red'
+        }
+      }).addTo(map)
+
+      heatLayerRef.current = heat
+    }
+
+    return () => {
+      if (heatLayerRef.current) {
+        map.removeLayer(heatLayerRef.current)
+      }
+    }
+  }, [map, heatmapData])
+
+  return null
+}
 
 function AdminDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('dashboard') // dashboard, restaurants, hidden, tags
   const [heatmapData, setHeatmapData] = useState([])
   const [restaurants, setRestaurants] = useState([])
-  const [map, setMap] = useState(null)
-  const [heatmapLayer, setHeatmapLayer] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -41,40 +110,7 @@ function AdminDashboard() {
     return () => { isMounted = false }
   }, [navigate])
 
-  useEffect(() => {
-    if (activeTab === 'dashboard' && heatmapData !== null) {
-      // Clean up existing map first
-      if (map) {
-        try {
-          map.remove()
-          setMap(null)
-        } catch (e) {
-          console.error('Error removing map:', e)
-        }
-      }
-      
-      // Small delay to ensure DOM is ready and cleanup complete
-      const timer = setTimeout(() => {
-        initializeMap()
-      }, 150)
-      
-      return () => {
-        clearTimeout(timer)
-      }
-    }
-    
-    // Cleanup when leaving dashboard
-    return () => {
-      if (activeTab !== 'dashboard' && map) {
-        try {
-          map.remove()
-          setMap(null)
-        } catch (e) {
-          console.error('Error removing map:', e)
-        }
-      }
-    }
-  }, [activeTab, heatmapData])
+  // Load heatmap và restaurants khi load component
 
   const loadHeatmapData = () => {
     // Load heatmap data
@@ -107,76 +143,7 @@ function AdminDashboard() {
       })
   }
 
-  const initializeMap = () => {
-    // Initialize Leaflet map
-    const L = window.L
-    if (!L) {
-      console.error('Leaflet not loaded')
-      return
-    }
 
-    // Check if container exists
-    const container = document.getElementById('heatmap-container')
-    if (!container) {
-      console.error('Heatmap container not found')
-      return
-    }
-
-    // Remove any existing map instance from container
-    if (container._leaflet_id) {
-      container._leaflet_id = null
-    }
-
-    // Check if we have data
-    if (heatmapData.length === 0) {
-      console.log('No heatmap data available yet')
-    }
-
-    // Create map centered on default location (SGU area)
-    const newMap = L.map('heatmap-container').setView([10.760426862777551, 106.68198430250096], 15)
-
-    // Add tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19
-    }).addTo(newMap)
-
-    // Add restaurant markers
-    restaurants.forEach(restaurant => {
-      // Create custom icon for restaurant
-      const restaurantIcon = L.divIcon({
-        className: 'restaurant-marker',
-        html: `<div style="
-          background-color: #FBBC04;
-          color: white;
-          border: 2px solid white;
-          border-radius: 50%;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        ">🍜</div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 32]
-      })
-
-      const marker = L.marker([restaurant.lat, restaurant.lng], { icon: restaurantIcon })
-        .addTo(newMap)
-
-      // Add popup with restaurant info
-      marker.bindPopup(`
-        <div style="min-width: 200px;">
-          <strong style="font-size: 16px;">${restaurant.name}</strong><br/>
-          <span style="color: #666; font-size: 14px;">${restaurant.address || ''}</span>
-        </div>
-      `)
-    })
-
-    setMap(newMap)
-  }
 
   const handleLogout = () => {
     fetch(`${BASE_URL}/admin/logout`, {
@@ -245,16 +212,56 @@ function AdminDashboard() {
       <div style={styles.mainContent}>
         {activeTab === 'dashboard' && (
           <div style={styles.dashboardContent}>
-            <h1 style={styles.pageTitle}>�️ Bản đồ Quán ăn</h1>
+            <h1 style={styles.pageTitle}>📍 Bản đồ Quán ăn & Heatmap User</h1>
             <p style={styles.pageDescription}>
-              Hiển thị vị trí các quán ăn trong hệ thống
+              Hiển thị vị trí các quán ăn và các khu vực người dùng hay ghé thăm
             </p>
             {restaurants.length === 0 && (
               <div style={styles.noDataMessage}>
                 ℹ️ Chưa có quán ăn nào trong hệ thống.
               </div>
             )}
-            <div id="heatmap-container" style={styles.heatmapContainer}></div>
+            <div style={styles.heatmapContainer}>
+              <MapContainer
+                center={[10.760426862777551, 106.68198430250096]}
+                zoom={15}
+                style={{ height: '100%', width: '100%' }}
+                zoomControl={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                  url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                />
+                
+                {/* Heatmap layer */}
+                <HeatmapLayer heatmapData={heatmapData} />
+
+                {/* Marker các quán */}
+                {restaurants.map(restaurant => (
+                  <Marker
+                    key={restaurant.id}
+                    position={[restaurant.lat, restaurant.lng]}
+                    icon={restaurantIcon}
+                  >
+                    <Popup maxWidth={300}>
+                      <div style={{ padding: '5px' }}>
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                        {restaurant.address && (
+                          <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
+                            📍 {restaurant.address}
+                          </p>
+                        )}
+                        {restaurant.description && (
+                          <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
+                            {restaurant.description}
+                          </p>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+            </div>
           </div>
         )}
 
