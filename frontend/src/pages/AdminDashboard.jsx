@@ -19,29 +19,36 @@ function AdminDashboard() {
       .then(res => {
         if (!res.ok) {
           navigate('/admin/login')
-          throw new Error('Not authenticated')
+          return null
         }
         return res.json()
       })
-      .catch(err => {
-        if (err.message !== 'Not authenticated') {
-          console.error('Check failed:', err)
+      .then(data => {
+        if (data) {
+          // Load heatmap data only if authenticated
+          loadHeatmapData()
         }
       })
-
-    // Load heatmap data
-    loadHeatmapData()
+      .catch(err => {
+        console.error('Auth check failed:', err)
+        navigate('/admin/login')
+      })
   }, [navigate])
 
   useEffect(() => {
-    if (activeTab === 'dashboard' && heatmapData.length > 0) {
-      initializeMap()
+    if (activeTab === 'dashboard') {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        initializeMap()
+      }, 100)
     }
-  }, [activeTab, heatmapData])
-
-  useEffect(() => {
-    if (activeTab === 'dashboard' && heatmapData.length > 0) {
-      initializeMap()
+    
+    // Cleanup function
+    return () => {
+      if (map) {
+        map.remove()
+        setMap(null)
+      }
     }
   }, [activeTab, heatmapData])
 
@@ -49,9 +56,19 @@ function AdminDashboard() {
     fetch(`${BASE_URL}/admin/heatmap`, {
       credentials: 'include'
     })
-      .then(res => res.json())
-      .then(data => setHeatmapData(data))
-      .catch(err => console.error('Error loading heatmap:', err))
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to load heatmap')
+        }
+        return res.json()
+      })
+      .then(data => {
+        setHeatmapData(data || [])
+      })
+      .catch(err => {
+        console.error('Error loading heatmap:', err)
+        setHeatmapData([])
+      })
   }
 
   const initializeMap = () => {
@@ -67,6 +84,12 @@ function AdminDashboard() {
       return
     }
 
+    // Check if we have data
+    if (heatmapData.length === 0) {
+      console.log('No heatmap data available yet')
+      // Still create map but without heatmap layer
+    }
+
     // Create map centered on Vietnam (adjust as needed)
     const newMap = L.map('heatmap-container').setView([16.047079, 108.206230], 13)
 
@@ -76,7 +99,7 @@ function AdminDashboard() {
       maxZoom: 19
     }).addTo(newMap)
 
-    // Add heatmap layer if plugin is available
+    // Add heatmap layer if plugin is available and data exists
     if (L.heatLayer && heatmapData.length > 0) {
       const heatPoints = heatmapData.map(point => [
         point.lat,
@@ -98,6 +121,8 @@ function AdminDashboard() {
       }).addTo(newMap)
 
       setHeatmapLayer(heat)
+    } else if (!L.heatLayer) {
+      console.error('Leaflet.heat plugin not loaded')
     }
 
     setMap(newMap)
@@ -165,6 +190,11 @@ function AdminDashboard() {
             <p style={styles.pageDescription}>
               Bản đồ nhiệt hiển thị các khu vực mà người dùng hay ghé thăm (dừng lại hơn 1 phút)
             </p>
+            {heatmapData.length === 0 && (
+              <div style={styles.noDataMessage}>
+                ℹ️ Chưa có dữ liệu heatmap. Dữ liệu sẽ được thu thập khi user sử dụng app.
+              </div>
+            )}
             <div id="heatmap-container" style={styles.heatmapContainer}></div>
           </div>
         )}
@@ -259,6 +289,15 @@ const styles = {
     fontSize: '16px',
     color: '#64748b',
     marginBottom: '24px'
+  },
+  noDataMessage: {
+    padding: '20px',
+    backgroundColor: '#f1f5f9',
+    borderRadius: '8px',
+    marginBottom: '16px',
+    color: '#475569',
+    textAlign: 'center',
+    fontSize: '14px'
   },
   heatmapContainer: {
     width: '100%',
