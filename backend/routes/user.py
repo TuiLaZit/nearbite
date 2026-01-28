@@ -380,7 +380,6 @@ def register_user_routes(app):
             
             return jsonify({"status": "success"})
         except Exception as e:
-            traceback.print_exc()
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
 
