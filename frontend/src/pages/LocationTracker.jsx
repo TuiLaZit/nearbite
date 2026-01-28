@@ -91,6 +91,7 @@ function LocationTracker() {
   const playedRestaurantsRef = useRef(new Map()) // Track quán đã phát: {restaurantId: timestamp}
   const visitStartTimeRef = useRef(null) // Track thời điểm bắt đầu visit (đứng gần quán > 10s)
   const audioStartTimeRef = useRef(null) // Track thời điểm bắt đầu nghe audio
+  const isChangingLanguageRef = useRef(false) // Flag để skip cooldown khi đổi ngôn ngữ
 
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -304,8 +305,10 @@ function LocationTracker() {
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
                   console.log('✅ 2 giây đã qua, bắt đầu phát audio')
                   playAudio(`${BASE_URL}${data.audio_url}`)
-                  // Lưu timestamp đã phát
-                  playedRestaurantsRef.current.set(newId, Date.now())
+                  // Lưu timestamp đã phát (nếu không đang đổi ngôn ngữ)
+                  if (!isChangingLanguageRef.current) {
+                    playedRestaurantsRef.current.set(newId, Date.now())
+                  }
                 }
               }, 2000) // 2 giây
             }
@@ -374,17 +377,20 @@ function LocationTracker() {
               return
             }
 
-            // DEBOUNCER: Đợi 3 giây trước khi phát audio
+            // DEBOUNCER: Đợi 2 giây trước khi phát audio
             if (data.audio_url && !isAudioPlaying) {
-              console.log('⏱ Bắt đầu debouncer 3 giây...')
+              console.log('⏱ Bắt đầu debouncer 2 giây...')
               poiEntryTimeRef.current = now
               poiDebounceTimerRef.current = setTimeout(() => {
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
-                  console.log('✅ 3 giây đã qua, bắt đầu phát audio')
+                  console.log('✅ 2 giây đã qua, bắt đầu phát audio')
                   playAudio(`${BASE_URL}${data.audio_url}`)
-                  playedRestaurantsRef.current.set(newId, Date.now())
+                  // Lưu timestamp (nếu không đang đổi ngôn ngữ)
+                  if (!isChangingLanguageRef.current) {
+                    playedRestaurantsRef.current.set(newId, Date.now())
+                  }
                 }
-              }, 3000)
+              }, 2000) // 2 giây
             }
           } else if (distanceChanged) {
             // CHỈ cập nhật distance state, KHÔNG động vào currentNarration - audio không bị ngắt
@@ -568,8 +574,8 @@ function LocationTracker() {
       console.log('▶️ Audio not playing, starting...')
       // Tạo audio mới và phát từ đầu
       playAudio(audioUrl)
-      // Lưu timestamp khi user tự bấm
-      if (currentNarration?.restaurantId) {
+      // Lưu timestamp khi user tự bấm (nếu không đang đổi ngôn ngữ)
+      if (currentNarration?.restaurantId && !isChangingLanguageRef.current) {
         playedRestaurantsRef.current.set(currentNarration.restaurantId, Date.now())
       }
     }
@@ -581,11 +587,18 @@ function LocationTracker() {
     console.log('===== CHANGING LANGUAGE =====')
     console.log('From:', language, 'To:', newLang)
     
+    // Set flag đang đổi ngôn ngữ để skip cooldown tracking
+    isChangingLanguageRef.current = true
+    
     // Lưu vào localStorage và update state
     localStorage.setItem('language', newLang)
     setLanguage(newLang)
     languageRef.current = newLang // Update ref ngay lập tức
 
+    // Reset cooldown map TRƯỚC khi dừng audio
+    playedRestaurantsRef.current.clear()
+    console.log('🧹 Cleared cooldown map')
+    
     // Dừng audio và reset hoàn toàn
     stopAudio()
     
@@ -598,14 +611,14 @@ function LocationTracker() {
     // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
     
-    // Reset cooldown map khi đổi ngôn ngữ
-    playedRestaurantsRef.current.clear()
-    
     if (isTracking && userLocation) {
       // Dùng setTimeout để đảm bảo audio đã dừng hẳn
       setTimeout(() => {
+        isChangingLanguageRef.current = false // Reset flag
         fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
       }, 200)
+    } else {
+      isChangingLanguageRef.current = false // Reset flag
     }
   }
 
