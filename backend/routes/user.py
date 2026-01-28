@@ -167,8 +167,8 @@ def register_user_routes(app):
         narration_final = translate_text(narration_vi, language)
         audio_url = text_to_speech(narration_final, language)
         
-        # Lấy bán kính POI từ database (mặc định 0.015 km nếu không có)
-        poi_radius = nearest.poi_radius_km if hasattr(nearest, 'poi_radius_km') and nearest.poi_radius_km else 0.015
+        # Lấy bán kính POI từ database (mặc định 0.030 km nếu không có)
+        poi_radius = nearest.poi_radius_km if hasattr(nearest, 'poi_radius_km') and nearest.poi_radius_km else 0.030
         
         # Message khi chưa đến gần quán
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
