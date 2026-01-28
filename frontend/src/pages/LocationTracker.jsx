@@ -469,6 +469,10 @@ function LocationTracker() {
     // Set isAudioPlaying NGAY LẬP TỨC trước khi tạo audio
     setIsAudioPlaying(true)
     
+    // ⚠️ SET audioStartTimeRef NGAY LẬP TỨC (trước khi play) để tránh race condition
+    audioStartTimeRef.current = Date.now()
+    console.log('⏱ audioStartTimeRef set:', audioStartTimeRef.current)
+    
     // Thêm timestamp để tránh cache browser
     const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
     
@@ -523,13 +527,13 @@ function LocationTracker() {
     audio.play()
       .then(() => {
         console.log('✅ Audio playing successfully')
-        audioStartTimeRef.current = Date.now() // Bắt đầu đếm thời gian nghe
+        // audioStartTimeRef đã được set ở trên rồi, không cần set lại ở đây
       })
       .catch(err => {
         console.error('Error playing audio:', err)
         console.log('⏹ Audio play failed, setting isAudioPlaying to FALSE')
         setIsAudioPlaying(false)
-        audioStartTimeRef.current = null
+        audioStartTimeRef.current = null // Reset nếu play fail
       })
   }
 
