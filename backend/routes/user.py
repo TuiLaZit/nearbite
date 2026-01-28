@@ -434,6 +434,9 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
                         r.avg_visit_duration = int(
                             (r.avg_visit_duration * (r.visit_count - 1) + duration_seconds) / r.visit_count
                         )
+                    # Commit ngay để lưu analytics
+                    db.session.commit()
+                    print(f"✅ Updated analytics for {r.name}: visit_count={r.visit_count}, avg_visit_duration={r.avg_visit_duration}s")
                 break
         
         # Save location visit
@@ -472,5 +475,6 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
                     (restaurant.avg_audio_duration * (restaurant.audio_play_count - 1) + duration_seconds) / restaurant.audio_play_count
                 )
             db.session.commit()
+            print(f"✅ Updated audio analytics for {restaurant.name}: audio_play_count={restaurant.audio_play_count}, avg_audio_duration={restaurant.avg_audio_duration}s")
         
         return jsonify({"status": "success"})

@@ -127,6 +127,7 @@ function LocationTracker() {
 
   // Track location visit khi user ở gần quán
   const trackLocationVisit = (lat, lng, durationSeconds, restaurantId = null) => {
+    console.log(`📍 Tracking location visit: duration=${durationSeconds}s, restaurant_id=${restaurantId}`)
     fetch(`${BASE_URL}/track-location`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,6 +147,7 @@ function LocationTracker() {
 
   // Track audio playback duration
   const trackAudioDuration = (restaurantId, durationSeconds) => {
+    console.log(`🎧 Tracking audio duration: duration=${durationSeconds}s, restaurant_id=${restaurantId}`)
     fetch(`${BASE_URL}/track-audio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
