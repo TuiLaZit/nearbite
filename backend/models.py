@@ -21,8 +21,9 @@ class Restaurant(db.Model):
     
     # Analytics fields
     visit_count = db.Column(db.Integer, default=0)  # Số lần ghé
-    avg_visit_duration = db.Column(db.Integer, default=0)  # Thời gian ghé trung bình (phút)
+    avg_visit_duration = db.Column(db.Integer, default=0)  # Thời gian ghé trung bình (giây)
     avg_audio_duration = db.Column(db.Integer, default=0)  # Thời gian nghe trung bình (giây)
+    audio_play_count = db.Column(db.Integer, default=0)  # Số lần phát audio
 
     menu_items = db.relationship(
         "MenuItem",
@@ -58,7 +59,8 @@ class Restaurant(db.Model):
             "is_active": self.is_active,
             "visit_count": self.visit_count,
             "avg_visit_duration": self.avg_visit_duration,
-            "avg_audio_duration": self.avg_audio_duration
+            "avg_audio_duration": self.avg_audio_duration,
+            "audio_play_count": self.audio_play_count
         }
         
         if include_details:

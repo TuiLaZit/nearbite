@@ -423,14 +423,17 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
             distance = calculate_distance(lat, lng, r.lat, r.lng)
             if distance <= r.poi_radius_km:
                 restaurant_id = r.id
-                # Update restaurant analytics
-                if duration_seconds >= 60:
+                # Update restaurant analytics khi duration >= 10s
+                if duration_seconds >= 10:
                     r.visit_count += 1
-                    # Update average visit duration
+                    # Tính trung bình đúng cho avg_visit_duration (giây)
+                    # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
                     if r.avg_visit_duration == 0:
-                        r.avg_visit_duration = duration_seconds // 60
+                        r.avg_visit_duration = duration_seconds
                     else:
-                        r.avg_visit_duration = (r.avg_visit_duration + duration_seconds // 60) // 2
+                        r.avg_visit_duration = int(
+                            (r.avg_visit_duration * (r.visit_count - 1) + duration_seconds) / r.visit_count
+                        )
                 break
         
         # Save location visit
@@ -457,11 +460,17 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
         
         restaurant = Restaurant.query.get(restaurant_id)
         if restaurant:
-            # Update average audio duration
+            # Tăng audio play count
+            restaurant.audio_play_count += 1
+            
+            # Tính trung bình đúng cho avg_audio_duration (giây)
+            # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
             if restaurant.avg_audio_duration == 0:
                 restaurant.avg_audio_duration = duration_seconds
             else:
-                restaurant.avg_audio_duration = (restaurant.avg_audio_duration + duration_seconds) // 2
+                restaurant.avg_audio_duration = int(
+                    (restaurant.avg_audio_duration * (restaurant.audio_play_count - 1) + duration_seconds) / restaurant.audio_play_count
+                )
             db.session.commit()
         
         return jsonify({"status": "success"})

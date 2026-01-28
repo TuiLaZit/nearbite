@@ -34,6 +34,12 @@ def run_migration():
                 conn.commit()
                 print('✅ Added avg_audio_duration column')
         
+        if 'audio_play_count' not in restaurant_columns:
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE restaurant ADD COLUMN audio_play_count INTEGER DEFAULT 0'))
+                conn.commit()
+                print('✅ Added audio_play_count column')
+        
         # Create LocationVisit table if it doesn't exist
         db.create_all()
         print('✅ Created LocationVisit table (if not exists)')
