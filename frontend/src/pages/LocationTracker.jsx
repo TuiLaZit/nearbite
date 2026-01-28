@@ -75,8 +75,6 @@ function LocationTracker() {
   const [currentNarration, setCurrentNarration] = useState(null)
   const [currentDistance, setCurrentDistance] = useState(null) // State riêng cho distance
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
-  const [audioBlocked, setAudioBlocked] = useState(false)
-  const [pendingAudioUrl, setPendingAudioUrl] = useState(null)
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
     const saved = localStorage.getItem('narrationPanelCollapsed')
     return saved === 'true'
@@ -279,19 +277,19 @@ function LocationTracker() {
               return
             }
 
-            // DEBOUNCER: Đợi 3 giây trước khi phát audio
+            // DEBOUNCER: Đợi 2 giây trước khi phát audio
             if (data.audio_url) {
-              console.log('⏱ Bắt đầu debouncer 3 giây...')
+              console.log('⏱ Bắt đầu debouncer 2 giây...')
               poiEntryTimeRef.current = now
               poiDebounceTimerRef.current = setTimeout(() => {
                 // Kiểm tra xem user vẫn còn trong POI không
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
-                  console.log('✅ 3 giây đã qua, bắt đầu phát audio')
+                  console.log('✅ 2 giây đã qua, bắt đầu phát audio')
                   playAudio(`${BASE_URL}${data.audio_url}`)
                   // Lưu timestamp đã phát
                   playedRestaurantsRef.current.set(newId, Date.now())
                 }
-              }, 3000) // 3 giây
+              }, 2000) // 2 giây
             }
           }
         } else {
@@ -401,8 +399,6 @@ function LocationTracker() {
       audioRef.current = null
     }
     setIsAudioPlaying(false)
-    setAudioBlocked(false)
-    setPendingAudioUrl(null)
     audioStartTimeRef.current = null
     
     // Hủy debounce timer nếu có
@@ -448,7 +444,6 @@ function LocationTracker() {
       console.error('Audio error details:', audio.error)
       console.log('⏹ Audio error, setting isAudioPlaying to FALSE')
       setIsAudioPlaying(false)
-      setAudioBlocked(false)
       audioStartTimeRef.current = null
     }
     
@@ -461,7 +456,6 @@ function LocationTracker() {
       }
       
       setIsAudioPlaying(false)
-      setAudioBlocked(false)
       audioStartTimeRef.current = null
       
       // Khi audio kết thúc, trigger GPS update ngay để cập nhật lại vị trí
@@ -475,29 +469,13 @@ function LocationTracker() {
       .then(() => {
         console.log('✅ Audio playing successfully')
         audioStartTimeRef.current = Date.now() // Bắt đầu đếm thời gian nghe
-        setAudioBlocked(false)
-        setPendingAudioUrl(null)
-        audioUnlockedRef.current = true
       })
       .catch(err => {
         console.error('Error playing audio:', err)
         console.log('⏹ Audio play failed, setting isAudioPlaying to FALSE')
         setIsAudioPlaying(false)
         audioStartTimeRef.current = null
-        // Nếu lỗi autoplay, lưu URL để chờ user tương tác
-        if (err.name === 'NotAllowedError') {
-          console.warn('Autoplay blocked. User interaction required.')
-          setAudioBlocked(true)
-          setPendingAudioUrl(url)
-        }
       })
-  }
-
-  // Unlock audio khi user click
-  const unlockAudio = () => {
-    if (pendingAudioUrl) {
-      playAudio(pendingAudioUrl)
-    }
   }
 
   // Bắt đầu tracking
@@ -1124,24 +1102,6 @@ function LocationTracker() {
                   }}
                 >
                   {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe thuyết minh'}
-                </button>
-              )}
-              {audioBlocked && (
-                <button
-                  onClick={unlockAudio}
-                  style={{
-                    padding: '8px 16px',
-                    background: '#FBBC04',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    animation: 'pulse 1s infinite'
-                  }}
-                >
-                  🔊 Bật âm thanh
                 </button>
               )}
             </div>
