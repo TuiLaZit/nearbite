@@ -25,15 +25,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 if not SUPABASE_URL and DATABASE_URL:
     SUPABASE_URL = extract_supabase_url_from_database_url(DATABASE_URL)
-    if SUPABASE_URL:
-        print(f"✅ Tự động lấy SUPABASE_URL từ DATABASE_URL: {SUPABASE_URL}")
 
 # Vẫn cần SUPABASE_SERVICE_KEY riêng (không thể lấy từ DATABASE_URL)
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-
-# Debug
-print(f"🔍 SUPABASE_URL: {SUPABASE_URL[:40] if SUPABASE_URL else '❌ MISSING'}...")
-print(f"🔍 SUPABASE_SERVICE_KEY: {'✅ SET (length: ' + str(len(SUPABASE_KEY)) + ')' if SUPABASE_KEY else '❌ MISSING - CẦN THÊM BIẾN NÀY TRÊN RAILWAY'}")
 
 # Initialize Supabase client
 supabase_client: Client = None
@@ -41,7 +35,6 @@ supabase_client: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✅ Supabase Storage đã sẵn sàng - có thể upload ảnh")
         
         # Tự động tạo bucket nếu chưa có
         try:
@@ -49,26 +42,15 @@ if SUPABASE_URL and SUPABASE_KEY:
             bucket_names = [b['name'] for b in buckets]
             
             if 'restaurant-images' not in bucket_names:
-                print("📦 Bucket 'restaurant-images' chưa tồn tại, đang tạo...")
                 supabase_client.storage.create_bucket(
                     'restaurant-images',
                     options={'public': True}
                 )
-                print("✅ Đã tạo bucket 'restaurant-images' thành công")
-            else:
-                print("✅ Bucket 'restaurant-images' đã tồn tại")
         except Exception as bucket_error:
-            print(f"⚠️  Không thể kiểm tra/tạo bucket: {bucket_error}")
-            print("   Bucket có thể đã tồn tại hoặc cần tạo thủ công")
+            pass
             
     except Exception as e:
-        print(f"❌ Lỗi khi kết nối Supabase Storage: {e}")
-else:
-    print("⚠️  Chưa thể upload ảnh - thiếu SUPABASE_SERVICE_KEY")
-    if not SUPABASE_KEY:
-        print("   📝 Cách fix: Thêm biến SUPABASE_SERVICE_KEY trên Railway")
-        print("   → Vào https://supabase.com/dashboard → chọn project → Settings → API")
-        print("   → Copy 'service_role' key (dạng eyJ...) → thêm vào Railway")
+        pass
 
 
 def upload_image(file_bytes, filename, bucket_name="restaurant-images"):

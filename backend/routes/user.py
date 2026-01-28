@@ -61,8 +61,6 @@ def register_user_routes(app):
             separator = f"\n<<<{separator_id}>>>\n"
             combined_text = separator.join(protected_texts)
             
-            print(f"Translating to {target_lang}, {len(protected_texts)} texts")
-            
             # Dịch 1 lần duy nhất
             translated_combined = translate_text(combined_text, target_lang)
             
@@ -71,12 +69,10 @@ def register_user_routes(app):
             
             # Nếu separator bị thay đổi, thử fallback
             if len(translated_parts) != len(texts):
-                print(f"WARNING: Split mismatch. Expected {len(texts)}, got {len(translated_parts)}")
                 # Thử split bằng các biến thể khác
                 for alt_sep in [f"\n<<< {separator_id} >>>\n", f"<<< {separator_id} >>>", separator_id]:
                     translated_parts = translated_combined.split(alt_sep)
                     if len(translated_parts) == len(texts):
-                        print(f"Found working separator: {alt_sep}")
                         break
             
             # Khôi phục placeholders và map lại với original texts
@@ -89,12 +85,9 @@ def register_user_routes(app):
                         translated_text = translated_text.replace(placeholder_id, original_placeholder)
                     translations[text] = translated_text
                 else:
-                    print(f"WARNING: Missing translation for text #{i}: {text[:50]}...")
                     translations[text] = text  # Fallback
                     
-            print(f"Translation completed: {len(translations)}/{len(texts)} texts")
         except Exception as e:
-            print(f"Batch translation error: {e}")
             import traceback
             traceback.print_exc()
             # Fallback: trả về text gốc
@@ -129,8 +122,8 @@ def register_user_routes(app):
                 try:
                     tag_dict['name'] = translate_text(tag.name, target_lang)
                 except Exception as e:
-                    print(f"Error translating tag {tag.id}: {e}")
                     # Giữ nguyên tiếng Việt nếu lỗi
+                    pass
             
             tags_data.append(tag_dict)
         
@@ -147,10 +140,6 @@ def register_user_routes(app):
         user_lat = data.get("latitude")
         user_lng = data.get("longitude")
         language = data.get("language", "vi")
-        
-        print(f"===== LOCATION REQUEST =====")
-        print(f"Language: {language}")
-        print(f"Position: {user_lat}, {user_lng}")
 
         restaurants = Restaurant.query.filter_by(is_active=True).all()
 
@@ -173,12 +162,6 @@ def register_user_routes(app):
         # Message khi chưa đến gần quán
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
         out_of_range_msg = translate_text(out_of_range_msg_vi, language)
-        
-        print(f"Nearest: {nearest.name}")
-        print(f"Distance: {min_dist}")
-        print(f"POI Radius: {poi_radius} km ({poi_radius * 1000}m)")
-        print(f"Audio URL: {audio_url}")
-        print(f"Language used: {language}")
 
         # Get restaurant data with translated tags
         restaurant_data = nearest.to_dict(include_details=True)
@@ -190,8 +173,8 @@ def register_user_routes(app):
                     try:
                         tag['name'] = translate_text(tag['name'], language)
                     except Exception as e:
-                        print(f"Error translating tag {tag.get('id')}: {e}")
                         # Keep original Vietnamese if translation fails
+                        pass
 
         return jsonify({
             "status": "success",
@@ -337,9 +320,6 @@ def register_user_routes(app):
             })
             
         except Exception as e:
-            print(f"Error in plan_tour: {e}")
-            import traceback
-            traceback.print_exc()
             return jsonify({
                 "status": "error",
                 "message": str(e)
@@ -354,31 +334,24 @@ def register_user_routes(app):
         """Track user location visits for heatmap"""
         try:
             data = request.json
-            print(f"📥 Received track-location request: {data}")
             
             lat = data.get("lat")
             lng = data.get("lng")
             duration_seconds = data.get("duration_seconds")
             
             if not all([lat, lng, duration_seconds]):
-                print("❌ Missing required fields")
                 return jsonify({"error": "Missing required fields"}), 400
             
             # Find if near any restaurant
             restaurant_id = None
             restaurants = Restaurant.query.filter_by(is_active=True).all()
-            print(f"🔍 Checking {len(restaurants)} active restaurants...")
             
             for r in restaurants:
                 distance = calculate_distance(lat, lng, r.lat, r.lng)
                 if distance <= r.poi_radius_km:
                     restaurant_id = r.id
-                    print(f"🎯 Found near restaurant: {r.name} (distance={distance*1000:.1f}m)")
                     # Update restaurant analytics khi duration >= 10s
                     if duration_seconds >= 10:
-                        old_count = r.visit_count
-                        old_avg = r.avg_visit_duration
-                        
                         # Tính trung bình đúng cho avg_visit_duration (giây)
                         # Công thức: New_Avg = (Old_Avg * Old_Count + New_Value) / (Old_Count + 1)
                         if r.visit_count == 0 or r.avg_visit_duration == 0:
@@ -393,15 +366,7 @@ def register_user_routes(app):
                         
                         # Commit ngay để lưu analytics
                         db.session.commit()
-                        print(f"✅ Updated analytics for {r.name}:")
-                        print(f"   visit_count: {old_count} → {r.visit_count}")
-                        print(f"   avg_visit_duration: {old_avg}s → {r.avg_visit_duration}s")
-                    else:
-                        print(f"⚠️ Duration {duration_seconds}s < 10s, không cập nhật analytics")
                     break
-            
-            if restaurant_id is None:
-                print("📍 Không tìm thấy quán gần vị trí này")
             
             # Save location visit
             visit = LocationVisit(
@@ -412,12 +377,9 @@ def register_user_routes(app):
             )
             db.session.add(visit)
             db.session.commit()
-            print(f"✅ Saved LocationVisit to database")
             
             return jsonify({"status": "success"})
         except Exception as e:
-            print(f"❌ Error in track_location: {str(e)}")
-            import traceback
             traceback.print_exc()
             db.session.rollback()
             return jsonify({"error": str(e)}), 500

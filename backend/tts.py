@@ -41,9 +41,8 @@ def cleanup_old_files():
                 if i < len(files_sorted):
                     file_to_remove = os.path.join(TTS_DIR, files_sorted[i][0])
                     os.remove(file_to_remove)
-                    print(f"Cleaned up old audio: {files_sorted[i][0]}")
     except Exception as e:
-        print(f"Cleanup error: {e}")
+        pass
 
 def text_to_speech(text, lang):
     os.makedirs(TTS_DIR, exist_ok=True)
@@ -67,16 +66,12 @@ def text_to_speech(text, lang):
     try:
         tts = gTTS(text=text, lang=mapped_lang, slow=False, tld='com')
         tts.save(filepath)
-        print(f"TTS created for language '{lang}' (mapped to '{mapped_lang}'): {filename}")
         return f"/static/tts/{filename}"
     except Exception as e:
-        print(f"TTS error for language '{lang}' (mapped to '{mapped_lang}'):", e)
         # Fallback: tạo TTS tiếng Việt
         try:
             tts = gTTS(text=text, lang="vi", slow=False, tld='com')
             tts.save(filepath)
-            print(f"TTS fallback to Vietnamese: {filename}")
             return f"/static/tts/{filename}"
         except Exception as fallback_error:
-            print(f"TTS fallback error:", fallback_error)
             return None
