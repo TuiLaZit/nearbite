@@ -138,11 +138,19 @@ function LocationTracker() {
         restaurant_id: restaurantId
       })
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`)
+        }
+        return res.json()
+      })
       .then(data => {
         console.log('✅ Location visit tracked:', data)
       })
-      .catch(err => console.error('Error tracking location:', err))
+      .catch(err => {
+        console.error('❌ Error tracking location:', err)
+        console.error('Details:', { lat, lng, durationSeconds, restaurantId })
+      })
   }
 
   // Track audio playback duration
@@ -156,11 +164,19 @@ function LocationTracker() {
         duration_seconds: durationSeconds
       })
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`)
+        }
+        return res.json()
+      })
       .then(data => {
         console.log('✅ Audio duration tracked:', data)
       })
-      .catch(err => console.error('Error tracking audio:', err))
+      .catch(err => {
+        console.error('❌ Error tracking audio:', err)
+        console.error('Details:', { restaurantId, durationSeconds })
+      })
   }
 
   // Hàm tính khoảng cách
@@ -389,9 +405,14 @@ function LocationTracker() {
       // Track audio duration trước khi dừng
       if (audioStartTimeRef.current && currentNarration?.restaurantId) {
         const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
+        console.log(`📊 Audio stopped manually: duration=${audioDuration}s, restaurant_id=${currentNarration.restaurantId}`)
         if (audioDuration >= 1) { // Chỉ track nếu nghe >= 1s
           trackAudioDuration(currentNarration.restaurantId, audioDuration)
+        } else {
+          console.log('⚠️ Audio duration < 1s, không track')
         }
+      } else {
+        console.log('⚠️ Cannot track audio: audioStartTime=', audioStartTimeRef.current, 'restaurantId=', currentNarration?.restaurantId)
       }
       
       audioRef.current.pause()
@@ -454,7 +475,14 @@ function LocationTracker() {
       // Track audio duration khi nghe xong
       if (audioStartTimeRef.current && currentNarration?.restaurantId) {
         const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
-        trackAudioDuration(currentNarration.restaurantId, audioDuration)
+        console.log(`📊 Audio finished: duration=${audioDuration}s, restaurant_id=${currentNarration.restaurantId}`)
+        if (audioDuration >= 1) { // Chỉ track nếu nghe >= 1s
+          trackAudioDuration(currentNarration.restaurantId, audioDuration)
+        } else {
+          console.log('⚠️ Audio duration < 1s, không track')
+        }
+      } else {
+        console.log('⚠️ Cannot track audio: audioStartTime=', audioStartTimeRef.current, 'restaurantId=', currentNarration?.restaurantId)
       }
       
       setIsAudioPlaying(false)
