@@ -407,74 +407,116 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
     @app.route("/track-location", methods=["POST"])
     def track_location():
         """Track user location visits for heatmap"""
-        data = request.json
-        
-        lat = data.get("lat")
-        lng = data.get("lng")
-        duration_seconds = data.get("duration_seconds")
-        
-        if not all([lat, lng, duration_seconds]):
-            return jsonify({"error": "Missing required fields"}), 400
-        
-        # Find if near any restaurant
-        restaurant_id = None
-        restaurants = Restaurant.query.filter_by(is_active=True).all()
-        for r in restaurants:
-            distance = calculate_distance(lat, lng, r.lat, r.lng)
-            if distance <= r.poi_radius_km:
-                restaurant_id = r.id
-                # Update restaurant analytics khi duration >= 10s
-                if duration_seconds >= 10:
-                    r.visit_count += 1
-                    # Tính trung bình đúng cho avg_visit_duration (giây)
-                    # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
-                    if r.avg_visit_duration == 0:
-                        r.avg_visit_duration = duration_seconds
+        try:
+            data = request.json
+            print(f"📥 Received track-location request: {data}")
+            
+            lat = data.get("lat")
+            lng = data.get("lng")
+            duration_seconds = data.get("duration_seconds")
+            
+            if not all([lat, lng, duration_seconds]):
+                print("❌ Missing required fields")
+                return jsonify({"error": "Missing required fields"}), 400
+            
+            # Find if near any restaurant
+            restaurant_id = None
+            restaurants = Restaurant.query.filter_by(is_active=True).all()
+            print(f"🔍 Checking {len(restaurants)} active restaurants...")
+            
+            for r in restaurants:
+                distance = calculate_distance(lat, lng, r.lat, r.lng)
+                if distance <= r.poi_radius_km:
+                    restaurant_id = r.id
+                    print(f"🎯 Found near restaurant: {r.name} (distance={distance*1000:.1f}m)")
+                    # Update restaurant analytics khi duration >= 10s
+                    if duration_seconds >= 10:
+                        old_count = r.visit_count
+                        old_avg = r.avg_visit_duration
+                        
+                        r.visit_count += 1
+                        # Tính trung bình đúng cho avg_visit_duration (giây)
+                        # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
+                        if r.avg_visit_duration == 0:
+                            r.avg_visit_duration = duration_seconds
+                        else:
+                            r.avg_visit_duration = int(
+                                (r.avg_visit_duration * (r.visit_count - 1) + duration_seconds) / r.visit_count
+                            )
+                        # Commit ngay để lưu analytics
+                        db.session.commit()
+                        print(f"✅ Updated analytics for {r.name}:")
+                        print(f"   visit_count: {old_count} → {r.visit_count}")
+                        print(f"   avg_visit_duration: {old_avg}s → {r.avg_visit_duration}s")
                     else:
-                        r.avg_visit_duration = int(
-                            (r.avg_visit_duration * (r.visit_count - 1) + duration_seconds) / r.visit_count
-                        )
-                    # Commit ngay để lưu analytics
-                    db.session.commit()
-                    print(f"✅ Updated analytics for {r.name}: visit_count={r.visit_count}, avg_visit_duration={r.avg_visit_duration}s")
-                break
-        
-        # Save location visit
-        visit = LocationVisit(
-            lat=lat,
-            lng=lng,
-            duration_seconds=duration_seconds,
-            restaurant_id=restaurant_id
-        )
-        db.session.add(visit)
-        db.session.commit()
-        
-        return jsonify({"status": "success"})
+                        print(f"⚠️ Duration {duration_seconds}s < 10s, không cập nhật analytics")
+                    break
+            
+            if restaurant_id is None:
+                print("📍 Không tìm thấy quán gần vị trí này")
+            
+            # Save location visit
+            visit = LocationVisit(
+                lat=lat,
+                lng=lng,
+                duration_seconds=duration_seconds,
+                restaurant_id=restaurant_id
+            )
+            db.session.add(visit)
+            db.session.commit()
+            print(f"✅ Saved LocationVisit to database")
+            
+            return jsonify({"status": "success"})
+        except Exception as e:
+            print(f"❌ Error in track_location: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/track-audio", methods=["POST"])
     def track_audio():
         """Track audio playback duration"""
-        data = request.json
-        restaurant_id = data.get("restaurant_id")
-        duration_seconds = data.get("duration_seconds")
-        
-        if not all([restaurant_id, duration_seconds]):
-            return jsonify({"error": "Missing required fields"}), 400
-        
-        restaurant = Restaurant.query.get(restaurant_id)
-        if restaurant:
-            # Tăng audio play count
-            restaurant.audio_play_count += 1
+        try:
+            data = request.json
+            print(f"🎧 Received track-audio request: {data}")
             
-            # Tính trung bình đúng cho avg_audio_duration (giây)
-            # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
-            if restaurant.avg_audio_duration == 0:
-                restaurant.avg_audio_duration = duration_seconds
+            restaurant_id = data.get("restaurant_id")
+            duration_seconds = data.get("duration_seconds")
+            
+            if not all([restaurant_id, duration_seconds]):
+                print("❌ Missing required fields")
+                return jsonify({"error": "Missing required fields"}), 400
+            
+            restaurant = Restaurant.query.get(restaurant_id)
+            if restaurant:
+                old_count = restaurant.audio_play_count
+                old_avg = restaurant.avg_audio_duration
+                
+                # Tăng audio play count
+                restaurant.audio_play_count += 1
+                
+                # Tính trung bình đúng cho avg_audio_duration (giây)
+                # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
+                if restaurant.avg_audio_duration == 0:
+                    restaurant.avg_audio_duration = duration_seconds
+                else:
+                    restaurant.avg_audio_duration = int(
+                        (restaurant.avg_audio_duration * (restaurant.audio_play_count - 1) + duration_seconds) / restaurant.audio_play_count
+                    )
+                db.session.commit()
+                
+                print(f"✅ Updated audio analytics for {restaurant.name}:")
+                print(f"   audio_play_count: {old_count} → {restaurant.audio_play_count}")
+                print(f"   avg_audio_duration: {old_avg}s → {restaurant.avg_audio_duration}s")
             else:
-                restaurant.avg_audio_duration = int(
-                    (restaurant.avg_audio_duration * (restaurant.audio_play_count - 1) + duration_seconds) / restaurant.audio_play_count
-                )
-            db.session.commit()
-            print(f"✅ Updated audio analytics for {restaurant.name}: audio_play_count={restaurant.audio_play_count}, avg_audio_duration={restaurant.avg_audio_duration}s")
-        
-        return jsonify({"status": "success"})
+                print(f"❌ Restaurant not found: id={restaurant_id}")
+                return jsonify({"error": "Restaurant not found"}), 404
+            
+            return jsonify({"status": "success"})
+        except Exception as e:
+            print(f"❌ Error in track_audio: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
