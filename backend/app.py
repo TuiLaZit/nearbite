@@ -19,8 +19,7 @@ CORS(
             "http://127.0.0.1:5500",
             "http://localhost:5500",
             "http://localhost:5173",
-            "https://nearbite.vercel.app",
-            "*"  # Cho phép tất cả origins trong development/testing
+            "https://nearbite.vercel.app"
         ]
     }},
     supports_credentials=True,
@@ -33,8 +32,17 @@ CORS(
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
+        origin = request.headers.get('Origin')
         response = jsonify({"status": "ok"})
-        response.headers.add("Access-Control-Allow-Origin", "*")
+        
+        # KHÔNG DÙNG wildcard "*" khi có credentials
+        # Phải trả về specific origin
+        if origin:
+            response.headers.add("Access-Control-Allow-Origin", origin)
+        else:
+            response.headers.add("Access-Control-Allow-Origin", "https://nearbite.vercel.app")
+        
+        response.headers.add("Access-Control-Allow-Credentials", "true")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
         response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
         return response, 200
