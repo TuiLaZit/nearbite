@@ -177,16 +177,18 @@ function LocationTracker() {
 
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
   const fetchAndUpdateLocation = (pos, lang = null) => {
-    // NẾU ĐANG PHÁT AUDIO, TẠM DỪNG GPS UPDATE
+    const currentLang = lang || languageRef.current
+    const userLat = pos.coords.latitude
+    const userLng = pos.coords.longitude
+    
+    // Cập nhật vị trí user luôn, không bị block bởi audio
+    setUserLocation([userLat, userLng])
+
+    // NẾU ĐANG PHÁT AUDIO, TẠM DỪNG GPS UPDATE (không fetch location mới)
     if (isAudioPlaying) {
       console.log('⏸ Audio đang phát, bỏ qua GPS update')
       return
     }
-
-    const currentLang = lang || languageRef.current
-    const userLat = pos.coords.latitude
-    const userLng = pos.coords.longitude
-    setUserLocation([userLat, userLng])
 
     fetch(`${BASE_URL}/location`, {
       method: 'POST',
@@ -406,6 +408,12 @@ function LocationTracker() {
       clearTimeout(poiDebounceTimerRef.current)
       poiDebounceTimerRef.current = null
     }
+    
+    // Khi dừng audio, trigger GPS update ngay để cập nhật lại vị trí
+    console.log('✅ Audio đã dừng, tiếp tục GPS tracking')
+    if (isTracking && userLocation) {
+      navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
+    }
   }
 
   // Phát audio
@@ -445,6 +453,12 @@ function LocationTracker() {
       setIsAudioPlaying(false)
       setAudioBlocked(false)
       audioStartTimeRef.current = null
+      
+      // Khi audio kết thúc, trigger GPS update ngay để cập nhật lại vị trí
+      console.log('✅ Audio đã phát xong, tiếp tục GPS tracking')
+      if (isTracking && userLocation) {
+        navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
+      }
     }
     
     setIsAudioPlaying(true)
