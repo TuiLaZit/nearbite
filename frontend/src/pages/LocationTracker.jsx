@@ -383,6 +383,8 @@ function LocationTracker() {
 
   // Dừng audio hoàn toàn
   const stopAudio = () => {
+    console.log('⏹ stopAudio called, setting isAudioPlaying to FALSE')
+    
     if (audioRef.current) {
       // Track audio duration trước khi dừng
       if (audioStartTimeRef.current && currentNarration?.restaurantId) {
@@ -418,11 +420,17 @@ function LocationTracker() {
 
   // Phát audio
   const playAudio = (url) => {
+    console.log('🔊 playAudio called, setting isAudioPlaying to TRUE')
+    
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.src = '' // Clear old source
       audioRef.current = null
     }
+    
+    // Set isAudioPlaying NGAY LẬP TỨC trước khi tạo audio
+    setIsAudioPlaying(true)
+    
     // Thêm timestamp để tránh cache browser
     const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
     
@@ -438,12 +446,14 @@ function LocationTracker() {
     audio.onerror = (e) => {
       console.error('Audio error:', e)
       console.error('Audio error details:', audio.error)
+      console.log('⏹ Audio error, setting isAudioPlaying to FALSE')
       setIsAudioPlaying(false)
       setAudioBlocked(false)
       audioStartTimeRef.current = null
     }
     
     audio.onended = () => {
+      console.log('⏹ Audio ended, setting isAudioPlaying to FALSE')
       // Track audio duration khi nghe xong
       if (audioStartTimeRef.current && currentNarration?.restaurantId) {
         const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
@@ -461,10 +471,9 @@ function LocationTracker() {
       }
     }
     
-    setIsAudioPlaying(true)
     audio.play()
       .then(() => {
-        console.log('Audio playing')
+        console.log('✅ Audio playing successfully')
         audioStartTimeRef.current = Date.now() // Bắt đầu đếm thời gian nghe
         setAudioBlocked(false)
         setPendingAudioUrl(null)
@@ -472,6 +481,7 @@ function LocationTracker() {
       })
       .catch(err => {
         console.error('Error playing audio:', err)
+        console.log('⏹ Audio play failed, setting isAudioPlaying to FALSE')
         setIsAudioPlaying(false)
         audioStartTimeRef.current = null
         // Nếu lỗi autoplay, lưu URL để chờ user tương tác
@@ -534,12 +544,20 @@ function LocationTracker() {
 
   // Toggle audio
   const handleToggleAudio = (audioUrl) => {
-    if (!audioUrl) return
+    console.log('🎵 handleToggleAudio called, current isAudioPlaying:', isAudioPlaying, 'audioRef.current:', !!audioRef.current)
+    
+    if (!audioUrl) {
+      console.log('❌ No audio URL provided')
+      return
+    }
 
-    if (isAudioPlaying && audioRef.current) {
+    // Kiểm tra xem audio có đang phát không dựa vào audioRef
+    if (audioRef.current && !audioRef.current.paused) {
+      console.log('⏹ Audio is playing, stopping...')
       // DỪNG HOÀN TOÀN - Xóa audio để phát lại từ đầu
       stopAudio()
     } else {
+      console.log('▶️ Audio not playing, starting...')
       // Tạo audio mới và phát từ đầu
       playAudio(audioUrl)
       // Lưu timestamp khi user tự bấm
