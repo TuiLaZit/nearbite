@@ -36,7 +36,7 @@ def register_admin_routes(app):
             lng=data.get("lng"),
             description=data.get("description"),
             avg_eat_time=data.get("avg_eat_time"),
-            poi_radius_km=data.get("poi_radius_km", 0.015)  # Default 15m if not provided
+            poi_radius_km=data.get("poi_radius_km", 0.030)  # Default 30m if not provided
         )
 
         db.session.add(restaurant)

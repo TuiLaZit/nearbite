@@ -16,7 +16,7 @@ class Restaurant(db.Model):
     lng = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
     avg_eat_time = db.Column(db.Integer)
-    poi_radius_km = db.Column(db.Float, default=0.015, nullable=False)  # POI activation radius in km (default 15m)
+    poi_radius_km = db.Column(db.Float, default=0.030, nullable=False)  # POI activation radius in km (default 30m)
     is_active = db.Column(db.Boolean, default=True)
     
     # Analytics fields
