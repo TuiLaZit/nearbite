@@ -268,11 +268,10 @@ function LocationTracker() {
             }
           } else {
             // VÀO POI - BẮT ĐẦU TRACKING VISIT
-            // Kiểm tra nếu cách < 10m (~0.01 km) và đứng > 10s mới track
-            const veryClose = distance <= 0.01 // 
-            if (veryClose && !visitStartTimeRef.current) {
+            // Bắt đầu tracking ngay khi vào POI (trong poi_radius)
+            if (!visitStartTimeRef.current) {
               visitStartTimeRef.current = Date.now()
-              console.log('📍 Bắt đầu đếm thời gian visit (đứng trong 10m)')
+              console.log(`📍 Bắt đầu đếm thời gian visit (vào POI ${data.nearest_place.name})`)
             }
             
             setCurrentNarration({
@@ -350,11 +349,10 @@ function LocationTracker() {
             // Vào trong POI
             lastDistanceRef.current = distance
             
-            // Bắt đầu tracking visit nếu ở rất gần (< 2m)
-            const veryClose = distance <= 0.002
-            if (veryClose && !visitStartTimeRef.current) {
+            // Bắt đầu tracking visit ngay khi vào POI
+            if (!visitStartTimeRef.current) {
               visitStartTimeRef.current = Date.now()
-              console.log('📍 Bắt đầu đếm thời gian visit (đứng trong 2m)')
+              console.log(`📍 Bắt đầu đếm thời gian visit (vào POI)`)
             }
             
             setCurrentNarration({
