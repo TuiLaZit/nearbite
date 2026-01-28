@@ -345,61 +345,6 @@ def register_user_routes(app):
                 "message": str(e)
             }), 500
 
-
-def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score"):
-    """
-    Xây dựng tour bằng thuật toán greedy
-    
-    Args:
-        scored_restaurants: List of {restaurant, score, avg_price, matching_tags}
-        time_limit: Thời gian tối đa (phút)
-        budget: Ngân sách tối đa (VND)
-        strategy: Chiến lược ("best_score", "nearest", "cheapest")
-    
-    Returns:
-        Dict chứa tour info hoặc None nếu không tạo được tour
-    """
-    tour = []
-    total_time = 0
-    total_cost = 0
-    avg_eat_time = 30  # Giả sử mỗi quán ăn 30 phút
-    
-    for item in scored_restaurants:
-        restaurant = item["restaurant"]
-        avg_price = item["avg_price"]
-        
-        # Kiểm tra constraints
-        if total_time + avg_eat_time <= time_limit and total_cost + avg_price <= budget:
-            tour.append({
-                "id": restaurant.id,
-                "name": restaurant.name,
-                "lat": restaurant.lat,
-                "lng": restaurant.lng,
-                "avg_price": round(avg_price),
-                "score": item["score"],
-                "matching_tags": item["matching_tags"],
-                "tags": [{"id": tag.id, "name": tag.name, "icon": tag.icon, "color": tag.color} for tag in restaurant.tags],
-                "images": [{"image_url": img.image_url, "is_primary": img.is_primary} for img in restaurant.images[:2]]  # Chỉ lấy 2 ảnh đầu
-            })
-            total_time += avg_eat_time
-            total_cost += avg_price
-            
-            # Giới hạn tour tối đa 5 quán
-            if len(tour) >= 5:
-                break
-    
-    if not tour:
-        return None
-    
-    return {
-        "strategy": strategy,
-        "restaurants": tour,
-        "total_time": total_time,
-        "total_cost": round(total_cost),
-        "num_stops": len(tour)
-    }
-
-
     # ======================
     # LOCATION TRACKING
     # ======================
@@ -524,3 +469,57 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
             traceback.print_exc()
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
+
+
+def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score"):
+    """
+    Xây dựng tour bằng thuật toán greedy
+    
+    Args:
+        scored_restaurants: List of {restaurant, score, avg_price, matching_tags}
+        time_limit: Thời gian tối đa (phút)
+        budget: Ngân sách tối đa (VND)
+        strategy: Chiến lược ("best_score", "nearest", "cheapest")
+    
+    Returns:
+        Dict chứa tour info hoặc None nếu không tạo được tour
+    """
+    tour = []
+    total_time = 0
+    total_cost = 0
+    avg_eat_time = 30  # Giả sử mỗi quán ăn 30 phút
+    
+    for item in scored_restaurants:
+        restaurant = item["restaurant"]
+        avg_price = item["avg_price"]
+        
+        # Kiểm tra constraints
+        if total_time + avg_eat_time <= time_limit and total_cost + avg_price <= budget:
+            tour.append({
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "lat": restaurant.lat,
+                "lng": restaurant.lng,
+                "avg_price": round(avg_price),
+                "score": item["score"],
+                "matching_tags": item["matching_tags"],
+                "tags": [{"id": tag.id, "name": tag.name, "icon": tag.icon, "color": tag.color} for tag in restaurant.tags],
+                "images": [{"image_url": img.image_url, "is_primary": img.is_primary} for img in restaurant.images[:2]]  # Chỉ lấy 2 ảnh đầu
+            })
+            total_time += avg_eat_time
+            total_cost += avg_price
+            
+            # Giới hạn tour tối đa 5 quán
+            if len(tour) >= 5:
+                break
+    
+    if not tour:
+        return None
+    
+    return {
+        "strategy": strategy,
+        "restaurants": tour,
+        "total_time": total_time,
+        "total_cost": round(total_cost),
+        "num_stops": len(tour)
+    }
