@@ -51,6 +51,5 @@ def translate_text(text, target_lang):
 
         return translated
     except Exception as e:
-        print(f"Translate error for language '{target_lang}' (mapped to '{mapped_lang}'):", e)
         # Fallback về tiếng Việt nếu lỗi
         return text

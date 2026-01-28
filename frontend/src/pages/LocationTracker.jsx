@@ -129,7 +129,7 @@ function LocationTracker() {
 
   // Track location visit khi user ở gần quán
   const trackLocationVisit = (lat, lng, durationSeconds, restaurantId = null) => {
-    console.log(`📍 Tracking location visit: duration=${durationSeconds}s, restaurant_id=${restaurantId}`)
+
     fetch(`${BASE_URL}/track-location`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -153,7 +153,7 @@ function LocationTracker() {
       })
       .then(data => {
         if (data) {
-          console.log('✅ Location visit tracked:', data)
+
         }
       })
       .catch(err => {
@@ -166,7 +166,7 @@ function LocationTracker() {
 
   // Track audio playback duration
   const trackAudioDuration = (restaurantId, durationSeconds) => {
-    console.log(`🎧 Tracking audio duration: duration=${durationSeconds}s, restaurant_id=${restaurantId}`)
+
     fetch(`${BASE_URL}/track-audio`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -188,7 +188,7 @@ function LocationTracker() {
       })
       .then(data => {
         if (data) { // Chỉ log khi có data (không phải 404)
-          console.log('✅ Audio duration tracked:', data)
+
         }
       })
       .catch(err => {
@@ -223,7 +223,7 @@ function LocationTracker() {
 
     // NẾU ĐANG PHÁT AUDIO, TẠM DỪNG GPS UPDATE (không fetch location mới)
     if (isAudioPlaying) {
-      console.log('⏸ Audio đang phát, bỏ qua GPS update')
+
       return
     }
 
@@ -261,7 +261,7 @@ function LocationTracker() {
 
           // Lấy bán kính POI từ API (mặc định 0.015 = 15m)
           const poiRadius = data.poi_radius_km || 0.015
-          console.log(`📍 POI Radius for ${data.nearest_place.name}: ${poiRadius * 1000}m`)
+
 
           // Kiểm tra khoảng cách
           if (distance > poiRadius) {
@@ -290,7 +290,7 @@ function LocationTracker() {
             // Bắt đầu tracking ngay khi vào POI (trong poi_radius)
             if (!visitStartTimeRef.current) {
               visitStartTimeRef.current = Date.now()
-              console.log(`📍 Bắt đầu đếm thời gian visit (vào POI ${data.nearest_place.name})`)
+
             }
             
             setCurrentNarration({
@@ -310,19 +310,19 @@ function LocationTracker() {
             const inCooldown = lastPlayedTime && (now - lastPlayedTime < cooldownPeriod)
 
             if (inCooldown) {
-              console.log('🔇 Quán đã phát trong 5 phút qua, không tự động phát')
+
               // Không tự động phát, chỉ hiện nút bấm
               return
             }
 
             // DEBOUNCER: Đợi 2 giây trước khi phát audio
             if (data.audio_url) {
-              console.log('⏱ Bắt đầu debouncer 2 giây...')
+
               poiEntryTimeRef.current = now
               poiDebounceTimerRef.current = setTimeout(() => {
                 // Kiểm tra xem user vẫn còn trong POI không
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
-                  console.log('✅ 2 giây đã qua, bắt đầu phát audio')
+
                   playAudio(`${BASE_URL}${data.audio_url}`)
                   // Lưu timestamp đã phát (nếu không đang đổi ngôn ngữ)
                   if (!isChangingLanguageRef.current) {
@@ -371,7 +371,7 @@ function LocationTracker() {
             // Bắt đầu tracking visit ngay khi vào POI
             if (!visitStartTimeRef.current) {
               visitStartTimeRef.current = Date.now()
-              console.log(`📍 Bắt đầu đếm thời gian visit (vào POI)`)
+
             }
             
             setCurrentNarration({
@@ -391,17 +391,17 @@ function LocationTracker() {
             const inCooldown = lastPlayedTime && (now - lastPlayedTime < cooldownPeriod)
 
             if (inCooldown) {
-              console.log('🔇 Quán đã phát trong 5 phút qua, không tự động phát')
+
               return
             }
 
             // DEBOUNCER: Đợi 2 giây trước khi phát audio
             if (data.audio_url && !isAudioPlaying) {
-              console.log('⏱ Bắt đầu debouncer 2 giây...')
+
               poiEntryTimeRef.current = now
               poiDebounceTimerRef.current = setTimeout(() => {
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
-                  console.log('✅ 2 giây đã qua, bắt đầu phát audio')
+
                   playAudio(`${BASE_URL}${data.audio_url}`)
                   // Lưu timestamp (nếu không đang đổi ngôn ngữ)
                   if (!isChangingLanguageRef.current) {
@@ -423,20 +423,20 @@ function LocationTracker() {
 
   // Dừng audio hoàn toàn
   const stopAudio = () => {
-    console.log('⏹ stopAudio called, setting isAudioPlaying to FALSE')
+
     
     if (audioRef.current) {
       // Track audio duration trước khi dừng
       if (audioStartTimeRef.current && currentNarration?.restaurantId) {
         const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
-        console.log(`📊 Audio stopped manually: duration=${audioDuration}s, restaurant_id=${currentNarration.restaurantId}`)
+
         if (audioDuration >= 1) { // Chỉ track nếu nghe >= 1s
           trackAudioDuration(currentNarration.restaurantId, audioDuration)
         } else {
-          console.log('⚠️ Audio duration < 1s, không track')
+
         }
       } else {
-        console.log('⚠️ Cannot track audio: audioStartTime=', audioStartTimeRef.current, 'restaurantId=', currentNarration?.restaurantId)
+
       }
       
       // Set flag trước khi cleanup để skip error event
@@ -463,7 +463,7 @@ function LocationTracker() {
     }
     
     // Khi dừng audio, trigger GPS update ngay để cập nhật lại vị trí
-    console.log('✅ Audio đã dừng, tiếp tục GPS tracking')
+
     if (isTracking && userLocation) {
       navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
     }
@@ -471,7 +471,7 @@ function LocationTracker() {
 
   // Phát audio
   const playAudio = (url) => {
-    console.log('🔊 playAudio called, setting isAudioPlaying to TRUE')
+
     
     if (audioRef.current) {
       // Set flag trước khi cleanup
@@ -490,7 +490,7 @@ function LocationTracker() {
     
     // ⚠️ SET audioStartTimeRef NGAY LẬP TỨC (trước khi play) để tránh race condition
     audioStartTimeRef.current = Date.now()
-    console.log('⏱ audioStartTimeRef set:', audioStartTimeRef.current)
+
     
     // Thêm timestamp để tránh cache browser
     const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
@@ -501,43 +501,43 @@ function LocationTracker() {
     
     // Sự kiện load thành công
     audio.onloadeddata = () => {
-      console.log('Audio loaded successfully')
+
     }
     
     audio.onerror = (e) => {
       // Ignore error nếu đang cleanup audio
       if (isCleaningUpAudioRef.current) {
-        console.log('⏭ Skip audio error (cleanup in progress)')
+
         return
       }
       
       console.error('Audio error:', e)
       console.error('Audio error details:', audio.error)
-      console.log('⏹ Audio error, setting isAudioPlaying to FALSE')
+
       setIsAudioPlaying(false)
       audioStartTimeRef.current = null
     }
     
     audio.onended = () => {
-      console.log('⏹ Audio ended, setting isAudioPlaying to FALSE')
+
       // Track audio duration khi nghe xong
       if (audioStartTimeRef.current && currentNarration?.restaurantId) {
         const audioDuration = Math.floor((Date.now() - audioStartTimeRef.current) / 1000)
-        console.log(`📊 Audio finished: duration=${audioDuration}s, restaurant_id=${currentNarration.restaurantId}`)
+
         if (audioDuration >= 1) { // Chỉ track nếu nghe >= 1s
           trackAudioDuration(currentNarration.restaurantId, audioDuration)
         } else {
-          console.log('⚠️ Audio duration < 1s, không track')
+
         }
       } else {
-        console.log('⚠️ Cannot track audio: audioStartTime=', audioStartTimeRef.current, 'restaurantId=', currentNarration?.restaurantId)
+
       }
       
       setIsAudioPlaying(false)
       audioStartTimeRef.current = null
       
       // Khi audio kết thúc, trigger GPS update ngay để cập nhật lại vị trí
-      console.log('✅ Audio đã phát xong, tiếp tục GPS tracking')
+
       if (isTracking && userLocation) {
         navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
       }
@@ -545,12 +545,12 @@ function LocationTracker() {
     
     audio.play()
       .then(() => {
-        console.log('✅ Audio playing successfully')
+
         // audioStartTimeRef đã được set ở trên rồi, không cần set lại ở đây
       })
       .catch(err => {
         console.error('Error playing audio:', err)
-        console.log('⏹ Audio play failed, setting isAudioPlaying to FALSE')
+
         setIsAudioPlaying(false)
         audioStartTimeRef.current = null // Reset nếu play fail
       })
@@ -600,20 +600,20 @@ function LocationTracker() {
 
   // Toggle audio
   const handleToggleAudio = (audioUrl) => {
-    console.log('🎵 handleToggleAudio called, current isAudioPlaying:', isAudioPlaying, 'audioRef.current:', !!audioRef.current)
+
     
     if (!audioUrl) {
-      console.log('❌ No audio URL provided')
+
       return
     }
 
     // Kiểm tra xem audio có đang phát không dựa vào audioRef
     if (audioRef.current && !audioRef.current.paused) {
-      console.log('⏹ Audio is playing, stopping...')
+
       // DỪNG HOÀN TOÀN - Xóa audio để phát lại từ đầu
       stopAudio()
     } else {
-      console.log('▶️ Audio not playing, starting...')
+
       // Tạo audio mới và phát từ đầu
       playAudio(audioUrl)
       // Lưu timestamp khi user tự bấm (nếu không đang đổi ngôn ngữ)
@@ -626,8 +626,8 @@ function LocationTracker() {
   // Xử lý thay đổi ngôn ngữ
   const handleLanguageChange = (e) => {
     const newLang = e.target.value
-    console.log('===== CHANGING LANGUAGE =====')
-    console.log('From:', language, 'To:', newLang)
+
+
     
     // Set flag đang đổi ngôn ngữ để skip cooldown tracking
     isChangingLanguageRef.current = true
@@ -639,7 +639,7 @@ function LocationTracker() {
 
     // Reset cooldown map TRƯỚC khi dừng audio
     playedRestaurantsRef.current.clear()
-    console.log('🧹 Cleared cooldown map')
+
     
     // Dừng audio và reset hoàn toàn
     stopAudio()
