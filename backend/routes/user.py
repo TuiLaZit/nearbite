@@ -389,20 +389,15 @@ def register_user_routes(app):
         """Track audio playback duration"""
         try:
             data = request.json
-            print(f"🎧 Received track-audio request: {data}")
             
             restaurant_id = data.get("restaurant_id")
             duration_seconds = data.get("duration_seconds")
             
             if not all([restaurant_id, duration_seconds]):
-                print("❌ Missing required fields")
                 return jsonify({"error": "Missing required fields"}), 400
             
             restaurant = Restaurant.query.get(restaurant_id)
             if restaurant:
-                old_count = restaurant.audio_play_count
-                old_avg = restaurant.avg_audio_duration
-                
                 # Tính trung bình đúng cho avg_audio_duration (giây)
                 # Công thức: New_Avg = (Old_Avg * Old_Count + New_Value) / (Old_Count + 1)
                 if restaurant.audio_play_count == 0 or restaurant.avg_audio_duration == 0:
@@ -416,19 +411,11 @@ def register_user_routes(app):
                 restaurant.audio_play_count += 1
                 
                 db.session.commit()
-                
-                print(f"✅ Updated audio analytics for {restaurant.name}:")
-                print(f"   audio_play_count: {old_count} → {restaurant.audio_play_count}")
-                print(f"   avg_audio_duration: {old_avg}s → {restaurant.avg_audio_duration}s")
             else:
-                print(f"❌ Restaurant not found: id={restaurant_id}")
                 return jsonify({"error": "Restaurant not found"}), 404
             
             return jsonify({"status": "success"})
         except Exception as e:
-            print(f"❌ Error in track_audio: {str(e)}")
-            import traceback
-            traceback.print_exc()
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
 
