@@ -434,15 +434,18 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
                         old_count = r.visit_count
                         old_avg = r.avg_visit_duration
                         
-                        r.visit_count += 1
                         # Tính trung bình đúng cho avg_visit_duration (giây)
-                        # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
-                        if r.avg_visit_duration == 0:
+                        # Công thức: New_Avg = (Old_Avg * Old_Count + New_Value) / (Old_Count + 1)
+                        if r.visit_count == 0 or r.avg_visit_duration == 0:
                             r.avg_visit_duration = duration_seconds
                         else:
                             r.avg_visit_duration = int(
-                                (r.avg_visit_duration * (r.visit_count - 1) + duration_seconds) / r.visit_count
+                                (r.avg_visit_duration * r.visit_count + duration_seconds) / (r.visit_count + 1)
                             )
+                        
+                        # Tăng visit_count SAU KHI tính average
+                        r.visit_count += 1
+                        
                         # Commit ngay để lưu analytics
                         db.session.commit()
                         print(f"✅ Updated analytics for {r.name}:")
@@ -493,17 +496,18 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
                 old_count = restaurant.audio_play_count
                 old_avg = restaurant.avg_audio_duration
                 
-                # Tăng audio play count
-                restaurant.audio_play_count += 1
-                
                 # Tính trung bình đúng cho avg_audio_duration (giây)
-                # Avg = (Old_Avg * (Count - 1) + New_Value) / Count
-                if restaurant.avg_audio_duration == 0:
+                # Công thức: New_Avg = (Old_Avg * Old_Count + New_Value) / (Old_Count + 1)
+                if restaurant.audio_play_count == 0 or restaurant.avg_audio_duration == 0:
                     restaurant.avg_audio_duration = duration_seconds
                 else:
                     restaurant.avg_audio_duration = int(
-                        (restaurant.avg_audio_duration * (restaurant.audio_play_count - 1) + duration_seconds) / restaurant.audio_play_count
+                        (restaurant.avg_audio_duration * restaurant.audio_play_count + duration_seconds) / (restaurant.audio_play_count + 1)
                     )
+                
+                # Tăng audio play count SAU KHI tính average
+                restaurant.audio_play_count += 1
+                
                 db.session.commit()
                 
                 print(f"✅ Updated audio analytics for {restaurant.name}:")
