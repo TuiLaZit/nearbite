@@ -142,16 +142,25 @@ function LocationTracker() {
     })
       .then(res => {
         if (!res.ok) {
+          // Nếu endpoint chưa có (404), warning thay vì error
+          if (res.status === 404) {
+            console.warn('⚠️ Location tracking endpoint not available yet (404) - backend chưa deploy code mới')
+            return null
+          }
           throw new Error(`HTTP error! status: ${res.status}`)
         }
         return res.json()
       })
       .then(data => {
-        console.log('✅ Location visit tracked:', data)
+        if (data) {
+          console.log('✅ Location visit tracked:', data)
+        }
       })
       .catch(err => {
-        console.error('❌ Error tracking location:', err)
-        console.error('Details:', { lat, lng, durationSeconds, restaurantId })
+        if (!err.message.includes('404')) {
+          console.error('❌ Error tracking location:', err)
+          console.error('Details:', { lat, lng, durationSeconds, restaurantId })
+        }
       })
   }
 
@@ -168,16 +177,26 @@ function LocationTracker() {
     })
       .then(res => {
         if (!res.ok) {
+          // Nếu endpoint chưa có (404), warning thay vì error
+          if (res.status === 404) {
+            console.warn('⚠️ Audio tracking endpoint not available yet (404) - backend chưa deploy code mới')
+            return null // Return null để skip .then() tiếp theo
+          }
           throw new Error(`HTTP error! status: ${res.status}`)
         }
         return res.json()
       })
       .then(data => {
-        console.log('✅ Audio duration tracked:', data)
+        if (data) { // Chỉ log khi có data (không phải 404)
+          console.log('✅ Audio duration tracked:', data)
+        }
       })
       .catch(err => {
-        console.error('❌ Error tracking audio:', err)
-        console.error('Details:', { restaurantId, durationSeconds })
+        // Chỉ log error khi KHÔNG phải 404 (404 đã handle ở trên)
+        if (!err.message.includes('404')) {
+          console.error('❌ Error tracking audio:', err)
+          console.error('Details:', { restaurantId, durationSeconds })
+        }
       })
   }
 
