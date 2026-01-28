@@ -92,6 +92,7 @@ function LocationTracker() {
   const visitStartTimeRef = useRef(null) // Track thời điểm bắt đầu visit (đứng gần quán > 10s)
   const audioStartTimeRef = useRef(null) // Track thời điểm bắt đầu nghe audio
   const isChangingLanguageRef = useRef(false) // Flag để skip cooldown khi đổi ngôn ngữ
+  const isCleaningUpAudioRef = useRef(false) // Flag để skip error khi cleanup audio
 
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -421,11 +422,19 @@ function LocationTracker() {
         console.log('⚠️ Cannot track audio: audioStartTime=', audioStartTimeRef.current, 'restaurantId=', currentNarration?.restaurantId)
       }
       
+      // Set flag trước khi cleanup để skip error event
+      isCleaningUpAudioRef.current = true
+      
       audioRef.current.pause()
       audioRef.current.currentTime = 0
       audioRef.current.src = ''
       audioRef.current.load()
       audioRef.current = null
+      
+      // Reset flag sau khi cleanup xong
+      setTimeout(() => {
+        isCleaningUpAudioRef.current = false
+      }, 100)
     }
     setIsAudioPlaying(false)
     audioStartTimeRef.current = null
@@ -448,9 +457,15 @@ function LocationTracker() {
     console.log('🔊 playAudio called, setting isAudioPlaying to TRUE')
     
     if (audioRef.current) {
+      // Set flag trước khi cleanup
+      isCleaningUpAudioRef.current = true
       audioRef.current.pause()
       audioRef.current.src = '' // Clear old source
       audioRef.current = null
+      // Reset flag
+      setTimeout(() => {
+        isCleaningUpAudioRef.current = false
+      }, 100)
     }
     
     // Set isAudioPlaying NGAY LẬP TỨC trước khi tạo audio
@@ -469,6 +484,12 @@ function LocationTracker() {
     }
     
     audio.onerror = (e) => {
+      // Ignore error nếu đang cleanup audio
+      if (isCleaningUpAudioRef.current) {
+        console.log('⏭ Skip audio error (cleanup in progress)')
+        return
+      }
+      
       console.error('Audio error:', e)
       console.error('Audio error details:', audio.error)
       console.log('⏹ Audio error, setting isAudioPlaying to FALSE')
