@@ -433,10 +433,10 @@ def register_admin_routes(app):
     @admin_required
     def upload_restaurant_image_file():
         """Upload image file to Supabase Storage and return URL"""
+        # If Supabase is not configured, fall back to saving the file locally
+        local_fallback = False
         if not supabase_client:
-            return jsonify({
-                "error": "Image upload is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env"
-            }), 500
+            local_fallback = True
         
         # Check if file is present
         if 'file' not in request.files:
@@ -464,9 +464,21 @@ def register_admin_routes(app):
             
             # Read file bytes
             file_bytes = file.read()
-            
-            # Upload to Supabase
-            public_url = upload_image(file_bytes, filename)
+            # If Supabase configured, upload there; otherwise save locally
+            if not local_fallback:
+                public_url = upload_image(file_bytes, filename)
+            else:
+                # Ensure uploads folder exists under static
+                import os
+                uploads_dir = os.path.join('static', 'uploads')
+                os.makedirs(uploads_dir, exist_ok=True)
+                file_path = os.path.join(uploads_dir, filename)
+                with open(file_path, 'wb') as f:
+                    f.write(file_bytes)
+
+                # Build public URL using request.host_url
+                host = request.host_url.rstrip('/')
+                public_url = f"{host}/static/uploads/{filename}"
             
             return jsonify({
                 "status": "success",
