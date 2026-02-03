@@ -69,18 +69,50 @@ def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
         raise Exception("Supabase client not initialized. Check your environment variables.")
     
     try:
+        # Determine content type from filename extension
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        content_type_map = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp'
+        }
+        content_type = content_type_map.get(ext, 'application/octet-stream')
+
         # Upload file to storage
         response = supabase_client.storage.from_(bucket_name).upload(
             filename,
             file_bytes,
-            {"content-type": "image/jpeg"}  # Adjust based on actual file type
+            {"content-type": content_type}
         )
-        
-        # Get public URL
-        public_url = supabase_client.storage.from_(bucket_name).get_public_url(filename)
-        
-        return public_url
-    
+
+        # Get public URL (Supabase Python client may return a dict/object)
+        public_url_obj = supabase_client.storage.from_(bucket_name).get_public_url(filename)
+
+        # Normalize to a plain string URL if possible
+        if isinstance(public_url_obj, str):
+            return public_url_obj
+
+        # Try common key names
+        for key in ('publicURL', 'publicUrl', 'public_url', 'url'):
+            if isinstance(public_url_obj, dict) and key in public_url_obj:
+                return public_url_obj[key]
+
+        # Fallback: stringify the object safely
+        try:
+            # If the client returns an object with attribute access
+            if hasattr(public_url_obj, 'get'):
+                # dict-like
+                for key in ('publicURL', 'publicUrl', 'public_url', 'url'):
+                    if public_url_obj.get(key):
+                        return public_url_obj.get(key)
+        except Exception:
+            pass
+
+        # As a last resort, return the string representation
+        return str(public_url_obj)
+
     except Exception as e:
         print(f"Error uploading image: {e}")
         raise e
