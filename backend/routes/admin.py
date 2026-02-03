@@ -341,7 +341,14 @@ def register_admin_routes(app):
     def add_restaurant_image(restaurant_id):
         """Add an image to a restaurant"""
         Restaurant.query.get_or_404(restaurant_id)
+        # Log incoming JSON for debugging
+        try:
+            raw = request.get_data(as_text=True)
+            print(f"[add_image] raw body: {raw}")
+        except Exception:
+            pass
         data = request.get_json()
+        print(f"[add_image] parsed json: {data}")
         
         # Validate data
         error = validate_restaurant_image(data)
@@ -365,6 +372,7 @@ def register_admin_routes(app):
         
         db.session.add(image)
         db.session.commit()
+        print(f"[add_image] saved image id={image.id} url={image.image_url}")
         
         return jsonify({
             "status": "success",
