@@ -1,4 +1,6 @@
 from flask import request, jsonify
+import os
+import traceback
 from models import Restaurant, MenuItem, Tag, RestaurantImage, restaurant_tags, LocationVisit
 from db import db
 from auth import admin_required
@@ -437,39 +439,48 @@ def register_admin_routes(app):
         local_fallback = False
         if not supabase_client:
             local_fallback = True
-        
+
+        # Debug: log incoming files
+        try:
+            print(f"[upload] incoming files: {list(request.files.keys())}")
+        except Exception:
+            pass
+
         # Check if file is present
         if 'file' not in request.files:
+            print("[upload] No file provided in request.files")
             return jsonify({"error": "No file provided"}), 400
-        
+
         file = request.files['file']
-        
+
         if file.filename == '':
+            print("[upload] Empty filename")
             return jsonify({"error": "No file selected"}), 400
-        
+
         # Check file type
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
         file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-        
+
         if file_ext not in allowed_extensions:
+            print(f"[upload] File type not allowed: {file_ext}")
             return jsonify({
                 "error": f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
             }), 400
-        
+
         try:
             # Generate unique filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             unique_id = str(uuid.uuid4())[:8]
             filename = f"{timestamp}_{unique_id}.{file_ext}"
-            
+
             # Read file bytes
             file_bytes = file.read()
-            # If Supabase configured, upload there; otherwise save locally
+
             if not local_fallback:
+                print(f"[upload] Uploading to Supabase: {filename} (size={len(file_bytes)} bytes)")
                 public_url = upload_image(file_bytes, filename)
             else:
-                # Ensure uploads folder exists under static
-                import os
+                print(f"[upload] Supabase not configured, saving locally: {filename} (size={len(file_bytes)} bytes)")
                 uploads_dir = os.path.join('static', 'uploads')
                 os.makedirs(uploads_dir, exist_ok=True)
                 file_path = os.path.join(uploads_dir, filename)
@@ -479,17 +490,31 @@ def register_admin_routes(app):
                 # Build public URL using request.host_url
                 host = request.host_url.rstrip('/')
                 public_url = f"{host}/static/uploads/{filename}"
-            
+
+            print(f"[upload] Saved. public_url={public_url}")
             return jsonify({
                 "status": "success",
                 "url": public_url,
                 "filename": filename
             })
-        
+
         except Exception as e:
+            print("[upload] Exception during upload:")
+            traceback.print_exc()
             return jsonify({
                 "error": f"Failed to upload image: {str(e)}"
             }), 500
+
+    @app.route("/admin/uploads", methods=["GET"])
+    @admin_required
+    def list_uploaded_files():
+        """List files saved in static/uploads for debugging"""
+        uploads_dir = os.path.join('static', 'uploads')
+        if not os.path.exists(uploads_dir):
+            return jsonify([])
+        files = sorted(os.listdir(uploads_dir))
+        host = request.host_url.rstrip('/')
+        return jsonify([f"{host}/static/uploads/{fn}" for fn in files])
 
 
     # ======================
