@@ -11,7 +11,7 @@ services:
       - key: FLASK_ENV
         value: production
     # Thêm environment variables từ Render Dashboard:
+    # - DATABASE_URL (from Supabase)
     # - SUPABASE_URL
     # - SUPABASE_KEY
     # - SECRET_KEY (generate random string)
-    # - DATABASE_URL
