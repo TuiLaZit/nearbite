@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: nearbite-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: FLASK_ENV
+        value: production
+    # Thêm environment variables từ Render Dashboard:
+    # - SUPABASE_URL
+    # - SUPABASE_KEY
+    # - SECRET_KEY (generate random string)
