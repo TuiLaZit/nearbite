@@ -105,11 +105,14 @@ class Tag(db.Model):
 
 
 class RestaurantImage(db.Model):
+    __tablename__ = 'restaurant_image'
+    
     id = db.Column(db.Integer, primary_key=True)
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.id"), nullable=False)
     image_url = db.Column(db.Text, nullable=False)
     caption = db.Column(db.Text)
     display_order = db.Column(db.Integer, default=0)
+    is_primary = db.Column(db.Boolean, default=False)
     
     def to_dict(self):
         return {
@@ -117,7 +120,8 @@ class RestaurantImage(db.Model):
             "restaurant_id": self.restaurant_id,
             "image_url": self.image_url,
             "caption": self.caption,
-            "display_order": self.display_order
+            "display_order": self.display_order,
+            "is_primary": self.is_primary
         }
 
 
@@ -138,15 +142,4 @@ class LocationVisit(db.Model):
             "duration_seconds": self.duration_seconds,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "restaurant_id": self.restaurant_id
-        }
-    is_primary = db.Column(db.Boolean, default=False)
-    
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "restaurant_id": self.restaurant_id,
-            "image_url": self.image_url,
-            "caption": self.caption,
-            "display_order": self.display_order,
-            "is_primary": self.is_primary
         }
