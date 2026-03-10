@@ -5,10 +5,14 @@ import os
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
 from auth import admin_login, admin_check, admin_logout
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
-app.secret_key = "dev-secret-key"   # 🔥 KHÔNG dùng getenv lúc này
+app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 
 app.static_folder = 'static'
 
@@ -48,7 +52,7 @@ def handle_preflight():
         return response, 200
 
 # Tự động detect môi trường production (HTTPS)
-is_production = os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_STATIC_URL")
+is_production = os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_STATIC_URL")
 
 app.config.update(
     SESSION_COOKIE_SAMESITE="None" if is_production else "Lax",
