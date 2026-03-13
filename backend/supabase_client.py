@@ -32,25 +32,38 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 # Initialize Supabase client
 supabase_client: Client = None
 
+# Avoid repeated bucket checks on every upload.
+_bucket_checked = False
+
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        
-        # Tự động tạo bucket nếu chưa có
-        try:
-            buckets = supabase_client.storage.list_buckets()
-            bucket_names = [b['name'] for b in buckets]
-            
-            if 'restaurant-images' not in bucket_names:
-                supabase_client.storage.create_bucket(
-                    'restaurant-images',
-                    options={'public': True}
-                )
-        except Exception as bucket_error:
-            pass
-            
+
     except Exception as e:
         pass
+
+
+def ensure_bucket_exists(bucket_name="restaurant-images"):
+    """Ensure storage bucket exists, but only when storage operations are used."""
+    global _bucket_checked
+
+    if _bucket_checked or not supabase_client:
+        return
+
+    try:
+        buckets = supabase_client.storage.list_buckets()
+        bucket_names = [b["name"] for b in buckets]
+
+        if bucket_name not in bucket_names:
+            supabase_client.storage.create_bucket(
+                bucket_name,
+                options={"public": True}
+            )
+    except Exception:
+        # Do not block app startup or request handling if storage bootstrap fails.
+        pass
+    finally:
+        _bucket_checked = True
 
 
 def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
@@ -67,6 +80,8 @@ def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
     """
     if not supabase_client:
         raise Exception("Supabase client not initialized. Check your environment variables.")
+
+    ensure_bucket_exists(bucket_name)
     
     try:
         # Upload file to storage
