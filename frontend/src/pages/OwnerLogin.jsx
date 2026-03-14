@@ -40,13 +40,17 @@ function OwnerLogin() {
         ← Quay lại
       </button>
       <h1>🏪 Đăng nhập chủ quán</h1>
+      <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', color: '#9a3412' }}>
+        Trang này chỉ dành cho chủ quán.
+        Tài khoản là <strong>username quán</strong> (ví dụ: bc4), không phải email.
+      </div>
       <form onSubmit={handleLogin}>
         <label style={{ display: 'block', marginBottom: '8px' }}>Tài khoản:</label>
         <input
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="Ví dụ: bbhat"
+          placeholder="Ví dụ: bc4"
           required
         />
 
@@ -62,6 +66,23 @@ function OwnerLogin() {
           {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </button>
       </form>
+
+      <div style={{ marginTop: '12px' }}>
+        <button
+          type="button"
+          onClick={() => navigate('/admin/login')}
+          style={{
+            background: '#1e293b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            cursor: 'pointer'
+          }}
+        >
+          🛡️ Tôi là admin
+        </button>
+      </div>
     </div>
   )
 }

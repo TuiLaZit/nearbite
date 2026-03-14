@@ -1,5 +1,5 @@
 from flask import request, jsonify, session
-from models import Restaurant, MenuItem, Tag, RestaurantImage, restaurant_tags, LocationVisit
+from models import Restaurant, MenuItem, Tag, RestaurantImage, AdminUser, restaurant_tags, LocationVisit
 from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
@@ -60,6 +60,58 @@ def register_admin_routes(app):
     # ======================
     # RESTAURANT CRUD
     # ======================
+
+    @app.route("/admin/accounts", methods=["GET"])
+    @admin_required
+    def get_admin_accounts():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        accounts = AdminUser.query.filter_by(is_active=True).order_by(AdminUser.created_at.asc()).all()
+        return jsonify([a.to_dict() for a in accounts])
+
+    @app.route("/admin/accounts", methods=["POST"])
+    @admin_required
+    def add_admin_account():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        data = request.get_json() or {}
+        email = (data.get("email") or "").strip().lower()
+
+        if not email or "@" not in email:
+            return jsonify({"error": "Email không hợp lệ"}), 400
+
+        exists = AdminUser.query.filter_by(email=email).first()
+        if exists:
+            if not exists.is_active:
+                exists.is_active = True
+                db.session.commit()
+            return jsonify({"status": "success", "account": exists.to_dict()})
+
+        account = AdminUser(email=email, is_active=True)
+        db.session.add(account)
+        db.session.commit()
+        return jsonify({"status": "success", "account": account.to_dict()})
+
+    @app.route("/admin/accounts/<int:account_id>", methods=["DELETE"])
+    @admin_required
+    def delete_admin_account(account_id):
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        account = AdminUser.query.get_or_404(account_id)
+        active_count = AdminUser.query.filter_by(is_active=True).count()
+
+        if active_count <= 1 and account.is_active:
+            return jsonify({"error": "Phải giữ ít nhất 1 tài khoản admin"}), 400
+
+        account.is_active = False
+        db.session.commit()
+        return jsonify({"status": "deleted", "id": account_id})
 
     @app.route("/admin/restaurants", methods=["GET"])
     @admin_required

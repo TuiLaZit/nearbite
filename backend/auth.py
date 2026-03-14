@@ -8,7 +8,7 @@ from email.message import EmailMessage
 from functools import wraps
 from flask import request, jsonify, session
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import Restaurant
+from models import Restaurant, AdminUser
 
 
 # ======================
@@ -16,8 +16,12 @@ from models import Restaurant
 # ======================
 
 def admin_login():
-    data = request.get_json()
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
     password = data.get("password")
+
+    if not email:
+        return jsonify({"error": "Email không được để trống"}), 400
 
     admin_password = os.getenv("ADMIN_PASSWORD", "dev")
     admin_password_hash = generate_password_hash(admin_password)
@@ -25,8 +29,27 @@ def admin_login():
     if not password or not check_password_hash(admin_password_hash, password):
         return jsonify({"error": "Unauthorized"}), 401
 
+    env_allowed = {
+        e.strip().lower()
+        for e in os.getenv("ADMIN_ALLOWED_EMAILS", "").split(",")
+        if e.strip()
+    }
+    db_allowed = AdminUser.query.filter_by(email=email, is_active=True).first()
+    active_count = AdminUser.query.filter_by(is_active=True).count()
+
+    # Bootstrap mode: allow first login and create initial admin account when list is empty.
+    if not env_allowed and active_count == 0 and not db_allowed:
+        admin_user = AdminUser(email=email, is_active=True)
+        db.session.add(admin_user)
+        db.session.commit()
+        db_allowed = admin_user
+
+    if email not in env_allowed and not db_allowed:
+        return jsonify({"error": "Email không có quyền đăng nhập admin"}), 403
+
     session["admin_logged_in"] = True
-    return jsonify({"status": "success"})
+    session["admin_email"] = email
+    return jsonify({"status": "success", "email": email})
 
 
 # ======================
@@ -35,7 +58,7 @@ def admin_login():
 
 def admin_check():
     if session.get("admin_logged_in"):
-        return jsonify({"logged_in": True})
+        return jsonify({"logged_in": True, "email": session.get("admin_email")})
     return jsonify({"logged_in": False}), 401
 
 
