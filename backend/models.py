@@ -133,6 +133,23 @@ class RestaurantImage(db.Model):
         }
 
 
+class AdminUser(db.Model):
+    __tablename__ = 'admin_user'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), nullable=False, unique=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "email": self.email,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 # Model for tracking user location visits (for heatmap)
 class LocationVisit(db.Model):
     id = db.Column(db.Integer, primary_key=True)

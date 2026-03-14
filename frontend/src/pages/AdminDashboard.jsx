@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import RestaurantManagement from './RestaurantManagement'
 import TagManagement from './TagManagement'
+import AdminAccountManagement from './AdminAccountManagement'
 
 // Fix cho Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl
@@ -248,6 +249,17 @@ function AdminDashboard({ role = 'admin' }) {
               🏷️ Quản lý Tags
             </button>
           )}
+          {!isOwner && (
+            <button
+              style={{
+                ...styles.navButton,
+                ...(activeTab === 'adminAccounts' ? styles.navButtonActive : {})
+              }}
+              onClick={() => setActiveTab('adminAccounts')}
+            >
+              👤 Tài khoản Admin
+            </button>
+          )}
         </nav>
 
         <div style={styles.sidebarFooter}>
@@ -427,6 +439,7 @@ function AdminDashboard({ role = 'admin' }) {
           />
         )}
         {!isOwner && activeTab === 'tags' && <TagManagement loginPath={loginPath} />}
+        {!isOwner && activeTab === 'adminAccounts' && <AdminAccountManagement />}
       </div>
     </div>
   )

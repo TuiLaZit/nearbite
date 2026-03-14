@@ -6,8 +6,9 @@ function AdminLogin({
   role = 'admin',
   redirectPath = '/admin',
   title = '🍜 Admin Login',
-  placeholder = 'Admin password'
+  placeholder = 'Mật khẩu'
 }) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
 
@@ -19,7 +20,7 @@ function AdminLogin({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ email, password })
       })
 
       if (response.ok) {
@@ -39,10 +40,18 @@ function AdminLogin({
       <h1>{title}</h1>
       <form onSubmit={handleLogin}>
         <input
+          type="email"
+          placeholder="Email admin"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
           type="password"
           placeholder={placeholder}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
         <button type="submit">Login</button>
       </form>

@@ -34,8 +34,8 @@ function App() {
           <AdminLogin
             role="admin"
             redirectPath="/admin"
-            title="🍜 Admin Login"
-            placeholder="Admin password"
+            title="🛡️ Đăng nhập Admin"
+            placeholder="Nhập ADMIN_PASSWORD"
           />
         }
       />
