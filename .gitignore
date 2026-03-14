@@ -14,3 +14,9 @@ venv/
 
 # Generated files
 backend/static/tts/*.mp3
+
+# Supabase migrations
+backend/migrations/supabase/
+
+# Local helper scripts
+run-local.ps1

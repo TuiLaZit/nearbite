@@ -75,9 +75,12 @@ function HeatmapLayer({ heatmapData }) {
   return null
 }
 
-function AdminDashboard() {
+function AdminDashboard({ role = 'admin' }) {
+  const isOwner = role === 'owner'
+  const authBase = isOwner ? '/owner' : '/admin'
+  const loginPath = isOwner ? '/owner/login' : '/admin/login'
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('dashboard') // dashboard, restaurants, hidden, tags
+  const [activeTab, setActiveTab] = useState(isOwner ? 'restaurants' : 'dashboard') // dashboard, restaurants, hidden, tags
   const [heatmapData, setHeatmapData] = useState([])
   const [restaurants, setRestaurants] = useState([])
   const [topRestaurants, setTopRestaurants] = useState({
@@ -90,30 +93,33 @@ function AdminDashboard() {
     let isMounted = true
     
     // Check authentication
-    fetch(`${BASE_URL}/admin/check`, {
+    fetch(`${BASE_URL}${authBase}/check`, {
       credentials: 'include'
     })
       .then(res => {
         if (!isMounted) return null
         if (!res.ok) {
-          navigate('/admin/login', { replace: true })
+          navigate(loginPath, { replace: true })
           return null
         }
         return res.json()
       })
       .then(data => {
         if (!isMounted || !data) return
-        // Load heatmap data only if authenticated
+        if (isOwner) {
+          // Owner chỉ cần quản lý quán, không cần analytics
+          return
+        }
         loadHeatmapData()
       })
       .catch(err => {
         if (!isMounted) return
         console.error('Auth check failed:', err)
-        navigate('/admin/login', { replace: true })
+        navigate(loginPath, { replace: true })
       })
     
     return () => { isMounted = false }
-  }, [navigate])
+  }, [authBase, isOwner, loginPath, navigate])
 
   // Load heatmap và restaurants khi load component
 
@@ -179,11 +185,12 @@ function AdminDashboard() {
 
 
   const handleLogout = () => {
-    fetch(`${BASE_URL}/admin/logout`, {
+    fetch(`${BASE_URL}${authBase}/logout`, {
       method: 'POST',
       credentials: 'include'
     }).then(() => {
-      navigate('/admin/login')
+      localStorage.removeItem('activeRole')
+      navigate(loginPath)
     })
   }
 
@@ -192,22 +199,24 @@ function AdminDashboard() {
       {/* Sidebar */}
       <div style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
-          <h2 style={styles.sidebarTitle}>🎛️ Admin Panel</h2>
+          <h2 style={styles.sidebarTitle}>{isOwner ? '🏪 Chủ quán Panel' : '🎛️ Admin Panel'}</h2>
         </div>
 
         <nav style={styles.nav}>
-          <button
-            style={{
-              ...styles.navButton,
-              ...(activeTab === 'dashboard' ? styles.navButtonActive : {})
-            }}
-            onClick={() => {
-              setActiveTab('dashboard')
-              loadHeatmapData() // Refresh data when clicking dashboard
-            }}
-          >
-            📊 Dashboard
-          </button>
+          {!isOwner && (
+            <button
+              style={{
+                ...styles.navButton,
+                ...(activeTab === 'dashboard' ? styles.navButtonActive : {})
+              }}
+              onClick={() => {
+                setActiveTab('dashboard')
+                loadHeatmapData() // Refresh data when clicking dashboard
+              }}
+            >
+              📊 Dashboard
+            </button>
+          )}
           <button
             style={{
               ...styles.navButton,
@@ -217,24 +226,28 @@ function AdminDashboard() {
           >
             🍽️ Quản lý Quán
           </button>
-          <button
-            style={{
-              ...styles.navButton,
-              ...(activeTab === 'hidden' ? styles.navButtonActive : {})
-            }}
-            onClick={() => setActiveTab('hidden')}
-          >
-            👻 Quán đã ẩn
-          </button>
-          <button
-            style={{
-              ...styles.navButton,
-              ...(activeTab === 'tags' ? styles.navButtonActive : {})
-            }}
-            onClick={() => setActiveTab('tags')}
-          >
-            🏷️ Quản lý Tags
-          </button>
+          {!isOwner && (
+            <button
+              style={{
+                ...styles.navButton,
+                ...(activeTab === 'hidden' ? styles.navButtonActive : {})
+              }}
+              onClick={() => setActiveTab('hidden')}
+            >
+              👻 Quán đã ẩn
+            </button>
+          )}
+          {!isOwner && (
+            <button
+              style={{
+                ...styles.navButton,
+                ...(activeTab === 'tags' ? styles.navButtonActive : {})
+              }}
+              onClick={() => setActiveTab('tags')}
+            >
+              🏷️ Quản lý Tags
+            </button>
+          )}
         </nav>
 
         <div style={styles.sidebarFooter}>
@@ -246,7 +259,7 @@ function AdminDashboard() {
 
       {/* Main content */}
       <div style={styles.mainContent}>
-        {activeTab === 'dashboard' && (
+        {!isOwner && activeTab === 'dashboard' && (
           <div style={styles.dashboardContent}>
             <h1 style={styles.pageTitle}>� Dashboard Analytics</h1>
             <p style={styles.pageDescription}>
@@ -398,9 +411,22 @@ function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'restaurants' && <RestaurantManagement isHidden={false} />}
-        {activeTab === 'hidden' && <RestaurantManagement isHidden={true} />}
-        {activeTab === 'tags' && <TagManagement />}
+        {activeTab === 'restaurants' && (
+          <RestaurantManagement
+            isHidden={false}
+            loginPath={loginPath}
+            authCheckPath={`${authBase}/check`}
+            isOwnerView={isOwner}
+          />
+        )}
+        {!isOwner && activeTab === 'hidden' && (
+          <RestaurantManagement
+            isHidden={true}
+            loginPath={loginPath}
+            authCheckPath={`${authBase}/check`}
+          />
+        )}
+        {!isOwner && activeTab === 'tags' && <TagManagement loginPath={loginPath} />}
       </div>
     </div>
   )
@@ -451,7 +477,7 @@ const styles = {
   navButtonActive: {
     backgroundColor: '#334155',
     color: 'white',
-    borderLeftColor: '#3b82f6',
+    borderLeft: '4px solid #3b82f6',
     fontWeight: '600'
   },
   sidebarFooter: {

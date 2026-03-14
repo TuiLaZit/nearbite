@@ -757,6 +757,15 @@ function LocationTracker() {
     }
   }
 
+  const handleCustomerLogout = () => {
+    fetch(`${BASE_URL}/customer/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    }).finally(() => {
+      navigate('/customer/login', { replace: true })
+    })
+  }
+
   // Cleanup khi component unmount
   useEffect(() => {
     return () => {
@@ -798,7 +807,7 @@ function LocationTracker() {
         
         {/* Xếp Tour button */}
         <button
-          onClick={() => navigate('/tour-planner')}
+          onClick={() => navigate('/customer/tour-planner')}
           style={{
             padding: '10px 20px',
             background: '#ff9800',
@@ -832,6 +841,22 @@ function LocationTracker() {
             <option key={lang.code} value={lang.code}>{lang.label}</option>
           ))}
         </select>
+
+        <button
+          onClick={handleCustomerLogout}
+          style={{
+            padding: '10px 16px',
+            background: '#ef4444',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          🚪 Đăng xuất
+        </button>
       </div>
 
       {/* Leaflet Map */}

@@ -1,7 +1,14 @@
 import os
+import re
+import secrets
+import smtplib
+import string
+from datetime import datetime, timedelta
+from email.message import EmailMessage
 from functools import wraps
 from flask import request, jsonify, session
 from werkzeug.security import check_password_hash, generate_password_hash
+from models import Restaurant
 
 
 # ======================
@@ -42,13 +49,169 @@ def admin_logout():
 
 
 # ======================
+# OWNER LOGIN
+# ======================
+
+def owner_login():
+    data = request.get_json() or {}
+    username = (data.get("username") or "").strip().lower()
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"error": "Username và mật khẩu không được để trống"}), 400
+
+    restaurant = Restaurant.query.filter_by(owner_username=username, is_active=True).first()
+
+    if not restaurant or not restaurant.owner_password_hash:
+        return jsonify({"error": "Tài khoản không hợp lệ"}), 401
+
+    if not check_password_hash(restaurant.owner_password_hash, password):
+        return jsonify({"error": "Tài khoản không hợp lệ"}), 401
+
+    session["owner_logged_in"] = True
+    session["owner_restaurant_id"] = restaurant.id
+    session["owner_username"] = restaurant.owner_username
+
+    return jsonify({
+        "status": "success",
+        "restaurant_id": restaurant.id,
+        "username": restaurant.owner_username
+    })
+
+
+def owner_check():
+    if session.get("owner_logged_in"):
+        return jsonify({
+            "logged_in": True,
+            "restaurant_id": session.get("owner_restaurant_id"),
+            "username": session.get("owner_username")
+        })
+    return jsonify({"logged_in": False}), 401
+
+
+def owner_logout():
+    session.pop("owner_logged_in", None)
+    session.pop("owner_restaurant_id", None)
+    session.pop("owner_username", None)
+    return jsonify({"status": "logged_out"})
+
+
+# ======================
+# CUSTOMER OTP LOGIN
+# ======================
+
+OTP_STORE = {}
+
+
+def _send_otp_email(email, otp):
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_mode = os.getenv("SMTP_MODE", "starttls").strip().lower()
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+
+    if not smtp_host or not smtp_user or not smtp_password or not smtp_from:
+        return False, "SMTP chưa được cấu hình"
+
+    msg = EmailMessage()
+    msg["Subject"] = "NearBite - Mã OTP đăng nhập"
+    msg["From"] = smtp_from
+    msg["To"] = email
+    msg.set_content(
+        f"Mã OTP đăng nhập NearBite của bạn là: {otp}\n"
+        f"Mã có hiệu lực trong 5 phút."
+    )
+
+    try:
+        if smtp_mode == "ssl":
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                if smtp_mode == "starttls":
+                    server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+def customer_request_otp():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return jsonify({"error": "Email không hợp lệ"}), 400
+
+    otp = "".join(secrets.choice(string.digits) for _ in range(6))
+    OTP_STORE[email] = {
+        "otp": otp,
+        "expires_at": datetime.utcnow() + timedelta(minutes=5)
+    }
+
+    sent, error = _send_otp_email(email, otp)
+    if not sent:
+        otp_debug_fallback = os.getenv("OTP_DEBUG_FALLBACK", "false").strip().lower() == "true"
+        if otp_debug_fallback:
+            return jsonify({
+                "status": "success",
+                "message": "OTP đã tạo ở môi trường local",
+                "debug_otp": otp
+            })
+        return jsonify({"error": f"Không gửi được OTP: {error}"}), 500
+
+    return jsonify({"status": "success", "message": "OTP đã được gửi tới email"})
+
+
+def customer_verify_otp():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+    otp = (data.get("otp") or "").strip()
+
+    record = OTP_STORE.get(email)
+    if not record:
+        return jsonify({"error": "OTP không tồn tại hoặc đã hết hạn"}), 400
+
+    if datetime.utcnow() > record["expires_at"]:
+        OTP_STORE.pop(email, None)
+        return jsonify({"error": "OTP đã hết hạn"}), 400
+
+    if record["otp"] != otp:
+        return jsonify({"error": "OTP không đúng"}), 400
+
+    OTP_STORE.pop(email, None)
+    session["customer_logged_in"] = True
+    session["customer_email"] = email
+
+    return jsonify({"status": "success", "email": email})
+
+
+def customer_check():
+    if session.get("customer_logged_in") and session.get("customer_email"):
+        return jsonify({
+            "logged_in": True,
+            "email": session.get("customer_email")
+        })
+    return jsonify({"logged_in": False}), 401
+
+
+def customer_logout():
+    session.pop("customer_logged_in", None)
+    session.pop("customer_email", None)
+    return jsonify({"status": "logged_out"})
+
+
+# ======================
 # DECORATOR
 # ======================
 
 def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if not session.get("admin_logged_in"):
+        if not session.get("admin_logged_in") and not session.get("owner_logged_in"):
             return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return wrapper

@@ -18,6 +18,9 @@ class Restaurant(db.Model):
     avg_eat_time = db.Column(db.Integer)
     poi_radius_km = db.Column(db.Float, default=0.030, nullable=False)  # POI activation radius in km (default 30m)
     is_active = db.Column(db.Boolean, default=True)
+    owner_username = db.Column(db.String(64), unique=True, nullable=True)
+    owner_password_hash = db.Column(db.String(255), nullable=True)
+    owner_password_plain = db.Column(db.String(32), nullable=True)
     
     # Analytics fields
     visit_count = db.Column(db.Integer, default=0)  # Số lần ghé
@@ -47,7 +50,7 @@ class Restaurant(db.Model):
         order_by="RestaurantImage.display_order"
     )
 
-    def to_dict(self, include_details=False):
+    def to_dict(self, include_details=False, include_admin_fields=False):
         result = {
             "id": self.id,
             "name": self.name,
@@ -62,6 +65,11 @@ class Restaurant(db.Model):
             "avg_audio_duration": self.avg_audio_duration,
             "audio_play_count": self.audio_play_count
         }
+
+        if include_admin_fields:
+            result["owner_username"] = self.owner_username
+            result["owner_password_plain"] = self.owner_password_plain
+            result["has_account"] = bool(self.owner_username and self.owner_password_hash)
         
         if include_details:
             result["menu"] = [item.to_dict() for item in self.menu_items]

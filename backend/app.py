@@ -4,7 +4,18 @@ from db import db
 import os
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
-from auth import admin_login, admin_check, admin_logout
+from auth import (
+    admin_login,
+    admin_check,
+    admin_logout,
+    owner_login,
+    owner_check,
+    owner_logout,
+    customer_request_otp,
+    customer_verify_otp,
+    customer_check,
+    customer_logout,
+)
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -81,6 +92,34 @@ def check():
 @app.route("/admin/logout", methods=["POST"])
 def logout():
     return admin_logout()
+
+@app.route("/owner/login", methods=["POST"])
+def owner_login_route():
+    return owner_login()
+
+@app.route("/owner/check", methods=["GET"])
+def owner_check_route():
+    return owner_check()
+
+@app.route("/owner/logout", methods=["POST"])
+def owner_logout_route():
+    return owner_logout()
+
+@app.route("/customer/request-otp", methods=["POST"])
+def customer_request_otp_route():
+    return customer_request_otp()
+
+@app.route("/customer/verify-otp", methods=["POST"])
+def customer_verify_otp_route():
+    return customer_verify_otp()
+
+@app.route("/customer/check", methods=["GET"])
+def customer_check_route():
+    return customer_check()
+
+@app.route("/customer/logout", methods=["POST"])
+def customer_logout_route():
+    return customer_logout()
 
 @app.route("/static/<path:path>")
 def serve_static(path):

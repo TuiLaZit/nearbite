@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
-function AdminLogin() {
+function AdminLogin({
+  role = 'admin',
+  redirectPath = '/admin',
+  title = '🍜 Admin Login',
+  placeholder = 'Admin password'
+}) {
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
 
@@ -18,7 +23,8 @@ function AdminLogin() {
       })
 
       if (response.ok) {
-        navigate('/admin')
+        localStorage.setItem('activeRole', role)
+        navigate(redirectPath)
       } else {
         alert('Sai mật khẩu')
       }
@@ -30,11 +36,11 @@ function AdminLogin() {
 
   return (
     <div className="container">
-      <h1>🍜 Admin Login</h1>
+      <h1>{title}</h1>
       <form onSubmit={handleLogin}>
         <input
           type="password"
-          placeholder="Admin password"
+          placeholder={placeholder}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />

@@ -155,7 +155,7 @@ function TourPlanner() {
         gap: '20px'
       }}>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/customer')}
           style={{
             padding: '8px 16px',
             background: '#fff',
