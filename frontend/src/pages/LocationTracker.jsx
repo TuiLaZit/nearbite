@@ -822,6 +822,22 @@ function LocationTracker() {
         >
           🗺️ {t('planTour')}
         </button>
+
+        <button
+          onClick={() => navigate('/customer/orders')}
+          style={{
+            padding: '10px 20px',
+            background: '#2563eb',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          🧾 Đặt món
+        </button>
         
         {/* Language selector */}
         <select 

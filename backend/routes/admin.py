@@ -1,5 +1,5 @@
 from flask import request, jsonify, session
-from models import Restaurant, MenuItem, Tag, RestaurantImage, AdminUser, restaurant_tags, LocationVisit
+from models import Restaurant, MenuItem, Tag, RestaurantImage, AdminUser, Order, restaurant_tags, LocationVisit
 from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
@@ -10,7 +10,7 @@ import secrets
 import string
 import unicodedata
 from datetime import datetime
-from sqlalchemy import func
+from sqlalchemy import func, extract
 from werkzeug.security import generate_password_hash
 
 def register_admin_routes(app):
@@ -124,6 +124,108 @@ def register_admin_routes(app):
         return jsonify([
             r.to_dict(include_admin_fields=True) for r in Restaurant.query.filter_by(is_active=True).all()
         ])
+
+    @app.route("/owner/orders", methods=["GET"])
+    @admin_required
+    def get_owner_orders():
+        if is_owner_session():
+            owner_restaurant_id = session.get("owner_restaurant_id")
+            query = Order.query.filter_by(restaurant_id=owner_restaurant_id)
+        else:
+            restaurant_id = request.args.get("restaurant_id", type=int)
+            query = Order.query
+            if restaurant_id:
+                query = query.filter_by(restaurant_id=restaurant_id)
+
+        order_type = request.args.get("order_type")
+        if order_type in ["delivery", "pickup"]:
+            query = query.filter(Order.order_type == order_type)
+
+        orders = query.order_by(Order.created_at.desc()).all()
+        return jsonify([
+            {
+                **order.to_dict(include_items=True),
+                "restaurant_name": order.restaurant.name if order.restaurant else None
+            }
+            for order in orders
+        ])
+
+    @app.route("/owner/orders/summary", methods=["GET"])
+    @admin_required
+    def get_owner_orders_summary():
+        if is_owner_session():
+            owner_restaurant_id = session.get("owner_restaurant_id")
+            query = Order.query.filter_by(restaurant_id=owner_restaurant_id)
+        else:
+            restaurant_id = request.args.get("restaurant_id", type=int)
+            query = Order.query
+            if restaurant_id:
+                query = query.filter_by(restaurant_id=restaurant_id)
+
+        now = datetime.utcnow()
+        monthly_orders = query.filter(
+            extract('year', Order.created_at) == now.year,
+            extract('month', Order.created_at) == now.month
+        ).all()
+
+        monthly_commission = sum(order.commission_amount for order in monthly_orders)
+        monthly_revenue = sum(order.total_amount for order in monthly_orders)
+
+        return jsonify({
+            "month": f"{now.year}-{now.month:02d}",
+            "order_count": len(monthly_orders),
+            "monthly_commission": monthly_commission,
+            "monthly_revenue": monthly_revenue
+        })
+
+    @app.route("/owner/orders/<int:order_id>/status", methods=["PATCH"])
+    @admin_required
+    def update_owner_order_status(order_id):
+        order = Order.query.get_or_404(order_id)
+
+        access_error = require_restaurant_access(order.restaurant_id)
+        if access_error:
+            return access_error
+
+        data = request.get_json() or {}
+        action = (data.get("action") or "").strip().lower()
+        note = (data.get("note") or "").strip()
+
+        if action == "confirm":
+            if order.order_status != "pending":
+                return jsonify({"error": "Chỉ xác nhận được đơn đang chờ"}), 400
+            order.order_status = "delivering" if order.order_type == "delivery" else "confirmed"
+        elif action == "mark_in_transit":
+            if order.order_type != "delivery":
+                return jsonify({"error": "Chỉ áp dụng cho đơn giao hàng"}), 400
+            if order.order_status not in ["pending", "confirmed", "delivering"]:
+                return jsonify({"error": "Trạng thái hiện tại không thể chuyển sang đang giao"}), 400
+            order.order_status = "delivering"
+        elif action == "mark_delivered":
+            if order.order_type != "delivery":
+                return jsonify({"error": "Chỉ áp dụng cho đơn giao hàng"}), 400
+            if order.order_status not in ["delivering", "confirmed"]:
+                return jsonify({"error": "Đơn phải ở trạng thái đang giao/xác nhận"}), 400
+            order.order_status = "delivered"
+        elif action == "mark_completed":
+            if order.order_type != "pickup":
+                return jsonify({"error": "Chỉ áp dụng cho đơn đặt trước"}), 400
+            if order.order_status not in ["confirmed", "pending"]:
+                return jsonify({"error": "Đơn phải ở trạng thái chờ/xác nhận"}), 400
+            order.order_status = "completed"
+        elif action == "cancel":
+            if order.order_status in ["delivered", "completed", "cancelled"]:
+                return jsonify({"error": "Không thể hủy đơn đã hoàn tất"}), 400
+            order.order_status = "cancelled"
+        else:
+            return jsonify({"error": "Hành động không hợp lệ"}), 400
+
+        if note:
+            previous_note = order.note or ""
+            order.note = f"{previous_note}\n[OWNER] {note}".strip()
+
+        db.session.commit()
+        return jsonify({"status": "success", "order": order.to_dict(include_items=True)})
 
     @app.route("/admin/restaurants", methods=["POST"])
     @admin_required

@@ -8,6 +8,7 @@ import RoleSelection from './pages/RoleSelection'
 import CustomerLogin from './pages/CustomerLogin'
 import OwnerLogin from './pages/OwnerLogin'
 import OwnerDashboard from './pages/OwnerDashboard'
+import CustomerOrders from './pages/CustomerOrders'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
       <Route element={<ProtectedRoute authPath="/customer/check" redirectTo="/customer/login" />}>
         <Route path="/customer" element={<LocationTracker />} />
         <Route path="/customer/tour-planner" element={<TourPlanner />} />
+        <Route path="/customer/orders" element={<CustomerOrders />} />
       </Route>
 
       <Route path="/tour-planner" element={<Navigate to="/customer/tour-planner" replace />} />

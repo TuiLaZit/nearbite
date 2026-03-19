@@ -50,6 +50,14 @@ class Restaurant(db.Model):
         order_by="RestaurantImage.display_order"
     )
 
+    orders = db.relationship(
+        "Order",
+        backref="restaurant",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="desc(Order.created_at)"
+    )
+
     def to_dict(self, include_details=False, include_admin_fields=False):
         result = {
             "id": self.id,
@@ -147,6 +155,83 @@ class AdminUser(db.Model):
             "email": self.email,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class Order(db.Model):
+    __tablename__ = 'customer_order'
+
+    id = db.Column(db.Integer, primary_key=True)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.id"), nullable=False)
+    customer_email = db.Column(db.String(255), nullable=False)
+    order_type = db.Column(db.String(20), nullable=False)  # delivery | pickup
+    delivery_address = db.Column(db.Text)
+    payment_method = db.Column(db.String(30), nullable=False)  # online_demo | cod
+    payment_status = db.Column(db.String(30), nullable=False)  # paid_demo | pending_cod
+    payment_transaction_id = db.Column(db.String(100))
+    order_status = db.Column(db.String(30), nullable=False, default="pending")
+    subtotal_amount = db.Column(db.Integer, nullable=False)
+    commission_rate = db.Column(db.Float, nullable=False)
+    commission_amount = db.Column(db.Integer, nullable=False)
+    total_amount = db.Column(db.Integer, nullable=False)
+    note = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    items = db.relationship(
+        "OrderItem",
+        backref="order",
+        cascade="all, delete-orphan",
+        lazy=True,
+        order_by="OrderItem.id"
+    )
+
+    def to_dict(self, include_items=True):
+        payload = {
+            "id": self.id,
+            "restaurant_id": self.restaurant_id,
+            "customer_email": self.customer_email,
+            "order_type": self.order_type,
+            "delivery_address": self.delivery_address,
+            "payment_method": self.payment_method,
+            "payment_status": self.payment_status,
+            "payment_transaction_id": self.payment_transaction_id,
+            "order_status": self.order_status,
+            "subtotal_amount": self.subtotal_amount,
+            "commission_rate": self.commission_rate,
+            "commission_amount": self.commission_amount,
+            "total_amount": self.total_amount,
+            "note": self.note,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+        if include_items:
+            payload["items"] = [item.to_dict() for item in self.items]
+
+        return payload
+
+
+class OrderItem(db.Model):
+    __tablename__ = 'customer_order_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("customer_order.id"), nullable=False)
+    menu_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=True)
+    item_name = db.Column(db.String(150), nullable=False)
+    unit_price = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    line_total = db.Column(db.Integer, nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "order_id": self.order_id,
+            "menu_item_id": self.menu_item_id,
+            "item_name": self.item_name,
+            "unit_price": self.unit_price,
+            "quantity": self.quantity,
+            "line_total": self.line_total
         }
 
 

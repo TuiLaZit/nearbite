@@ -9,6 +9,7 @@ from functools import wraps
 from flask import request, jsonify, session
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import Restaurant, AdminUser
+from db import db
 
 
 # ======================
@@ -126,16 +127,46 @@ def owner_logout():
 OTP_STORE = {}
 
 
+def _parse_smtp_port(raw_port):
+    value = (raw_port or "").strip()
+    if not value:
+        return 587, None
+    try:
+        port = int(value)
+    except ValueError:
+        return None, f"SMTP_PORT không hợp lệ: {value}"
+
+    if port <= 0 or port > 65535:
+        return None, f"SMTP_PORT vượt phạm vi hợp lệ: {port}"
+
+    return port, None
+
+
 def _send_otp_email(email, otp):
     smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_port, port_error = _parse_smtp_port(os.getenv("SMTP_PORT", "587"))
+    if port_error:
+        return False, port_error
+
     smtp_mode = os.getenv("SMTP_MODE", "starttls").strip().lower()
     smtp_user = os.getenv("SMTP_USER")
     smtp_password = os.getenv("SMTP_PASSWORD")
     smtp_from = os.getenv("SMTP_FROM", smtp_user)
 
+    # Support legacy flag style without breaking existing deployments.
+    smtp_secure = (os.getenv("SMTP_SECURE") or "").strip().lower()
+    if smtp_secure in {"ssl", "true", "1"}:
+        smtp_mode = "ssl"
+    elif smtp_secure in {"starttls", "tls"}:
+        smtp_mode = "starttls"
+    elif smtp_secure in {"plain", "none", "false", "0"}:
+        smtp_mode = "plain"
+
     if not smtp_host or not smtp_user or not smtp_password or not smtp_from:
         return False, "SMTP chưa được cấu hình"
+
+    if smtp_mode not in {"starttls", "ssl", "plain"}:
+        return False, f"SMTP_MODE không hợp lệ: {smtp_mode}"
 
     msg = EmailMessage()
     msg["Subject"] = "NearBite - Mã OTP đăng nhập"
@@ -149,12 +180,15 @@ def _send_otp_email(email, otp):
     try:
         if smtp_mode == "ssl":
             with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+                server.ehlo()
                 server.login(smtp_user, smtp_password)
                 server.send_message(msg)
         else:
             with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+                server.ehlo()
                 if smtp_mode == "starttls":
                     server.starttls()
+                    server.ehlo()
                 server.login(smtp_user, smtp_password)
                 server.send_message(msg)
         return True, None

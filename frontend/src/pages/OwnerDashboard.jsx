@@ -14,6 +14,9 @@ function OwnerDashboard() {
   const [imageForm, setImageForm] = useState({ caption: '', is_primary: false })
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [orders, setOrders] = useState([])
+  const [orderSummary, setOrderSummary] = useState(null)
+  const [processingOrderId, setProcessingOrderId] = useState(null)
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -65,6 +68,39 @@ function OwnerDashboard() {
         setLoading(false)
       })
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      loadOrders().catch((error) => alert(error.message))
+      loadOrderSummary().catch((error) => alert(error.message))
+    }
+  }, [activeTab])
+
+  const loadOrders = async () => {
+    const response = await fetch(`${BASE_URL}/owner/orders`, {
+      credentials: 'include'
+    })
+
+    if (!response.ok) {
+      throw new Error('Không thể tải danh sách đơn hàng')
+    }
+
+    const data = await response.json()
+    setOrders(Array.isArray(data) ? data : [])
+  }
+
+  const loadOrderSummary = async () => {
+    const response = await fetch(`${BASE_URL}/owner/orders/summary`, {
+      credentials: 'include'
+    })
+
+    if (!response.ok) {
+      throw new Error('Không thể tải thống kê đơn hàng')
+    }
+
+    const data = await response.json()
+    setOrderSummary(data)
+  }
 
   const handleLogout = () => {
     fetch(`${BASE_URL}/owner/logout`, {
@@ -224,6 +260,66 @@ function OwnerDashboard() {
     await loadOwnerRestaurant()
   }
 
+  const handleOrderAction = async (orderId, action) => {
+    setProcessingOrderId(orderId)
+
+    try {
+      const response = await fetch(`${BASE_URL}/owner/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Không thể cập nhật trạng thái đơn hàng')
+      }
+
+      await loadOrders()
+      await loadOrderSummary()
+    } catch (error) {
+      alert(error.message)
+    } finally {
+      setProcessingOrderId(null)
+    }
+  }
+
+  const formatCurrency = (amount) => {
+    return Number(amount || 0).toLocaleString('vi-VN') + 'đ'
+  }
+
+  const getOrderActions = (order) => {
+    if (order.order_status === 'cancelled' || order.order_status === 'delivered' || order.order_status === 'completed') {
+      return []
+    }
+
+    if (order.order_type === 'delivery') {
+      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận + bắt đầu giao' }]
+      if (order.order_status === 'confirmed') return [{ action: 'mark_in_transit', label: 'Đang giao' }]
+      if (order.order_status === 'delivering') return [{ action: 'mark_delivered', label: 'Đã giao xong' }]
+    }
+
+    if (order.order_type === 'pickup') {
+      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận chuẩn bị' }]
+      if (order.order_status === 'confirmed') return [{ action: 'mark_completed', label: 'Khách đã nhận món' }]
+    }
+
+    return []
+  }
+
+  const getStatusLabel = (order) => {
+    const map = {
+      pending: 'Chờ xác nhận',
+      confirmed: 'Đã xác nhận',
+      delivering: 'Đang giao',
+      delivered: 'Đã giao xong',
+      completed: 'Hoàn tất',
+      cancelled: 'Đã hủy'
+    }
+    return map[order.order_status] || order.order_status
+  }
+
   if (loading) {
     return <div style={styles.loading}>Đang tải dashboard chủ quán...</div>
   }
@@ -371,7 +467,60 @@ function OwnerDashboard() {
         {activeTab === 'orders' && (
           <div style={styles.card}>
             <h3>Đơn hàng</h3>
-            <p>Chức năng quản lý đơn hàng, xác nhận giao và tính commission tháng sẽ làm ở bước tiếp theo.</p>
+            <div style={styles.orderSummaryWrap}>
+              <StatCard label="Số đơn tháng này" value={orderSummary?.order_count || 0} />
+              <StatCard label="Doanh thu tháng" value={formatCurrency(orderSummary?.monthly_revenue)} />
+              <StatCard label="Commission tháng" value={formatCurrency(orderSummary?.monthly_commission)} />
+            </div>
+
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Loại</th>
+                  <th>Khách</th>
+                  <th>Món</th>
+                  <th>Tổng tiền</th>
+                  <th>Trạng thái</th>
+                  <th>Thanh toán</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>Chưa có đơn hàng nào</td>
+                  </tr>
+                )}
+                {orders.map((order) => (
+                  <tr key={order.id}>
+                    <td>#{order.id}</td>
+                    <td>{order.order_type === 'delivery' ? 'Giao hàng' : 'Đặt trước'}</td>
+                    <td>{order.customer_email}</td>
+                    <td>
+                      {(order.items || []).map((item) => `${item.item_name} x${item.quantity}`).join(', ')}
+                    </td>
+                    <td>{formatCurrency(order.total_amount)}</td>
+                    <td>{getStatusLabel(order)}</td>
+                    <td>{order.payment_status === 'paid_demo' ? 'Online demo' : 'COD chờ thu'}</td>
+                    <td>
+                      <div style={styles.orderActions}>
+                        {getOrderActions(order).map((entry) => (
+                          <button
+                            key={entry.action}
+                            onClick={() => handleOrderAction(order.id, entry.action)}
+                            disabled={processingOrderId === order.id}
+                          >
+                            {entry.label}
+                          </button>
+                        ))}
+                        {getOrderActions(order).length === 0 && <span style={styles.noActionText}>-</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </main>
@@ -523,6 +672,20 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  orderSummaryWrap: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '12px',
+    marginBottom: '14px'
+  },
+  orderActions: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap'
+  },
+  noActionText: {
+    color: '#64748b'
   }
 }
 
