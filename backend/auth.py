@@ -1,6 +1,7 @@
 import os
 import re
 import secrets
+import socket
 import smtplib
 import string
 from datetime import datetime, timedelta
@@ -142,16 +143,76 @@ def _parse_smtp_port(raw_port):
     return port, None
 
 
+def _is_true(raw_value, default=False):
+    if raw_value is None:
+        return default
+    return str(raw_value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _resolve_smtp_targets(host, port, prefer_ipv4=True):
+    try:
+        addr_info = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+    except Exception as exc:
+        return [], f"DNS lookup thất bại cho {host}:{port} ({exc})"
+
+    if prefer_ipv4:
+        addr_info.sort(key=lambda item: 0 if item[0] == socket.AF_INET else 1)
+
+    targets = []
+    seen = set()
+    for family, _socktype, _proto, _canon, sockaddr in addr_info:
+        ip = sockaddr[0]
+        key = (family, ip)
+        if key in seen:
+            continue
+        seen.add(key)
+        targets.append((family, ip))
+
+    if not targets:
+        return [], f"Không resolve được địa chỉ cho {host}:{port}"
+
+    return targets, None
+
+
+def _probe_smtp_connectivity(host, port, prefer_ipv4=True):
+    targets, err = _resolve_smtp_targets(host, port, prefer_ipv4=prefer_ipv4)
+    if err:
+        return None, err
+
+    errors = []
+    for family, ip in targets:
+        sock = None
+        try:
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.settimeout(8)
+            sock.connect((ip, port))
+            return ip, None
+        except OSError as exc:
+            errno_value = getattr(exc, "errno", "?")
+            errors.append(f"{ip} errno={errno_value} {exc}")
+        except Exception as exc:
+            errors.append(f"{ip} {exc}")
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+
+    return None, "; ".join(errors)
+
+
 def _send_otp_email(email, otp):
-    smtp_host = os.getenv("SMTP_HOST")
+    smtp_host = (os.getenv("SMTP_HOST") or "").strip()
     smtp_port, port_error = _parse_smtp_port(os.getenv("SMTP_PORT", "587"))
     if port_error:
         return False, port_error
 
     smtp_mode = os.getenv("SMTP_MODE", "starttls").strip().lower()
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+    smtp_user = (os.getenv("SMTP_USER") or "").strip()
+    smtp_password = (os.getenv("SMTP_PASSWORD") or "").strip()
+    smtp_from = (os.getenv("SMTP_FROM") or smtp_user).strip()
+    smtp_prefer_ipv4 = _is_true(os.getenv("SMTP_PREFER_IPV4"), default=True)
 
     # Support legacy flag style without breaking existing deployments.
     smtp_secure = (os.getenv("SMTP_SECURE") or "").strip().lower()
@@ -168,6 +229,17 @@ def _send_otp_email(email, otp):
     if smtp_mode not in {"starttls", "ssl", "plain"}:
         return False, f"SMTP_MODE không hợp lệ: {smtp_mode}"
 
+    connect_host, connect_error = _probe_smtp_connectivity(
+        smtp_host,
+        smtp_port,
+        prefer_ipv4=smtp_prefer_ipv4
+    )
+    if not connect_host:
+        return False, (
+            f"Không thể kết nối SMTP server {smtp_host}:{smtp_port} từ môi trường deploy. "
+            f"Chi tiết: {connect_error}"
+        )
+
     msg = EmailMessage()
     msg["Subject"] = "NearBite - Mã OTP đăng nhập"
     msg["From"] = smtp_from
@@ -179,12 +251,12 @@ def _send_otp_email(email, otp):
 
     try:
         if smtp_mode == "ssl":
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as server:
+            with smtplib.SMTP_SSL(connect_host, smtp_port, timeout=15) as server:
                 server.ehlo()
                 server.login(smtp_user, smtp_password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
+            with smtplib.SMTP(connect_host, smtp_port, timeout=15) as server:
                 server.ehlo()
                 if smtp_mode == "starttls":
                     server.starttls()
