@@ -1,9 +1,12 @@
 import os
 import re
 import secrets
+import json
 import socket
 import smtplib
 import string
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from functools import wraps
@@ -202,7 +205,122 @@ def _probe_smtp_connectivity(host, port, prefer_ipv4=True):
     return None, "; ".join(errors)
 
 
+def _build_otp_text(otp):
+    return (
+        f"Mã OTP đăng nhập NearBite của bạn là: {otp}\n"
+        f"Mã có hiệu lực trong 5 phút."
+    )
+
+
+def _send_otp_via_resend(email, otp):
+    api_key = (os.getenv("RESEND_API_KEY") or "").strip()
+    from_email = (os.getenv("RESEND_FROM_EMAIL") or os.getenv("SMTP_FROM") or "").strip()
+
+    if not api_key or not from_email:
+        return False, "Thiếu RESEND_API_KEY hoặc RESEND_FROM_EMAIL"
+
+    payload = {
+        "from": from_email,
+        "to": [email],
+        "subject": "NearBite - Mã OTP đăng nhập",
+        "text": _build_otp_text(otp)
+    }
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            status = getattr(response, "status", 200)
+            if status < 200 or status >= 300:
+                body = response.read().decode("utf-8", errors="ignore")
+                return False, f"Resend trả về HTTP {status}: {body[:300]}"
+        return True, None
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore") if hasattr(exc, "read") else ""
+        return False, f"Resend HTTP {exc.code}: {body[:300]}"
+    except Exception as exc:
+        return False, f"Resend lỗi kết nối: {exc}"
+
+
+def _send_otp_via_brevo_api(email, otp):
+    api_key = (os.getenv("BREVO_API_KEY") or "").strip()
+    sender_email = (os.getenv("BREVO_SENDER_EMAIL") or os.getenv("SMTP_FROM") or "").strip()
+    sender_name = (os.getenv("BREVO_SENDER_NAME") or "NearBite").strip() or "NearBite"
+
+    if not api_key or not sender_email:
+        return False, "Thiếu BREVO_API_KEY hoặc BREVO_SENDER_EMAIL"
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": email}],
+        "subject": "NearBite - Mã OTP đăng nhập",
+        "textContent": _build_otp_text(otp)
+    }
+
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            status = getattr(response, "status", 200)
+            if status < 200 or status >= 300:
+                body = response.read().decode("utf-8", errors="ignore")
+                return False, f"Brevo API trả về HTTP {status}: {body[:300]}"
+        return True, None
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore") if hasattr(exc, "read") else ""
+        return False, f"Brevo API HTTP {exc.code}: {body[:300]}"
+    except Exception as exc:
+        return False, f"Brevo API lỗi kết nối: {exc}"
+
+
 def _send_otp_email(email, otp):
+    provider = (os.getenv("OTP_EMAIL_PROVIDER") or "auto").strip().lower()
+    last_error = None
+
+    if provider in {"smtp", "auto"}:
+        sent, err = _send_otp_email_via_smtp(email, otp)
+        if sent:
+            return True, None
+        last_error = f"SMTP: {err}"
+        if provider == "smtp":
+            return False, last_error
+
+    if provider in {"resend", "auto"}:
+        sent, err = _send_otp_via_resend(email, otp)
+        if sent:
+            return True, None
+        if provider == "resend":
+            return False, f"Resend: {err}"
+        last_error = f"{last_error}; Resend: {err}" if last_error else f"Resend: {err}"
+
+    if provider in {"brevo", "brevo_api", "auto"}:
+        sent, err = _send_otp_via_brevo_api(email, otp)
+        if sent:
+            return True, None
+        if provider in {"brevo", "brevo_api"}:
+            return False, f"Brevo API: {err}"
+        last_error = f"{last_error}; Brevo API: {err}" if last_error else f"Brevo API: {err}"
+
+    return False, last_error or "Không có kênh gửi email khả dụng"
+
+
+def _send_otp_email_via_smtp(email, otp):
     smtp_host = (os.getenv("SMTP_HOST") or "").strip()
     smtp_port, port_error = _parse_smtp_port(os.getenv("SMTP_PORT", "587"))
     if port_error:
@@ -244,10 +362,7 @@ def _send_otp_email(email, otp):
     msg["Subject"] = "NearBite - Mã OTP đăng nhập"
     msg["From"] = smtp_from
     msg["To"] = email
-    msg.set_content(
-        f"Mã OTP đăng nhập NearBite của bạn là: {otp}\n"
-        f"Mã có hiệu lực trong 5 phút."
-    )
+    msg.set_content(_build_otp_text(otp))
 
     try:
         if smtp_mode == "ssl":
