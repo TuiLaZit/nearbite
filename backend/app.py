@@ -77,6 +77,18 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
+# Auto create missing tables in local development so new features can run
+# without manual migration steps.
+auto_create_tables_env = (os.getenv("AUTO_CREATE_TABLES") or "").strip().lower()
+if auto_create_tables_env:
+    auto_create_tables = auto_create_tables_env in {"1", "true", "yes", "on"}
+else:
+    auto_create_tables = not bool(is_production)
+
+if auto_create_tables:
+    with app.app_context():
+        db.create_all()
+
 
 @app.route("/")
 def home():

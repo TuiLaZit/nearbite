@@ -1,25 +1,43 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
 const DEFAULT_COMMISSION_RATE = 0.1
 
 function CustomerOrders() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { restaurantId: routeRestaurantId } = useParams()
+
+  const queryRestaurantId = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('restaurantId')
+  }, [location.search])
+
+  const requestedRestaurantId = routeRestaurantId || queryRestaurantId || ''
+
   const [restaurants, setRestaurants] = useState([])
   const [selectedRestaurantId, setSelectedRestaurantId] = useState('')
+  const [checkoutStep, setCheckoutStep] = useState(1)
   const [quantities, setQuantities] = useState({})
   const [orderType, setOrderType] = useState('pickup')
   const [paymentMethod, setPaymentMethod] = useState('cod')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [note, setNote] = useState('')
+  const [transferConfirmed, setTransferConfirmed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [orderHistory, setOrderHistory] = useState([])
+  const [historyError, setHistoryError] = useState('')
   const [loading, setLoading] = useState(true)
 
   const selectedRestaurant = useMemo(() => {
     return restaurants.find((r) => String(r.id) === String(selectedRestaurantId)) || null
   }, [restaurants, selectedRestaurantId])
+
+  const isRestaurantLocked = useMemo(() => {
+    if (!requestedRestaurantId) return false
+    return restaurants.some((r) => String(r.id) === String(requestedRestaurantId))
+  }, [restaurants, requestedRestaurantId])
 
   const selectedItems = useMemo(() => {
     const menu = selectedRestaurant?.menu || []
@@ -48,6 +66,12 @@ function CustomerOrders() {
 
   const total = subtotal + commission
 
+  const transferContent = useMemo(() => {
+    const restaurantCode = selectedRestaurantId || 'X'
+    const amountCode = total || 0
+    return `NB-${restaurantCode}-${amountCode}`
+  }, [selectedRestaurantId, total])
+
   const fetchRestaurants = async () => {
     const response = await fetch(`${BASE_URL}/restaurants`)
     if (!response.ok) {
@@ -57,7 +81,21 @@ function CustomerOrders() {
     const data = await response.json()
     const restaurantList = data.restaurants || []
     setRestaurants(restaurantList)
-    if (!selectedRestaurantId && restaurantList.length > 0) {
+
+    if (restaurantList.length === 0) {
+      setSelectedRestaurantId('')
+      return
+    }
+
+    if (requestedRestaurantId) {
+      const matchedRestaurant = restaurantList.find((restaurant) => String(restaurant.id) === String(requestedRestaurantId))
+      if (matchedRestaurant) {
+        setSelectedRestaurantId(String(matchedRestaurant.id))
+        return
+      }
+    }
+
+    if (!selectedRestaurantId) {
       setSelectedRestaurantId(String(restaurantList[0].id))
     }
   }
@@ -67,29 +105,46 @@ function CustomerOrders() {
       credentials: 'include'
     })
 
+    if (response.status === 401) {
+      navigate('/customer/login', { replace: true })
+      return
+    }
+
     if (!response.ok) {
-      throw new Error('Không thể tải lịch sử đơn hàng')
+      setOrderHistory([])
+      setHistoryError('Không thể tải lịch sử đơn hàng lúc này. Bạn vẫn có thể tiếp tục đặt món.')
+      return
     }
 
     const data = await response.json()
     setOrderHistory(Array.isArray(data) ? data : [])
+    setHistoryError('')
   }
 
   useEffect(() => {
-    Promise.all([fetchRestaurants(), fetchOrderHistory()])
+    fetchRestaurants()
       .catch((error) => alert(error.message))
-      .finally(() => setLoading(false))
+      .finally(async () => {
+        await fetchOrderHistory()
+        setLoading(false)
+      })
   }, [])
 
   useEffect(() => {
     if (orderType === 'delivery') {
       setPaymentMethod('online_demo')
     }
+    setTransferConfirmed(false)
   }, [orderType])
+
+  useEffect(() => {
+    setTransferConfirmed(false)
+  }, [paymentMethod, selectedRestaurantId, total])
 
   const handleRestaurantChange = (event) => {
     setSelectedRestaurantId(event.target.value)
     setQuantities({})
+    setCheckoutStep(1)
   }
 
   const handleQuantityChange = (menuItemId, value) => {
@@ -116,6 +171,29 @@ function CustomerOrders() {
     return statusMap[status] || status
   }
 
+  const handleGoToCheckout = () => {
+    if (!selectedRestaurantId) {
+      alert('Không tìm thấy quán để đặt món')
+      return
+    }
+
+    if (selectedItems.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 món trước khi tiếp tục')
+      return
+    }
+
+    setCheckoutStep(2)
+  }
+
+  const copyTransferContent = async () => {
+    try {
+      await navigator.clipboard.writeText(transferContent)
+      alert('Đã copy nội dung chuyển khoản demo')
+    } catch {
+      alert(`Nội dung chuyển khoản: ${transferContent}`)
+    }
+  }
+
   const handleSubmitOrder = async (event) => {
     event.preventDefault()
 
@@ -131,6 +209,16 @@ function CustomerOrders() {
 
     if (orderType === 'delivery' && !deliveryAddress.trim()) {
       alert('Vui lòng nhập địa chỉ giao hàng')
+      return
+    }
+
+    if (orderType === 'delivery' && deliveryAddress.trim().length < 5) {
+      alert('Địa chỉ giao hàng quá ngắn')
+      return
+    }
+
+    if (paymentMethod === 'online_demo' && !transferConfirmed) {
+      alert('Vui lòng hoàn thành bước chuyển khoản demo trước khi tạo đơn')
       return
     }
 
@@ -165,6 +253,8 @@ function CustomerOrders() {
       setNote('')
       setOrderType('pickup')
       setPaymentMethod('cod')
+      setTransferConfirmed(false)
+      setCheckoutStep(1)
       await fetchOrderHistory()
     } catch (error) {
       alert(error.message)
@@ -180,7 +270,7 @@ function CustomerOrders() {
   return (
     <div style={styles.page}>
       <div style={styles.headerRow}>
-        <h1 style={styles.title}>🧾 Đặt Món</h1>
+        <h1 style={styles.title}>🧾 Đặt Món {selectedRestaurant ? `- ${selectedRestaurant.name}` : ''}</h1>
         <button style={styles.backButton} onClick={() => navigate('/customer')}>
           ← Về bản đồ
         </button>
@@ -189,8 +279,9 @@ function CustomerOrders() {
       <div style={styles.grid}>
         <section style={styles.card}>
           <h3>Tạo đơn mới</h3>
-          <form onSubmit={handleSubmitOrder} style={styles.form}>
-            <label>
+
+          {!isRestaurantLocked && (
+            <label style={styles.formField}>
               Chọn quán
               <select value={selectedRestaurantId} onChange={handleRestaurantChange} required>
                 {restaurants.map((restaurant) => (
@@ -200,116 +291,173 @@ function CustomerOrders() {
                 ))}
               </select>
             </label>
+          )}
 
-            <div>
-              <div style={styles.subTitle}>Chọn món</div>
-              {(selectedRestaurant?.menu || []).length === 0 && <p>Quán này chưa có menu.</p>}
-              <div style={styles.menuList}>
-                {(selectedRestaurant?.menu || []).map((item) => (
-                  <div key={item.id} style={styles.menuRow}>
-                    <div>
-                      <strong>{item.name}</strong>
-                      <div style={styles.price}>{formatCurrency(item.price)}</div>
+          <div style={styles.stepRow}>
+            <div style={checkoutStep === 1 ? styles.activeStepChip : styles.stepChip}>1. Chọn món</div>
+            <div style={checkoutStep === 2 ? styles.activeStepChip : styles.stepChip}>2. Nhận món và thanh toán</div>
+          </div>
+
+          {checkoutStep === 1 && (
+            <div style={styles.form}>
+              <div>
+                <div style={styles.subTitle}>Menu quán</div>
+                {(selectedRestaurant?.menu || []).length === 0 && <p>Quán này chưa có menu.</p>}
+                <div style={styles.menuList}>
+                  {(selectedRestaurant?.menu || []).map((item) => (
+                    <div key={item.id} style={styles.menuRow}>
+                      <div>
+                        <strong>{item.name}</strong>
+                        <div style={styles.price}>{formatCurrency(item.price)}</div>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={quantities[item.id] || 0}
+                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                        style={styles.qtyInput}
+                      />
                     </div>
-                    <input
-                      type="number"
-                      min="0"
-                      value={quantities[item.id] || 0}
-                      onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                      style={styles.qtyInput}
-                    />
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+
+              <div style={styles.totalsBox}>
+                <div>Tạm tính: <strong>{formatCurrency(subtotal)}</strong></div>
+                <div>Phí nền tảng demo (~10%): <strong>{formatCurrency(commission)}</strong></div>
+                <div>Tổng thanh toán dự kiến: <strong>{formatCurrency(total)}</strong></div>
+              </div>
+
+              <button type="button" onClick={handleGoToCheckout} disabled={selectedItems.length === 0} style={styles.submitButton}>
+                Tiếp tục chọn nhận món và thanh toán
+              </button>
             </div>
+          )}
 
-            <div>
-              <div style={styles.subTitle}>Hình thức nhận món</div>
-              <label style={styles.radioLine}>
-                <input
-                  type="radio"
-                  checked={orderType === 'pickup'}
-                  onChange={() => setOrderType('pickup')}
-                />
-                Đặt trước tại quán (Pickup)
-              </label>
-              <label style={styles.radioLine}>
-                <input
-                  type="radio"
-                  checked={orderType === 'delivery'}
-                  onChange={() => setOrderType('delivery')}
-                />
-                Giao hàng tận nơi (Delivery)
-              </label>
-            </div>
-
-            {orderType === 'delivery' && (
-              <label>
-                Địa chỉ giao hàng
-                <textarea
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  rows={3}
-                  placeholder="Nhập địa chỉ chi tiết"
-                  required
-                />
-              </label>
-            )}
-
-            <div>
-              <div style={styles.subTitle}>Phương thức thanh toán</div>
-              {orderType === 'delivery' ? (
+          {checkoutStep === 2 && (
+            <form onSubmit={handleSubmitOrder} style={styles.form}>
+              <div>
+                <div style={styles.subTitle}>Hình thức nhận món</div>
                 <label style={styles.radioLine}>
-                  <input type="radio" checked readOnly />
-                  Online demo (bắt buộc cho delivery)
+                  <input
+                    type="radio"
+                    checked={orderType === 'pickup'}
+                    onChange={() => setOrderType('pickup')}
+                  />
+                  Tới quán ăn (Pickup)
                 </label>
-              ) : (
-                <>
-                  <label style={styles.radioLine}>
-                    <input
-                      type="radio"
-                      checked={paymentMethod === 'cod'}
-                      onChange={() => setPaymentMethod('cod')}
-                    />
-                    Thanh toán khi nhận món (COD)
-                  </label>
-                  <label style={styles.radioLine}>
-                    <input
-                      type="radio"
-                      checked={paymentMethod === 'online_demo'}
-                      onChange={() => setPaymentMethod('online_demo')}
-                    />
-                    Online demo
-                  </label>
-                </>
+                <label style={styles.radioLine}>
+                  <input
+                    type="radio"
+                    checked={orderType === 'delivery'}
+                    onChange={() => setOrderType('delivery')}
+                  />
+                  Quán giao tận nơi (Delivery)
+                </label>
+              </div>
+
+              {orderType === 'delivery' && (
+                <label style={styles.formField}>
+                  Địa chỉ giao hàng
+                  <textarea
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    rows={3}
+                    placeholder="Nhập địa chỉ chi tiết"
+                    required
+                  />
+                </label>
               )}
-            </div>
 
-            <label>
-              Ghi chú đơn hàng
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                placeholder="Ví dụ: ít cay, thêm đũa..."
-              />
-            </label>
+              <div>
+                <div style={styles.subTitle}>Phương thức thanh toán</div>
+                {orderType === 'delivery' ? (
+                  <label style={styles.radioLine}>
+                    <input type="radio" checked readOnly />
+                    Thanh toán nền tảng online (bắt buộc cho delivery)
+                  </label>
+                ) : (
+                  <>
+                    <label style={styles.radioLine}>
+                      <input
+                        type="radio"
+                        checked={paymentMethod === 'cod'}
+                        onChange={() => setPaymentMethod('cod')}
+                      />
+                      Trả khi nhận món tại quán (COD)
+                    </label>
+                    <label style={styles.radioLine}>
+                      <input
+                        type="radio"
+                        checked={paymentMethod === 'online_demo'}
+                        onChange={() => setPaymentMethod('online_demo')}
+                      />
+                      Thanh toán nền tảng online
+                    </label>
+                  </>
+                )}
+              </div>
 
-            <div style={styles.totalsBox}>
-              <div>Tạm tính: <strong>{formatCurrency(subtotal)}</strong></div>
-              <div>Phí nền tảng demo (~10%): <strong>{formatCurrency(commission)}</strong></div>
-              <div>Tổng thanh toán: <strong>{formatCurrency(total)}</strong></div>
-            </div>
+              {paymentMethod === 'online_demo' && (
+                <div style={styles.transferBox}>
+                  <div style={styles.transferTitle}>Chuyển khoản demo</div>
+                  <div>Ngân hàng: <strong>MB Bank (Demo)</strong></div>
+                  <div>Số tài khoản: <strong>0123456789</strong></div>
+                  <div>Chủ tài khoản: <strong>NEARBITE DEMO</strong></div>
+                  <div>Số tiền: <strong>{formatCurrency(total)}</strong></div>
+                  <div>
+                    Nội dung: <strong>{transferContent}</strong>
+                    <button type="button" onClick={copyTransferContent} style={styles.copyButton}>
+                      Copy
+                    </button>
+                  </div>
+                  <label style={styles.confirmLine}>
+                    <input
+                      type="checkbox"
+                      checked={transferConfirmed}
+                      onChange={(e) => setTransferConfirmed(e.target.checked)}
+                    />
+                    Tôi đã chuyển khoản thành công (demo)
+                  </label>
+                </div>
+              )}
 
-            <button type="submit" disabled={submitting || selectedItems.length === 0} style={styles.submitButton}>
-              {submitting ? 'Đang gửi đơn...' : 'Xác nhận đặt món'}
-            </button>
-          </form>
+              <label style={styles.formField}>
+                Ghi chú đơn hàng
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={2}
+                  placeholder="Ví dụ: ít cay, thêm đũa..."
+                />
+              </label>
+
+              <div style={styles.totalsBox}>
+                <div>Tạm tính: <strong>{formatCurrency(subtotal)}</strong></div>
+                <div>Phí nền tảng demo (~10%): <strong>{formatCurrency(commission)}</strong></div>
+                <div>Tổng thanh toán: <strong>{formatCurrency(total)}</strong></div>
+              </div>
+
+              <div style={styles.actionRow}>
+                <button type="button" style={styles.secondaryButton} onClick={() => setCheckoutStep(1)}>
+                  ← Quay lại chọn món
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || selectedItems.length === 0 || (paymentMethod === 'online_demo' && !transferConfirmed)}
+                  style={styles.submitButton}
+                >
+                  {submitting ? 'Đang gửi đơn...' : 'Xác nhận đặt món'}
+                </button>
+              </div>
+            </form>
+          )}
         </section>
 
         <section style={styles.card}>
           <h3>Lịch sử đơn hàng</h3>
-          {orderHistory.length === 0 && <p>Bạn chưa có đơn hàng nào.</p>}
+          {historyError && <p style={styles.warningText}>{historyError}</p>}
+          {!historyError && orderHistory.length === 0 && <p>Bạn chưa có đơn hàng nào.</p>}
           <div style={styles.historyList}>
             {orderHistory.map((order) => (
               <article key={order.id} style={styles.historyItem}>
@@ -374,6 +522,33 @@ const styles = {
     display: 'grid',
     gap: '12px'
   },
+  formField: {
+    display: 'grid',
+    gap: '6px'
+  },
+  stepRow: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+    marginBottom: '12px'
+  },
+  stepChip: {
+    border: '1px solid #cbd5e1',
+    borderRadius: '999px',
+    padding: '6px 10px',
+    fontSize: '12px',
+    color: '#475569',
+    background: '#f8fafc'
+  },
+  activeStepChip: {
+    border: '1px solid #2563eb',
+    borderRadius: '999px',
+    padding: '6px 10px',
+    fontSize: '12px',
+    color: '#1d4ed8',
+    background: '#dbeafe',
+    fontWeight: '700'
+  },
   subTitle: {
     fontWeight: '600',
     marginBottom: '8px'
@@ -424,6 +599,20 @@ const styles = {
     fontWeight: '700',
     cursor: 'pointer'
   },
+  actionRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px'
+  },
+  secondaryButton: {
+    padding: '12px 14px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    background: '#fff',
+    color: '#1e293b',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
   historyList: {
     display: 'grid',
     gap: '10px',
@@ -451,6 +640,44 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
+  },
+  warningText: {
+    margin: '8px 0 10px',
+    padding: '8px 10px',
+    borderRadius: '8px',
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+    color: '#92400e',
+    fontSize: '13px'
+  },
+  transferBox: {
+    border: '1px solid #bfdbfe',
+    background: '#eff6ff',
+    borderRadius: '10px',
+    padding: '10px',
+    display: 'grid',
+    gap: '6px',
+    fontSize: '14px'
+  },
+  transferTitle: {
+    fontWeight: '700',
+    color: '#1d4ed8'
+  },
+  copyButton: {
+    marginLeft: '8px',
+    padding: '4px 8px',
+    fontSize: '12px',
+    borderRadius: '6px',
+    border: '1px solid #93c5fd',
+    background: '#fff',
+    cursor: 'pointer'
+  },
+  confirmLine: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginTop: '4px',
+    fontWeight: '600'
   }
 }
 

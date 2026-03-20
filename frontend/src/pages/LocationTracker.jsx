@@ -823,22 +823,6 @@ function LocationTracker() {
           🗺️ {t('planTour')}
         </button>
 
-        <button
-          onClick={() => navigate('/customer/orders')}
-          style={{
-            padding: '10px 20px',
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          🧾 Đặt món
-        </button>
-        
         {/* Language selector */}
         <select 
           value={language} 
@@ -1046,6 +1030,22 @@ function LocationTracker() {
                                 }}
                               >
                                 🧭 Chỉ đường
+                              </button>
+                              <button
+                                onClick={() => navigate(`/customer/orders/${selectedRestaurant.id}`)}
+                                style={{
+                                  padding: '8px 12px',
+                                  background: '#2563eb',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  flex: '1',
+                                  minWidth: '100px'
+                                }}
+                              >
+                                🧾 Đặt món
                               </button>
                             </div>
                           </>

@@ -431,121 +431,131 @@ def register_user_routes(app):
 
     @app.route("/customer/orders", methods=["POST"])
     def create_customer_order():
-        customer_email, error_response = customer_required()
-        if error_response:
-            return error_response
+        try:
+            customer_email, error_response = customer_required()
+            if error_response:
+                return error_response
 
-        data = request.get_json() or {}
-        restaurant_id = data.get("restaurant_id")
-        order_type = (data.get("order_type") or "").strip().lower()
-        delivery_address = (data.get("delivery_address") or "").strip()
-        payment_method = (data.get("payment_method") or "").strip().lower()
-        order_items = data.get("items") or []
-        note = (data.get("note") or "").strip()
+            data = request.get_json() or {}
+            restaurant_id = data.get("restaurant_id")
+            order_type = (data.get("order_type") or "").strip().lower()
+            delivery_address = (data.get("delivery_address") or "").strip()
+            payment_method = (data.get("payment_method") or "").strip().lower()
+            order_items = data.get("items") or []
+            note = (data.get("note") or "").strip()
 
-        if order_type not in ["delivery", "pickup"]:
-            return jsonify({"error": "Loại đơn không hợp lệ"}), 400
+            if order_type not in ["delivery", "pickup"]:
+                return jsonify({"error": "Loại đơn không hợp lệ"}), 400
 
-        if order_type == "delivery" and not delivery_address:
-            return jsonify({"error": "Vui lòng nhập địa chỉ giao hàng"}), 400
+            if order_type == "delivery" and not delivery_address:
+                return jsonify({"error": "Vui lòng nhập địa chỉ giao hàng"}), 400
 
-        if order_type == "delivery" and payment_method != "online_demo":
-            return jsonify({"error": "Đơn giao hàng chỉ hỗ trợ thanh toán online"}), 400
+            if order_type == "delivery" and len(delivery_address) < 5:
+                return jsonify({"error": "Địa chỉ giao hàng quá ngắn"}), 400
 
-        if order_type == "pickup" and payment_method not in ["online_demo", "cod"]:
-            return jsonify({"error": "Đơn đặt trước chỉ hỗ trợ COD hoặc online"}), 400
+            if order_type == "delivery" and payment_method != "online_demo":
+                return jsonify({"error": "Đơn giao hàng chỉ hỗ trợ thanh toán online"}), 400
 
-        if not isinstance(order_items, list) or len(order_items) == 0:
-            return jsonify({"error": "Vui lòng chọn ít nhất 1 món"}), 400
+            if order_type == "pickup" and payment_method not in ["online_demo", "cod"]:
+                return jsonify({"error": "Đơn đặt trước chỉ hỗ trợ COD hoặc online"}), 400
 
-        restaurant = Restaurant.query.filter_by(id=restaurant_id, is_active=True).first()
-        if not restaurant:
-            return jsonify({"error": "Không tìm thấy quán"}), 404
+            if not isinstance(order_items, list) or len(order_items) == 0:
+                return jsonify({"error": "Vui lòng chọn ít nhất 1 món"}), 400
 
-        subtotal_amount = 0
-        normalized_items = []
+            restaurant = Restaurant.query.filter_by(id=restaurant_id, is_active=True).first()
+            if not restaurant:
+                return jsonify({"error": "Không tìm thấy quán"}), 404
 
-        for raw_item in order_items:
-            menu_item_id = raw_item.get("menu_item_id")
-            quantity = int(raw_item.get("quantity", 0))
+            subtotal_amount = 0
+            normalized_items = []
 
-            if quantity <= 0:
-                return jsonify({"error": "Số lượng món phải lớn hơn 0"}), 400
+            for raw_item in order_items:
+                menu_item_id = raw_item.get("menu_item_id")
+                quantity = int(raw_item.get("quantity", 0))
 
-            menu_item = MenuItem.query.filter_by(id=menu_item_id, restaurant_id=restaurant.id).first()
-            if not menu_item:
-                return jsonify({"error": "Món ăn không hợp lệ"}), 400
+                if quantity <= 0:
+                    return jsonify({"error": "Số lượng món phải lớn hơn 0"}), 400
 
-            line_total = menu_item.price * quantity
-            subtotal_amount += line_total
-            normalized_items.append({
-                "menu_item_id": menu_item.id,
-                "item_name": menu_item.name,
-                "unit_price": menu_item.price,
-                "quantity": quantity,
-                "line_total": line_total
-            })
+                menu_item = MenuItem.query.filter_by(id=menu_item_id, restaurant_id=restaurant.id).first()
+                if not menu_item:
+                    return jsonify({"error": "Món ăn không hợp lệ"}), 400
 
-        commission_rate = float(os.getenv("ORDER_COMMISSION_RATE", "0.1"))
-        commission_rate = max(0.0, min(commission_rate, 1.0))
-        commission_amount = int(round(subtotal_amount * commission_rate))
-        total_amount = subtotal_amount + commission_amount
+                line_total = menu_item.price * quantity
+                subtotal_amount += line_total
+                normalized_items.append({
+                    "menu_item_id": menu_item.id,
+                    "item_name": menu_item.name,
+                    "unit_price": menu_item.price,
+                    "quantity": quantity,
+                    "line_total": line_total
+                })
 
-        if payment_method == "online_demo":
-            payment_status = "paid_demo"
-            payment_transaction_id = f"DEMO-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{secrets.randbelow(10000):04d}"
-        else:
-            payment_status = "pending_cod"
-            payment_transaction_id = None
+            commission_rate = float(os.getenv("ORDER_COMMISSION_RATE", "0.1"))
+            commission_rate = max(0.0, min(commission_rate, 1.0))
+            commission_amount = int(round(subtotal_amount * commission_rate))
+            total_amount = subtotal_amount + commission_amount
 
-        order = Order(
-            restaurant_id=restaurant.id,
-            customer_email=customer_email,
-            order_type=order_type,
-            delivery_address=delivery_address if order_type == "delivery" else None,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            payment_transaction_id=payment_transaction_id,
-            order_status="pending",
-            subtotal_amount=subtotal_amount,
-            commission_rate=commission_rate,
-            commission_amount=commission_amount,
-            total_amount=total_amount,
-            note=note
-        )
-        db.session.add(order)
-        db.session.flush()
+            if payment_method == "online_demo":
+                payment_status = "paid_demo"
+                payment_transaction_id = f"DEMO-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{secrets.randbelow(10000):04d}"
+            else:
+                payment_status = "pending_cod"
+                payment_transaction_id = None
 
-        for item in normalized_items:
-            db.session.add(OrderItem(
-                order_id=order.id,
-                menu_item_id=item["menu_item_id"],
-                item_name=item["item_name"],
-                unit_price=item["unit_price"],
-                quantity=item["quantity"],
-                line_total=item["line_total"]
-            ))
+            order = Order(
+                restaurant_id=restaurant.id,
+                customer_email=customer_email,
+                order_type=order_type,
+                delivery_address=delivery_address if order_type == "delivery" else None,
+                payment_method=payment_method,
+                payment_status=payment_status,
+                payment_transaction_id=payment_transaction_id,
+                order_status="pending",
+                subtotal_amount=subtotal_amount,
+                commission_rate=commission_rate,
+                commission_amount=commission_amount,
+                total_amount=total_amount,
+                note=note
+            )
+            db.session.add(order)
+            db.session.flush()
 
-        db.session.commit()
+            for item in normalized_items:
+                db.session.add(OrderItem(
+                    order_id=order.id,
+                    menu_item_id=item["menu_item_id"],
+                    item_name=item["item_name"],
+                    unit_price=item["unit_price"],
+                    quantity=item["quantity"],
+                    line_total=item["line_total"]
+                ))
 
-        payload = order.to_dict(include_items=True)
-        payload["restaurant_name"] = restaurant.name
-        return jsonify({"status": "success", "order": payload})
+            db.session.commit()
+
+            payload = order.to_dict(include_items=True)
+            payload["restaurant_name"] = restaurant.name
+            return jsonify({"status": "success", "order": payload})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": f"Không thể tạo đơn hàng: {str(e)}"}), 500
 
     @app.route("/customer/orders", methods=["GET"])
     def get_customer_orders():
-        customer_email, error_response = customer_required()
-        if error_response:
-            return error_response
+        try:
+            customer_email, error_response = customer_required()
+            if error_response:
+                return error_response
 
-        orders = Order.query.filter_by(customer_email=customer_email).order_by(Order.created_at.desc()).all()
-        return jsonify([
-            {
-                **order.to_dict(include_items=True),
-                "restaurant_name": order.restaurant.name if order.restaurant else None
-            }
-            for order in orders
-        ])
+            orders = Order.query.filter_by(customer_email=customer_email).order_by(Order.created_at.desc()).all()
+            return jsonify([
+                {
+                    **order.to_dict(include_items=True),
+                    "restaurant_name": order.restaurant.name if order.restaurant else None
+                }
+                for order in orders
+            ])
+        except Exception as e:
+            return jsonify({"error": f"Không thể tải lịch sử đơn hàng: {str(e)}"}), 500
 
 
 def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score"):
