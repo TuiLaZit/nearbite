@@ -34,7 +34,8 @@ CORS(
             "http://127.0.0.1:5500",
             "http://localhost:5500",
             "http://localhost:5173",
-            "https://nearbite.vercel.app"
+            "https://nearbite.vercel.app",
+            r"https://.*\.vercel\.app"
         ]
     }},
     supports_credentials=True,

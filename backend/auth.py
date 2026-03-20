@@ -152,6 +152,23 @@ def _is_true(raw_value, default=False):
     return str(raw_value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _get_int_env(name, default_value, min_value=None, max_value=None):
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        value = default_value
+    else:
+        try:
+            value = int(raw)
+        except ValueError:
+            value = default_value
+
+    if min_value is not None:
+        value = max(min_value, value)
+    if max_value is not None:
+        value = min(max_value, value)
+    return value
+
+
 def _resolve_smtp_targets(host, port, prefer_ipv4=True):
     try:
         addr_info = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
@@ -182,12 +199,15 @@ def _probe_smtp_connectivity(host, port, prefer_ipv4=True):
     if err:
         return None, err
 
+    connect_timeout_seconds = _get_int_env("SMTP_CONNECT_TIMEOUT_SECONDS", 3, min_value=1, max_value=10)
+    max_targets = _get_int_env("SMTP_MAX_TARGETS", 2, min_value=1, max_value=10)
+
     errors = []
-    for family, ip in targets:
+    for family, ip in targets[:max_targets]:
         sock = None
         try:
             sock = socket.socket(family, socket.SOCK_STREAM)
-            sock.settimeout(8)
+            sock.settimeout(connect_timeout_seconds)
             sock.connect((ip, port))
             return ip, None
         except OSError as exc:
@@ -236,6 +256,8 @@ def _send_otp_via_resend(email, otp):
         method="POST"
     )
 
+    request_timeout = _get_int_env("OTP_HTTP_TIMEOUT_SECONDS", 8, min_value=3, max_value=20)
+
     def _extract_resend_error(body_text):
         try:
             payload = json.loads(body_text or "{}")
@@ -250,7 +272,7 @@ def _send_otp_via_resend(email, otp):
         return None, None, message
 
     try:
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=request_timeout) as response:
             status = getattr(response, "status", 200)
             if status < 200 or status >= 300:
                 body = response.read().decode("utf-8", errors="ignore")
@@ -300,8 +322,10 @@ def _send_otp_via_brevo_api(email, otp):
         method="POST"
     )
 
+    request_timeout = _get_int_env("OTP_HTTP_TIMEOUT_SECONDS", 8, min_value=3, max_value=20)
+
     try:
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=request_timeout) as response:
             status = getattr(response, "status", 200)
             if status < 200 or status >= 300:
                 body = response.read().decode("utf-8", errors="ignore")
@@ -399,6 +423,8 @@ def _send_otp_email_via_smtp(email, otp):
         seen.add(key)
         dedup_pairs.append((mode, port))
 
+    max_port_attempts = _get_int_env("SMTP_MAX_PORT_ATTEMPTS", 2, min_value=1, max_value=10)
+
     msg = EmailMessage()
     msg["Subject"] = "NearBite - Mã OTP đăng nhập"
     msg["From"] = smtp_from
@@ -406,7 +432,7 @@ def _send_otp_email_via_smtp(email, otp):
     msg.set_content(_build_otp_text(otp))
 
     errors = []
-    for candidate_mode, candidate_port in dedup_pairs:
+    for candidate_mode, candidate_port in dedup_pairs[:max_port_attempts]:
         connect_host, connect_error = _probe_smtp_connectivity(
             smtp_host,
             candidate_port,
@@ -420,12 +446,12 @@ def _send_otp_email_via_smtp(email, otp):
 
         try:
             if candidate_mode == "ssl":
-                with smtplib.SMTP_SSL(connect_host, candidate_port, timeout=15) as server:
+                with smtplib.SMTP_SSL(connect_host, candidate_port, timeout=10) as server:
                     server.ehlo()
                     server.login(smtp_user, smtp_password)
                     server.send_message(msg)
             else:
-                with smtplib.SMTP(connect_host, candidate_port, timeout=15) as server:
+                with smtplib.SMTP(connect_host, candidate_port, timeout=10) as server:
                     server.ehlo()
                     if candidate_mode == "starttls":
                         server.starttls()
