@@ -4,7 +4,18 @@ from db import db
 import os
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
-from auth import admin_login, admin_check, admin_logout
+from auth import (
+    admin_login,
+    admin_check,
+    admin_logout,
+    owner_login,
+    owner_check,
+    owner_logout,
+    customer_request_otp,
+    customer_verify_otp,
+    customer_check,
+    customer_logout,
+)
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -23,7 +34,8 @@ CORS(
             "http://127.0.0.1:5500",
             "http://localhost:5500",
             "http://localhost:5173",
-            "https://nearbite.vercel.app"
+            "https://nearbite.vercel.app",
+            r"https://.*\.vercel\.app"
         ]
     }},
     supports_credentials=True,
@@ -82,6 +94,34 @@ def check():
 def logout():
     return admin_logout()
 
+@app.route("/owner/login", methods=["POST"])
+def owner_login_route():
+    return owner_login()
+
+@app.route("/owner/check", methods=["GET"])
+def owner_check_route():
+    return owner_check()
+
+@app.route("/owner/logout", methods=["POST"])
+def owner_logout_route():
+    return owner_logout()
+
+@app.route("/customer/request-otp", methods=["POST"])
+def customer_request_otp_route():
+    return customer_request_otp()
+
+@app.route("/customer/verify-otp", methods=["POST"])
+def customer_verify_otp_route():
+    return customer_verify_otp()
+
+@app.route("/customer/check", methods=["GET"])
+def customer_check_route():
+    return customer_check()
+
+@app.route("/customer/logout", methods=["POST"])
+def customer_logout_route():
+    return customer_logout()
+
 @app.route("/static/<path:path>")
 def serve_static(path):
     """Serve static files with CORS headers"""
@@ -95,5 +135,5 @@ register_user_routes(app)
 register_admin_routes(app)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))
 

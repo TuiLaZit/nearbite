@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
-function TagManagement() {
+function TagManagement({ loginPath = '/admin/login' }) {
   const navigate = useNavigate()
   const [tags, setTags] = useState([])
   const [showModal, setShowModal] = useState(false)
@@ -22,7 +22,7 @@ function TagManagement() {
     })
       .then(res => {
         if (!res.ok) {
-          navigate('/admin/login', { replace: true })
+          navigate(loginPath, { replace: true })
           return null
         }
         return res.json()
@@ -35,9 +35,9 @@ function TagManagement() {
       })
       .catch(err => {
         console.error('Auth check failed:', err)
-        navigate('/admin/login', { replace: true })
+        navigate(loginPath, { replace: true })
       })
-  }, [])
+  }, [loginPath, navigate])
 
   const loadTags = () => {
     fetch(`${BASE_URL}/admin/tags`, {

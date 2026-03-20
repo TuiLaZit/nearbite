@@ -1,31 +1,239 @@
-from flask import request, jsonify
-import os
-import traceback
-from models import Restaurant, MenuItem, Tag, RestaurantImage, restaurant_tags, LocationVisit
+from flask import request, jsonify, session
+from models import Restaurant, MenuItem, Tag, RestaurantImage, AdminUser, Order, restaurant_tags, LocationVisit
 from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
 from supabase_client import upload_image, delete_image, supabase_client
 import uuid
+import re
+import secrets
+import string
+import unicodedata
 from datetime import datetime
-from sqlalchemy import func
+from sqlalchemy import func, extract
+from werkzeug.security import generate_password_hash
 
 def register_admin_routes(app):
+
+    def is_admin_session():
+        return bool(session.get("admin_logged_in"))
+
+    def is_owner_session():
+        return bool(session.get("owner_logged_in")) and not is_admin_session()
+
+    def require_admin_only():
+        if not is_admin_session():
+            return jsonify({"error": "Admin only"}), 403
+        return None
+
+    def require_restaurant_access(restaurant_id):
+        if is_admin_session():
+            return None
+        if is_owner_session() and session.get("owner_restaurant_id") == restaurant_id:
+            return None
+        return jsonify({"error": "Forbidden"}), 403
+
+    def slugify_name(name):
+        normalized = unicodedata.normalize("NFKD", name)
+        ascii_name = normalized.encode("ascii", "ignore").decode("ascii").lower()
+        words = re.findall(r"[a-z0-9]+", ascii_name)
+        if not words:
+            return "quan"
+        initials = "".join(word[0] for word in words)
+        return initials[:20]
+
+    def generate_unique_owner_username(restaurant_name):
+        base_username = slugify_name(restaurant_name)
+        candidate = base_username
+        suffix = 1
+
+        while Restaurant.query.filter_by(owner_username=candidate).first():
+            candidate = f"{base_username}{suffix}"
+            suffix += 1
+
+        return candidate
+
+    def generate_random_password(length=6):
+        charset = string.ascii_letters + string.digits
+        return "".join(secrets.choice(charset) for _ in range(length))
 
     # ======================
     # RESTAURANT CRUD
     # ======================
 
+    @app.route("/admin/accounts", methods=["GET"])
+    @admin_required
+    def get_admin_accounts():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        accounts = AdminUser.query.filter_by(is_active=True).order_by(AdminUser.created_at.asc()).all()
+        return jsonify([a.to_dict() for a in accounts])
+
+    @app.route("/admin/accounts", methods=["POST"])
+    @admin_required
+    def add_admin_account():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        data = request.get_json() or {}
+        email = (data.get("email") or "").strip().lower()
+
+        if not email or "@" not in email:
+            return jsonify({"error": "Email không hợp lệ"}), 400
+
+        exists = AdminUser.query.filter_by(email=email).first()
+        if exists:
+            if not exists.is_active:
+                exists.is_active = True
+                db.session.commit()
+            return jsonify({"status": "success", "account": exists.to_dict()})
+
+        account = AdminUser(email=email, is_active=True)
+        db.session.add(account)
+        db.session.commit()
+        return jsonify({"status": "success", "account": account.to_dict()})
+
+    @app.route("/admin/accounts/<int:account_id>", methods=["DELETE"])
+    @admin_required
+    def delete_admin_account(account_id):
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        account = AdminUser.query.get_or_404(account_id)
+        active_count = AdminUser.query.filter_by(is_active=True).count()
+
+        if active_count <= 1 and account.is_active:
+            return jsonify({"error": "Phải giữ ít nhất 1 tài khoản admin"}), 400
+
+        account.is_active = False
+        db.session.commit()
+        return jsonify({"status": "deleted", "id": account_id})
+
     @app.route("/admin/restaurants", methods=["GET"])
     @admin_required
     def get_restaurants_admin():
+        if is_owner_session():
+            owner_restaurant_id = session.get("owner_restaurant_id")
+            restaurants = Restaurant.query.filter_by(id=owner_restaurant_id, is_active=True).all()
+            return jsonify([r.to_dict(include_admin_fields=True) for r in restaurants])
+
         return jsonify([
-            r.to_dict() for r in Restaurant.query.filter_by(is_active=True).all()
+            r.to_dict(include_admin_fields=True) for r in Restaurant.query.filter_by(is_active=True).all()
         ])
+
+    @app.route("/owner/orders", methods=["GET"])
+    @admin_required
+    def get_owner_orders():
+        if is_owner_session():
+            owner_restaurant_id = session.get("owner_restaurant_id")
+            query = Order.query.filter_by(restaurant_id=owner_restaurant_id)
+        else:
+            restaurant_id = request.args.get("restaurant_id", type=int)
+            query = Order.query
+            if restaurant_id:
+                query = query.filter_by(restaurant_id=restaurant_id)
+
+        order_type = request.args.get("order_type")
+        if order_type in ["delivery", "pickup"]:
+            query = query.filter(Order.order_type == order_type)
+
+        orders = query.order_by(Order.created_at.desc()).all()
+        return jsonify([
+            {
+                **order.to_dict(include_items=True),
+                "restaurant_name": order.restaurant.name if order.restaurant else None
+            }
+            for order in orders
+        ])
+
+    @app.route("/owner/orders/summary", methods=["GET"])
+    @admin_required
+    def get_owner_orders_summary():
+        if is_owner_session():
+            owner_restaurant_id = session.get("owner_restaurant_id")
+            query = Order.query.filter_by(restaurant_id=owner_restaurant_id)
+        else:
+            restaurant_id = request.args.get("restaurant_id", type=int)
+            query = Order.query
+            if restaurant_id:
+                query = query.filter_by(restaurant_id=restaurant_id)
+
+        now = datetime.utcnow()
+        monthly_orders = query.filter(
+            extract('year', Order.created_at) == now.year,
+            extract('month', Order.created_at) == now.month
+        ).all()
+
+        monthly_commission = sum(order.commission_amount for order in monthly_orders)
+        monthly_revenue = sum(order.total_amount for order in monthly_orders)
+
+        return jsonify({
+            "month": f"{now.year}-{now.month:02d}",
+            "order_count": len(monthly_orders),
+            "monthly_commission": monthly_commission,
+            "monthly_revenue": monthly_revenue
+        })
+
+    @app.route("/owner/orders/<int:order_id>/status", methods=["PATCH"])
+    @admin_required
+    def update_owner_order_status(order_id):
+        order = Order.query.get_or_404(order_id)
+
+        access_error = require_restaurant_access(order.restaurant_id)
+        if access_error:
+            return access_error
+
+        data = request.get_json() or {}
+        action = (data.get("action") or "").strip().lower()
+        note = (data.get("note") or "").strip()
+
+        if action == "confirm":
+            if order.order_status != "pending":
+                return jsonify({"error": "Chỉ xác nhận được đơn đang chờ"}), 400
+            order.order_status = "delivering" if order.order_type == "delivery" else "confirmed"
+        elif action == "mark_in_transit":
+            if order.order_type != "delivery":
+                return jsonify({"error": "Chỉ áp dụng cho đơn giao hàng"}), 400
+            if order.order_status not in ["pending", "confirmed", "delivering"]:
+                return jsonify({"error": "Trạng thái hiện tại không thể chuyển sang đang giao"}), 400
+            order.order_status = "delivering"
+        elif action == "mark_delivered":
+            if order.order_type != "delivery":
+                return jsonify({"error": "Chỉ áp dụng cho đơn giao hàng"}), 400
+            if order.order_status not in ["delivering", "confirmed"]:
+                return jsonify({"error": "Đơn phải ở trạng thái đang giao/xác nhận"}), 400
+            order.order_status = "delivered"
+        elif action == "mark_completed":
+            if order.order_type != "pickup":
+                return jsonify({"error": "Chỉ áp dụng cho đơn đặt trước"}), 400
+            if order.order_status not in ["confirmed", "pending"]:
+                return jsonify({"error": "Đơn phải ở trạng thái chờ/xác nhận"}), 400
+            order.order_status = "completed"
+        elif action == "cancel":
+            if order.order_status in ["delivered", "completed", "cancelled"]:
+                return jsonify({"error": "Không thể hủy đơn đã hoàn tất"}), 400
+            order.order_status = "cancelled"
+        else:
+            return jsonify({"error": "Hành động không hợp lệ"}), 400
+
+        if note:
+            previous_note = order.note or ""
+            order.note = f"{previous_note}\n[OWNER] {note}".strip()
+
+        db.session.commit()
+        return jsonify({"status": "success", "order": order.to_dict(include_items=True)})
 
     @app.route("/admin/restaurants", methods=["POST"])
     @admin_required
     def add_restaurant():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
         data = request.get_json()
 
         error = validate_restaurant(data)
@@ -46,12 +254,16 @@ def register_admin_routes(app):
 
         return jsonify({
             "status": "success",
-            "restaurant": restaurant.to_dict()
+            "restaurant": restaurant.to_dict(include_admin_fields=True)
         })
 
     @app.route("/admin/restaurants/<int:id>", methods=["PUT"])
     @admin_required
     def update_restaurant(id):
+        access_error = require_restaurant_access(id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(id)
         data = request.get_json()
 
@@ -70,12 +282,16 @@ def register_admin_routes(app):
 
         return jsonify({
             "status": "success",
-            "restaurant": restaurant.to_dict()
+            "restaurant": restaurant.to_dict(include_admin_fields=True)
         })
 
     @app.route("/admin/restaurants/<int:id>", methods=["DELETE"])
     @admin_required
     def delete_restaurant(id):
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
         restaurant = Restaurant.query.get_or_404(id)
         data = request.get_json()
 
@@ -98,6 +314,36 @@ def register_admin_routes(app):
             "id": id
         })
 
+    @app.route("/admin/restaurants/<int:id>/account", methods=["POST"])
+    @admin_required
+    def create_or_reset_restaurant_account(id):
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        restaurant = Restaurant.query.get_or_404(id)
+
+        is_reset = bool(restaurant.owner_username and restaurant.owner_password_hash)
+
+        if is_reset:
+            username = restaurant.owner_username
+        else:
+            username = generate_unique_owner_username(restaurant.name)
+            restaurant.owner_username = username
+
+        raw_password = generate_random_password(6)
+        restaurant.owner_password_hash = generate_password_hash(raw_password)
+        restaurant.owner_password_plain = raw_password
+
+        db.session.commit()
+
+        return jsonify({
+            "status": "reset" if is_reset else "created",
+            "restaurant_id": restaurant.id,
+            "username": username,
+            "password": raw_password
+        })
+
     # ======================
     # SOFT DELETE / RESTORE
     # ======================
@@ -105,6 +351,10 @@ def register_admin_routes(app):
     @app.route("/admin/restaurants/<int:id>/restore", methods=["PUT"])
     @admin_required
     def restore_restaurant(id):
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
         restaurant = Restaurant.query.get_or_404(id)
         restaurant.is_active = True
         db.session.commit()
@@ -113,6 +363,10 @@ def register_admin_routes(app):
     @app.route("/admin/restaurants/hidden", methods=["GET"])
     @admin_required
     def get_hidden_restaurants():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
         from sqlalchemy.orm import joinedload
         
         # Use eager loading for better performance
@@ -121,7 +375,7 @@ def register_admin_routes(app):
             joinedload(Restaurant.tags),
             joinedload(Restaurant.images)
         ).filter_by(is_active=False).all()
-        return jsonify([r.to_dict() for r in restaurants])
+        return jsonify([r.to_dict(include_admin_fields=True) for r in restaurants])
 
     # ======================
     # MENU CRUD
@@ -130,12 +384,20 @@ def register_admin_routes(app):
     @app.route("/admin/restaurants/<int:restaurant_id>/menu", methods=["GET"])
     @admin_required
     def get_menu(restaurant_id):
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(restaurant_id)
         return jsonify([item.to_dict() for item in restaurant.menu_items])
 
     @app.route("/admin/restaurants/<int:restaurant_id>/menu", methods=["POST"])
     @admin_required
     def add_menu_item(restaurant_id):
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         Restaurant.query.get_or_404(restaurant_id)
         data = request.get_json()
 
@@ -161,6 +423,10 @@ def register_admin_routes(app):
     @admin_required
     def update_menu_item(id):
         item = MenuItem.query.get_or_404(id)
+        access_error = require_restaurant_access(item.restaurant_id)
+        if access_error:
+            return access_error
+
         data = request.get_json()
 
         error = validate_menu_item(data)
@@ -181,6 +447,10 @@ def register_admin_routes(app):
     @admin_required
     def delete_menu_item(id):
         item = MenuItem.query.get_or_404(id)
+        access_error = require_restaurant_access(item.restaurant_id)
+        if access_error:
+            return access_error
+
         db.session.delete(item)
         db.session.commit()
 
@@ -282,6 +552,10 @@ def register_admin_routes(app):
     @admin_required
     def get_restaurant_tags(restaurant_id):
         """Get all tags for a restaurant"""
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(restaurant_id)
         return jsonify([tag.to_dict() for tag in restaurant.tags])
 
@@ -289,6 +563,10 @@ def register_admin_routes(app):
     @admin_required
     def add_tag_to_restaurant(restaurant_id, tag_id):
         """Add a tag to a restaurant"""
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(restaurant_id)
         tag = Tag.query.get_or_404(tag_id)
         
@@ -309,6 +587,10 @@ def register_admin_routes(app):
     @admin_required
     def remove_tag_from_restaurant(restaurant_id, tag_id):
         """Remove a tag from a restaurant"""
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(restaurant_id)
         tag = Tag.query.get_or_404(tag_id)
         
@@ -333,6 +615,10 @@ def register_admin_routes(app):
     @admin_required
     def get_restaurant_images(restaurant_id):
         """Get all images for a restaurant"""
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(restaurant_id)
         return jsonify([img.to_dict() for img in restaurant.images])
 
@@ -340,15 +626,12 @@ def register_admin_routes(app):
     @admin_required
     def add_restaurant_image(restaurant_id):
         """Add an image to a restaurant"""
+        access_error = require_restaurant_access(restaurant_id)
+        if access_error:
+            return access_error
+
         Restaurant.query.get_or_404(restaurant_id)
-        # Log incoming JSON for debugging
-        try:
-            raw = request.get_data(as_text=True)
-            print(f"[add_image] raw body: {raw}")
-        except Exception:
-            pass
         data = request.get_json()
-        print(f"[add_image] parsed json: {data}")
         
         # Validate data
         error = validate_restaurant_image(data)
@@ -372,7 +655,6 @@ def register_admin_routes(app):
         
         db.session.add(image)
         db.session.commit()
-        print(f"[add_image] saved image id={image.id} url={image.image_url}")
         
         return jsonify({
             "status": "success",
@@ -384,6 +666,10 @@ def register_admin_routes(app):
     def update_restaurant_image(id):
         """Update an image"""
         image = RestaurantImage.query.get_or_404(id)
+        access_error = require_restaurant_access(image.restaurant_id)
+        if access_error:
+            return access_error
+
         data = request.get_json()
         
         # Validate data if URL is being changed
@@ -416,6 +702,10 @@ def register_admin_routes(app):
     def delete_restaurant_image(id):
         """Delete an image"""
         image = RestaurantImage.query.get_or_404(id)
+        access_error = require_restaurant_access(image.restaurant_id)
+        if access_error:
+            return access_error
+
         db.session.delete(image)
         db.session.commit()
         
@@ -432,8 +722,12 @@ def register_admin_routes(app):
     @admin_required
     def get_restaurant_details(id):
         """Get complete restaurant details including menu, tags, and images"""
+        access_error = require_restaurant_access(id)
+        if access_error:
+            return access_error
+
         restaurant = Restaurant.query.get_or_404(id)
-        return jsonify(restaurant.to_dict(include_details=True))
+        return jsonify(restaurant.to_dict(include_details=True, include_admin_fields=True))
 
     # ======================
     # IMAGE UPLOAD
@@ -443,86 +737,51 @@ def register_admin_routes(app):
     @admin_required
     def upload_restaurant_image_file():
         """Upload image file to Supabase Storage and return URL"""
-        # If Supabase is not configured, fall back to saving the file locally
-        local_fallback = False
         if not supabase_client:
-            local_fallback = True
-
-        # Debug: log incoming files
-        try:
-            print(f"[upload] incoming files: {list(request.files.keys())}")
-        except Exception:
-            pass
-
+            return jsonify({
+                "error": "Image upload is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env"
+            }), 500
+        
         # Check if file is present
         if 'file' not in request.files:
-            print("[upload] No file provided in request.files")
             return jsonify({"error": "No file provided"}), 400
-
+        
         file = request.files['file']
-
+        
         if file.filename == '':
-            print("[upload] Empty filename")
             return jsonify({"error": "No file selected"}), 400
-
+        
         # Check file type
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
         file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-
+        
         if file_ext not in allowed_extensions:
-            print(f"[upload] File type not allowed: {file_ext}")
             return jsonify({
                 "error": f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
             }), 400
-
+        
         try:
             # Generate unique filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             unique_id = str(uuid.uuid4())[:8]
             filename = f"{timestamp}_{unique_id}.{file_ext}"
-
+            
             # Read file bytes
             file_bytes = file.read()
-
-            if not local_fallback:
-                print(f"[upload] Uploading to Supabase: {filename} (size={len(file_bytes)} bytes)")
-                public_url = upload_image(file_bytes, filename)
-            else:
-                print(f"[upload] Supabase not configured, saving locally: {filename} (size={len(file_bytes)} bytes)")
-                uploads_dir = os.path.join('static', 'uploads')
-                os.makedirs(uploads_dir, exist_ok=True)
-                file_path = os.path.join(uploads_dir, filename)
-                with open(file_path, 'wb') as f:
-                    f.write(file_bytes)
-
-                # Build public URL using request.host_url
-                host = request.host_url.rstrip('/')
-                public_url = f"{host}/static/uploads/{filename}"
-
-            print(f"[upload] Saved. public_url={public_url}")
+            
+            # Upload to Supabase
+            public_url = upload_image(file_bytes, filename)
+            
             return jsonify({
                 "status": "success",
                 "url": public_url,
                 "filename": filename
             })
-
+        
         except Exception as e:
-            print("[upload] Exception during upload:")
-            traceback.print_exc()
             return jsonify({
                 "error": f"Failed to upload image: {str(e)}"
             }), 500
-
-    @app.route("/admin/uploads", methods=["GET"])
-    @admin_required
-    def list_uploaded_files():
-        """List files saved in static/uploads for debugging"""
-        uploads_dir = os.path.join('static', 'uploads')
-        if not os.path.exists(uploads_dir):
-            return jsonify([])
-        files = sorted(os.listdir(uploads_dir))
-        host = request.host_url.rstrip('/')
-        return jsonify([f"{host}/static/uploads/{fn}" for fn in files])
 
 
     # ======================
@@ -532,6 +791,10 @@ def register_admin_routes(app):
     @app.route("/admin/heatmap", methods=["GET"])
     @admin_required
     def get_heatmap_data():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
         """Get heatmap data for admin dashboard with duration-based intensity"""
         try:
             # Get all location visits
@@ -566,6 +829,10 @@ def register_admin_routes(app):
     @app.route("/admin/restaurants/top", methods=["GET"])
     @admin_required
     def get_top_restaurants():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
         """Get top restaurants by different metrics calculated from location_visit table"""
         try:
             metric = request.args.get('metric', 'visits')  # visits, duration, audio
@@ -668,6 +935,10 @@ def register_admin_routes(app):
             joinedload(Restaurant.tags),
             joinedload(Restaurant.images)
         ).filter_by(is_active=True)
+
+        if is_owner_session():
+            owner_restaurant_id = session.get("owner_restaurant_id")
+            query = query.filter(Restaurant.id == owner_restaurant_id)
         
         # Search by name
         if search:
@@ -691,7 +962,7 @@ def register_admin_routes(app):
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         
         return jsonify({
-            'restaurants': [r.to_dict(include_details=True) for r in pagination.items],
+            'restaurants': [r.to_dict(include_details=True, include_admin_fields=True) for r in pagination.items],
             'total': pagination.total,
             'page': page,
             'per_page': per_page,

@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
-function RestaurantManagement({ isHidden = false }) {
+function RestaurantManagement({
+  isHidden = false,
+  loginPath = '/admin/login',
+  authCheckPath = '/admin/check',
+  isOwnerView = false
+}) {
   const navigate = useNavigate()
   const [restaurants, setRestaurants] = useState([])
   const [tags, setTags] = useState([])
@@ -30,12 +35,12 @@ function RestaurantManagement({ isHidden = false }) {
 
   useEffect(() => {
     // Check authentication first
-    fetch(`${BASE_URL}/admin/check`, {
+    fetch(`${BASE_URL}${authCheckPath}`, {
       credentials: 'include'
     })
       .then(res => {
         if (!res.ok) {
-          navigate('/admin/login', { replace: true })
+          navigate(loginPath, { replace: true })
           return null
         }
         return res.json()
@@ -48,9 +53,9 @@ function RestaurantManagement({ isHidden = false }) {
       })
       .catch(err => {
         console.error('Auth check failed:', err)
-        navigate('/admin/login', { replace: true })
+        navigate(loginPath, { replace: true })
       })
-  }, [])
+  }, [authCheckPath, loginPath, navigate])
 
   // Load restaurants when authenticated or filters change
   useEffect(() => {
@@ -272,8 +277,44 @@ function RestaurantManagement({ isHidden = false }) {
       .catch(err => console.error('Error restoring restaurant:', err))
   }
 
-  const handleOpenDetails = (id) => {
-    navigate(`/admin/restaurant/${id}`)
+  const handleCreateOrResetAccount = async (restaurant) => {
+    const actionText = restaurant.has_account ? 'đặt lại mật khẩu' : 'tạo tài khoản'
+
+    if (!confirm(`Bạn có chắc muốn ${actionText} cho quán "${restaurant.name}"?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`${BASE_URL}/admin/restaurants/${restaurant.id}/account`, {
+        method: 'POST',
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        let backendMessage = `HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          backendMessage = errorBody.error || backendMessage
+        } catch {
+          // Ignore JSON parse errors and fallback to status code.
+        }
+        throw new Error(backendMessage)
+      }
+
+      const data = await response.json()
+      const message = [
+        data.status === 'reset' ? '✅ Đã cấp lại mật khẩu thành công' : '✅ Đã tạo tài khoản thành công',
+        `Quán: ${restaurant.name}`,
+        `Username: ${data.username}`,
+        `Password mới: ${data.password}`
+      ].join('\n')
+
+      alert(message)
+      loadRestaurants()
+    } catch (error) {
+      console.error('Account action failed:', error)
+      alert(`Có lỗi khi tạo/cấp lại tài khoản quán: ${error.message}`)
+    }
   }
 
   const toggleTagFilter = (tagId) => {
@@ -385,6 +426,8 @@ function RestaurantManagement({ isHidden = false }) {
               <thead>
                 <tr>
                   <th style={styles.th}>Tên quán</th>
+                  {!isHidden && !isOwnerView && <th style={styles.th}>Tài khoản quán</th>}
+                  {!isHidden && !isOwnerView && <th style={styles.th}>Password</th>}
                   {!isHidden && <th style={styles.th}>Lượt ghé</th>}
                   {!isHidden && <th style={styles.th}>TG ghé TB (phút)</th>}
                   {!isHidden && <th style={styles.th}>TG nghe TB (giây)</th>}
@@ -408,6 +451,27 @@ function RestaurantManagement({ isHidden = false }) {
                         ))}
                       </div>
                     </td>
+                    {!isHidden && !isOwnerView && (
+                      <td style={styles.td}>
+                        {r.has_account ? (
+                          <div>
+                            <div style={styles.accountUsername}>{r.owner_username}</div>
+                            <div style={styles.accountHint}>Đã có tài khoản</div>
+                          </div>
+                        ) : (
+                          <span style={styles.noAccountText}>Chưa có tài khoản</span>
+                        )}
+                      </td>
+                    )}
+                    {!isHidden && !isOwnerView && (
+                      <td style={styles.td}>
+                        {r.has_account ? (
+                          <span style={styles.passwordText}>{r.owner_password_plain || 'Chưa có'}</span>
+                        ) : (
+                          <span style={styles.noAccountText}>-</span>
+                        )}
+                      </td>
+                    )}
                     {!isHidden && <td style={styles.td}>{r.visit_count || 0}</td>}
                     {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
                     {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
@@ -434,14 +498,24 @@ function RestaurantManagement({ isHidden = false }) {
                         ) : (
                           <>
                             <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
-                            <button style={styles.btnDetails} onClick={() => handleOpenDetails(r.id)}>📋</button>
-                            <button 
-                              style={styles.btnDelete} 
-                              onClick={() => handleDelete(r.id, r.name)}
-                              title="Ẩn quán"
-                            >
-                              👻 Ẩn
-                            </button>
+                            {!isOwnerView && (
+                              <button
+                                style={r.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
+                                onClick={() => handleCreateOrResetAccount(r)}
+                                title={r.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
+                              >
+                                {r.has_account ? '🔐 Quên mật khẩu' : '👤 Tạo tài khoản'}
+                              </button>
+                            )}
+                            {!isOwnerView && (
+                              <button 
+                                style={styles.btnDelete} 
+                                onClick={() => handleDelete(r.id, r.name)}
+                                title="Ẩn quán"
+                              >
+                                👻 Ẩn
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -710,6 +784,24 @@ const styles = {
     color: 'white',
     fontWeight: '500'
   },
+  accountUsername: {
+    fontWeight: '700',
+    color: '#1d4ed8',
+    marginBottom: '4px'
+  },
+  accountHint: {
+    fontSize: '12px',
+    color: '#64748b'
+  },
+  noAccountText: {
+    color: '#94a3b8'
+  },
+  passwordText: {
+    fontFamily: 'Consolas, monospace',
+    fontWeight: '700',
+    color: '#0f172a',
+    letterSpacing: '0.4px'
+  },
   actionButtons: {
     display: 'flex',
     gap: '8px'
@@ -723,11 +815,20 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px'
   },
-  btnDetails: {
+  btnCreateAccount: {
     padding: '6px 12px',
     border: 'none',
     borderRadius: '6px',
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
+  btnResetPassword: {
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '6px',
+    backgroundColor: '#7c3aed',
     color: 'white',
     cursor: 'pointer',
     fontSize: '14px'

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
-function RestaurantDetails() {
+function RestaurantDetails({ dashboardPath = '/admin', dashboardLabel = 'Admin' }) {
   const { restaurantId } = useParams()
   const navigate = useNavigate()
   const [restaurant, setRestaurant] = useState(null)
@@ -253,7 +253,7 @@ function RestaurantDetails() {
   }
 
   const handleGoBack = () => {
-    navigate('/admin')
+    navigate(dashboardPath)
   }
 
   if (!restaurant) {
@@ -262,7 +262,7 @@ function RestaurantDetails() {
 
   return (
     <div className="container">
-      <button onClick={handleGoBack}>⬅️ Quay lại trang Admin</button>
+      <button onClick={handleGoBack}>⬅️ Quay lại trang {dashboardLabel}</button>
       <h1>📍 Chi tiết quán: {restaurant.name}</h1>
       
       {/* Tab Navigation */}
