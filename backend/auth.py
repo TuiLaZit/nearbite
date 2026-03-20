@@ -236,6 +236,19 @@ def _send_otp_via_resend(email, otp):
         method="POST"
     )
 
+    def _extract_resend_error(body_text):
+        try:
+            payload = json.loads(body_text or "{}")
+        except Exception:
+            return None, None, body_text
+
+        error_block = payload.get("error") or {}
+        if isinstance(error_block, dict):
+            return error_block.get("code"), error_block.get("name"), error_block.get("message")
+
+        message = payload.get("message") if isinstance(payload, dict) else None
+        return None, None, message
+
     try:
         with urllib.request.urlopen(req, timeout=20) as response:
             status = getattr(response, "status", 200)
@@ -245,7 +258,19 @@ def _send_otp_via_resend(email, otp):
         return True, None
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="ignore") if hasattr(exc, "read") else ""
-        return False, f"Resend HTTP {exc.code}: {body[:300]}"
+        code, name, message = _extract_resend_error(body)
+
+        if exc.code == 403 and str(code) == "1010":
+            return False, (
+                "Resend 403/1010: Tài khoản đang ở chế độ test hoặc domain FROM chưa verify. "
+                "Nếu dùng resend.dev, chỉ gửi được tới email chủ tài khoản Resend. "
+                "Để gửi cho người dùng thật, cần verify domain trong Resend và đặt RESEND_FROM_EMAIL theo domain đó."
+            )
+
+        details = message or body[:300]
+        if code or name:
+            return False, f"Resend HTTP {exc.code}: {name or 'error'} (code={code}) {details}"
+        return False, f"Resend HTTP {exc.code}: {details}"
     except Exception as exc:
         return False, f"Resend lỗi kết nối: {exc}"
 
@@ -347,16 +372,32 @@ def _send_otp_email_via_smtp(email, otp):
     if smtp_mode not in {"starttls", "ssl", "plain"}:
         return False, f"SMTP_MODE không hợp lệ: {smtp_mode}"
 
-    connect_host, connect_error = _probe_smtp_connectivity(
-        smtp_host,
-        smtp_port,
-        prefer_ipv4=smtp_prefer_ipv4
-    )
-    if not connect_host:
-        return False, (
-            f"Không thể kết nối SMTP server {smtp_host}:{smtp_port} từ môi trường deploy. "
-            f"Chi tiết: {connect_error}"
-        )
+    # Try configured pair first, then common SMTP fallback pairs.
+    candidate_pairs = [(smtp_mode, smtp_port)]
+
+    raw_fallback_ports = (os.getenv("SMTP_PORT_FALLBACKS") or "").strip()
+    if raw_fallback_ports:
+        for raw_port in raw_fallback_ports.split(","):
+            port_value, err = _parse_smtp_port(raw_port)
+            if not err and port_value:
+                candidate_pairs.append((smtp_mode, port_value))
+
+    # Common cross-provider SMTP ports.
+    candidate_pairs.extend([
+        ("starttls", 587),
+        ("ssl", 465),
+        ("starttls", 2525),
+        ("plain", 25)
+    ])
+
+    dedup_pairs = []
+    seen = set()
+    for mode, port in candidate_pairs:
+        key = (mode, port)
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup_pairs.append((mode, port))
 
     msg = EmailMessage()
     msg["Subject"] = "NearBite - Mã OTP đăng nhập"
@@ -364,23 +405,40 @@ def _send_otp_email_via_smtp(email, otp):
     msg["To"] = email
     msg.set_content(_build_otp_text(otp))
 
-    try:
-        if smtp_mode == "ssl":
-            with smtplib.SMTP_SSL(connect_host, smtp_port, timeout=15) as server:
-                server.ehlo()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-        else:
-            with smtplib.SMTP(connect_host, smtp_port, timeout=15) as server:
-                server.ehlo()
-                if smtp_mode == "starttls":
-                    server.starttls()
+    errors = []
+    for candidate_mode, candidate_port in dedup_pairs:
+        connect_host, connect_error = _probe_smtp_connectivity(
+            smtp_host,
+            candidate_port,
+            prefer_ipv4=smtp_prefer_ipv4
+        )
+        if not connect_host:
+            errors.append(
+                f"{smtp_host}:{candidate_port} ({candidate_mode}) unreachable: {connect_error}"
+            )
+            continue
+
+        try:
+            if candidate_mode == "ssl":
+                with smtplib.SMTP_SSL(connect_host, candidate_port, timeout=15) as server:
                     server.ehlo()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
+                    server.login(smtp_user, smtp_password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(connect_host, candidate_port, timeout=15) as server:
+                    server.ehlo()
+                    if candidate_mode == "starttls":
+                        server.starttls()
+                        server.ehlo()
+                    server.login(smtp_user, smtp_password)
+                    server.send_message(msg)
+            return True, None
+        except Exception as exc:
+            errors.append(
+                f"{smtp_host}:{candidate_port} ({candidate_mode}) send failed: {exc}"
+            )
+
+    return False, "; ".join(errors) if errors else "Không gửi được email qua SMTP"
 
 
 def customer_request_otp():
