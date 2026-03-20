@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { BASE_URL } from '../config'
+import { useTranslation } from '../hooks/useTranslation'
+import { useAppLanguage } from '../hooks/useAppLanguage'
 
 const DEFAULT_COMMISSION_RATE = 0.1
 
@@ -17,6 +19,9 @@ function CustomerOrders() {
   const requestedRestaurantId = routeRestaurantId || queryRestaurantId || ''
 
   const [restaurants, setRestaurants] = useState([])
+  const { language, setLanguage } = useAppLanguage()
+  const [languages, setLanguages] = useState([])
+  const { t } = useTranslation(language)
   const [selectedRestaurantId, setSelectedRestaurantId] = useState('')
   const [checkoutStep, setCheckoutStep] = useState(1)
   const [quantities, setQuantities] = useState({})
@@ -28,6 +33,7 @@ function CustomerOrders() {
   const [submitting, setSubmitting] = useState(false)
   const [orderHistory, setOrderHistory] = useState([])
   const [historyError, setHistoryError] = useState('')
+  const [dynamicTranslations, setDynamicTranslations] = useState({})
   const [loading, setLoading] = useState(true)
 
   const selectedRestaurant = useMemo(() => {
@@ -72,10 +78,15 @@ function CustomerOrders() {
     return `NB-${restaurantCode}-${amountCode}`
   }, [selectedRestaurantId, total])
 
+  const translateDynamicText = (text) => {
+    if (!text) return ''
+    return dynamicTranslations[text] || text
+  }
+
   const fetchRestaurants = async () => {
     const response = await fetch(`${BASE_URL}/restaurants`)
     if (!response.ok) {
-      throw new Error('Không thể tải danh sách quán')
+      throw new Error(t('error'))
     }
 
     const data = await response.json()
@@ -100,6 +111,15 @@ function CustomerOrders() {
     }
   }
 
+  const fetchLanguages = async () => {
+    const response = await fetch(`${BASE_URL}/languages`)
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data.status !== 'success') {
+      return
+    }
+    setLanguages(Array.isArray(data.languages) ? data.languages : [])
+  }
+
   const fetchOrderHistory = async () => {
     const response = await fetch(`${BASE_URL}/customer/orders`, {
       credentials: 'include'
@@ -112,7 +132,7 @@ function CustomerOrders() {
 
     if (!response.ok) {
       setOrderHistory([])
-      setHistoryError('Không thể tải lịch sử đơn hàng lúc này. Bạn vẫn có thể tiếp tục đặt món.')
+      setHistoryError(t('cannotLoadOrderHistoryNow'))
       return
     }
 
@@ -122,7 +142,7 @@ function CustomerOrders() {
   }
 
   useEffect(() => {
-    fetchRestaurants()
+    Promise.all([fetchRestaurants(), fetchLanguages()])
       .catch((error) => alert(error.message))
       .finally(async () => {
         await fetchOrderHistory()
@@ -136,6 +156,56 @@ function CustomerOrders() {
     }
     setTransferConfirmed(false)
   }, [orderType])
+
+  useEffect(() => {
+    const translateDynamicTexts = async () => {
+      if (language === 'vi') {
+        setDynamicTranslations({})
+        return
+      }
+
+      const sourceTexts = new Set()
+
+      restaurants.forEach((restaurant) => {
+        if (restaurant.name) sourceTexts.add(restaurant.name)
+        ;(restaurant.menu || []).forEach((item) => {
+          if (item.name) sourceTexts.add(item.name)
+        })
+      })
+
+      orderHistory.forEach((order) => {
+        if (order.restaurant_name) sourceTexts.add(order.restaurant_name)
+        ;(order.items || []).forEach((item) => {
+          if (item.item_name) sourceTexts.add(item.item_name)
+        })
+      })
+
+      const texts = Array.from(sourceTexts)
+      if (texts.length === 0) {
+        setDynamicTranslations({})
+        return
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/translate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texts, target_lang: language })
+        })
+
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok || data.status !== 'success') {
+          return
+        }
+
+        setDynamicTranslations(data.translations || {})
+      } catch {
+        // Ignore translation failure and keep original Vietnamese text.
+      }
+    }
+
+    translateDynamicTexts()
+  }, [language, restaurants, orderHistory])
 
   useEffect(() => {
     setTransferConfirmed(false)
@@ -161,24 +231,24 @@ function CustomerOrders() {
 
   const getOrderStatusLabel = (status) => {
     const statusMap = {
-      pending: 'Chờ xác nhận',
-      confirmed: 'Đã xác nhận',
-      delivering: 'Đang giao',
-      delivered: 'Đã giao xong',
-      completed: 'Hoàn tất',
-      cancelled: 'Đã hủy'
+      pending: t('waitingForConfirm'),
+      confirmed: t('confirmed'),
+      delivering: t('deliveringLabel'),
+      delivered: t('deliveredLabel'),
+      completed: t('completedLabel'),
+      cancelled: t('cancelledLabel')
     }
     return statusMap[status] || status
   }
 
   const handleGoToCheckout = () => {
     if (!selectedRestaurantId) {
-      alert('Không tìm thấy quán để đặt món')
+      alert(t('cannotFindRestaurantToOrder'))
       return
     }
 
     if (selectedItems.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 món trước khi tiếp tục')
+      alert(t('selectAtLeastOneItemBeforeContinue'))
       return
     }
 
@@ -188,9 +258,9 @@ function CustomerOrders() {
   const copyTransferContent = async () => {
     try {
       await navigator.clipboard.writeText(transferContent)
-      alert('Đã copy nội dung chuyển khoản demo')
+      alert(t('copiedTransferContent'))
     } catch {
-      alert(`Nội dung chuyển khoản: ${transferContent}`)
+      alert(`${t('transferContentLabel')}: ${transferContent}`)
     }
   }
 
@@ -198,27 +268,27 @@ function CustomerOrders() {
     event.preventDefault()
 
     if (!selectedRestaurantId) {
-      alert('Vui lòng chọn quán')
+      alert(t('selectRestaurantFirst'))
       return
     }
 
     if (selectedItems.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 món')
+      alert(t('selectAtLeastOneItem'))
       return
     }
 
     if (orderType === 'delivery' && !deliveryAddress.trim()) {
-      alert('Vui lòng nhập địa chỉ giao hàng')
+      alert(t('inputDeliveryAddressRequired'))
       return
     }
 
     if (orderType === 'delivery' && deliveryAddress.trim().length < 5) {
-      alert('Địa chỉ giao hàng quá ngắn')
+      alert(t('deliveryAddressTooShort'))
       return
     }
 
     if (paymentMethod === 'online_demo' && !transferConfirmed) {
-      alert('Vui lòng hoàn thành bước chuyển khoản demo trước khi tạo đơn')
+      alert(t('finishTransferBeforeOrder'))
       return
     }
 
@@ -244,10 +314,10 @@ function CustomerOrders() {
 
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Không thể tạo đơn hàng')
+        throw new Error(data.error || t('cannotCreateOrder'))
       }
 
-      alert('Đặt món thành công! Chủ quán sẽ xử lý đơn sớm nhất.')
+      alert(t('orderSuccessMessage'))
       setQuantities({})
       setDeliveryAddress('')
       setNote('')
@@ -264,29 +334,42 @@ function CustomerOrders() {
   }
 
   if (loading) {
-    return <div style={styles.loading}>Đang tải trang đặt món...</div>
+    return <div style={styles.loading}>{t('loadingOrderPage')}</div>
   }
 
   return (
     <div style={styles.page}>
       <div style={styles.headerRow}>
-        <h1 style={styles.title}>🧾 Đặt Món {selectedRestaurant ? `- ${selectedRestaurant.name}` : ''}</h1>
-        <button style={styles.backButton} onClick={() => navigate('/customer')}>
-          ← Về bản đồ
-        </button>
+        <h1 style={styles.title}>
+          🧾 {selectedRestaurant ? t('orderForRestaurant', { name: translateDynamicText(selectedRestaurant.name) }) : t('orderFood')}
+        </h1>
+        <div style={styles.headerActions}>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={styles.languageSelect}
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
+          </select>
+          <button style={styles.backButton} onClick={() => navigate('/customer')}>
+            ← {t('backToMapArrow')}
+          </button>
+        </div>
       </div>
 
       <div style={styles.grid}>
         <section style={styles.card}>
-          <h3>Tạo đơn mới</h3>
+          <h3>{t('createNewOrder')}</h3>
 
           {!isRestaurantLocked && (
             <label style={styles.formField}>
-              Chọn quán
+              {t('chooseRestaurant')}
               <select value={selectedRestaurantId} onChange={handleRestaurantChange} required>
                 {restaurants.map((restaurant) => (
                   <option key={restaurant.id} value={restaurant.id}>
-                    {restaurant.name}
+                    {translateDynamicText(restaurant.name)}
                   </option>
                 ))}
               </select>
@@ -294,20 +377,20 @@ function CustomerOrders() {
           )}
 
           <div style={styles.stepRow}>
-            <div style={checkoutStep === 1 ? styles.activeStepChip : styles.stepChip}>1. Chọn món</div>
-            <div style={checkoutStep === 2 ? styles.activeStepChip : styles.stepChip}>2. Nhận món và thanh toán</div>
+            <div style={checkoutStep === 1 ? styles.activeStepChip : styles.stepChip}>1. {t('chooseDish')}</div>
+            <div style={checkoutStep === 2 ? styles.activeStepChip : styles.stepChip}>2. {t('receiveAndPayment')}</div>
           </div>
 
           {checkoutStep === 1 && (
             <div style={styles.form}>
               <div>
-                <div style={styles.subTitle}>Menu quán</div>
-                {(selectedRestaurant?.menu || []).length === 0 && <p>Quán này chưa có menu.</p>}
+                <div style={styles.subTitle}>{t('menuOfRestaurant')}</div>
+                {(selectedRestaurant?.menu || []).length === 0 && <p>{t('noMenuYet')}</p>}
                 <div style={styles.menuList}>
                   {(selectedRestaurant?.menu || []).map((item) => (
                     <div key={item.id} style={styles.menuRow}>
                       <div>
-                        <strong>{item.name}</strong>
+                        <strong>{translateDynamicText(item.name)}</strong>
                         <div style={styles.price}>{formatCurrency(item.price)}</div>
                       </div>
                       <input
@@ -323,13 +406,13 @@ function CustomerOrders() {
               </div>
 
               <div style={styles.totalsBox}>
-                <div>Tạm tính: <strong>{formatCurrency(subtotal)}</strong></div>
-                <div>Phí nền tảng demo (~10%): <strong>{formatCurrency(commission)}</strong></div>
-                <div>Tổng thanh toán dự kiến: <strong>{formatCurrency(total)}</strong></div>
+                <div>{t('subtotal')}: <strong>{formatCurrency(subtotal)}</strong></div>
+                <div>{t('platformFee')}: <strong>{formatCurrency(commission)}</strong></div>
+                <div>{t('estimatedTotal')}: <strong>{formatCurrency(total)}</strong></div>
               </div>
 
               <button type="button" onClick={handleGoToCheckout} disabled={selectedItems.length === 0} style={styles.submitButton}>
-                Tiếp tục chọn nhận món và thanh toán
+                {t('continueCheckout')}
               </button>
             </div>
           )}
@@ -337,14 +420,14 @@ function CustomerOrders() {
           {checkoutStep === 2 && (
             <form onSubmit={handleSubmitOrder} style={styles.form}>
               <div>
-                <div style={styles.subTitle}>Hình thức nhận món</div>
+                <div style={styles.subTitle}>{t('receiveMethod')}</div>
                 <label style={styles.radioLine}>
                   <input
                     type="radio"
                     checked={orderType === 'pickup'}
                     onChange={() => setOrderType('pickup')}
                   />
-                  Tới quán ăn (Pickup)
+                  {t('pickupAtRestaurant')}
                 </label>
                 <label style={styles.radioLine}>
                   <input
@@ -352,29 +435,29 @@ function CustomerOrders() {
                     checked={orderType === 'delivery'}
                     onChange={() => setOrderType('delivery')}
                   />
-                  Quán giao tận nơi (Delivery)
+                  {t('deliveryToAddress')}
                 </label>
               </div>
 
               {orderType === 'delivery' && (
                 <label style={styles.formField}>
-                  Địa chỉ giao hàng
+                  {t('deliveryAddress')}
                   <textarea
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
                     rows={3}
-                    placeholder="Nhập địa chỉ chi tiết"
+                    placeholder={t('deliveryAddressPlaceholder')}
                     required
                   />
                 </label>
               )}
 
               <div>
-                <div style={styles.subTitle}>Phương thức thanh toán</div>
+                <div style={styles.subTitle}>{t('paymentMethod')}</div>
                 {orderType === 'delivery' ? (
                   <label style={styles.radioLine}>
                     <input type="radio" checked readOnly />
-                    Thanh toán nền tảng online (bắt buộc cho delivery)
+                    {t('onlineRequiredForDelivery')}
                   </label>
                 ) : (
                   <>
@@ -384,7 +467,7 @@ function CustomerOrders() {
                         checked={paymentMethod === 'cod'}
                         onChange={() => setPaymentMethod('cod')}
                       />
-                      Trả khi nhận món tại quán (COD)
+                      {t('codAtPickup')}
                     </label>
                     <label style={styles.radioLine}>
                       <input
@@ -392,7 +475,7 @@ function CustomerOrders() {
                         checked={paymentMethod === 'online_demo'}
                         onChange={() => setPaymentMethod('online_demo')}
                       />
-                      Thanh toán nền tảng online
+                      {t('onlinePlatformPayment')}
                     </label>
                   </>
                 )}
@@ -400,15 +483,15 @@ function CustomerOrders() {
 
               {paymentMethod === 'online_demo' && (
                 <div style={styles.transferBox}>
-                  <div style={styles.transferTitle}>Chuyển khoản demo</div>
-                  <div>Ngân hàng: <strong>MB Bank (Demo)</strong></div>
-                  <div>Số tài khoản: <strong>0123456789</strong></div>
-                  <div>Chủ tài khoản: <strong>NEARBITE DEMO</strong></div>
-                  <div>Số tiền: <strong>{formatCurrency(total)}</strong></div>
+                  <div style={styles.transferTitle}>{t('transferDemo')}</div>
+                  <div>{t('bankLabel')}: <strong>MB Bank (Demo)</strong></div>
+                  <div>{t('accountNumberLabel')}: <strong>0123456789</strong></div>
+                  <div>{t('accountNameLabel')}: <strong>NEARBITE DEMO</strong></div>
+                  <div>{t('amountLabel')}: <strong>{formatCurrency(total)}</strong></div>
                   <div>
-                    Nội dung: <strong>{transferContent}</strong>
+                    {t('transferContentLabel')}: <strong>{transferContent}</strong>
                     <button type="button" onClick={copyTransferContent} style={styles.copyButton}>
-                      Copy
+                      {t('copyButton')}
                     </button>
                   </div>
                   <label style={styles.confirmLine}>
@@ -417,37 +500,37 @@ function CustomerOrders() {
                       checked={transferConfirmed}
                       onChange={(e) => setTransferConfirmed(e.target.checked)}
                     />
-                    Tôi đã chuyển khoản thành công (demo)
+                    {t('transferConfirmedDemo')}
                   </label>
                 </div>
               )}
 
               <label style={styles.formField}>
-                Ghi chú đơn hàng
+                {t('orderNote')}
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
-                  placeholder="Ví dụ: ít cay, thêm đũa..."
+                  placeholder={t('orderNotePlaceholder')}
                 />
               </label>
 
               <div style={styles.totalsBox}>
-                <div>Tạm tính: <strong>{formatCurrency(subtotal)}</strong></div>
-                <div>Phí nền tảng demo (~10%): <strong>{formatCurrency(commission)}</strong></div>
-                <div>Tổng thanh toán: <strong>{formatCurrency(total)}</strong></div>
+                <div>{t('subtotal')}: <strong>{formatCurrency(subtotal)}</strong></div>
+                <div>{t('platformFee')}: <strong>{formatCurrency(commission)}</strong></div>
+                <div>{t('totalPayment')}: <strong>{formatCurrency(total)}</strong></div>
               </div>
 
               <div style={styles.actionRow}>
                 <button type="button" style={styles.secondaryButton} onClick={() => setCheckoutStep(1)}>
-                  ← Quay lại chọn món
+                  ← {t('backToChooseDish')}
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || selectedItems.length === 0 || (paymentMethod === 'online_demo' && !transferConfirmed)}
                   style={styles.submitButton}
                 >
-                  {submitting ? 'Đang gửi đơn...' : 'Xác nhận đặt món'}
+                  {submitting ? t('sendingOrder') : t('confirmOrder')}
                 </button>
               </div>
             </form>
@@ -455,26 +538,26 @@ function CustomerOrders() {
         </section>
 
         <section style={styles.card}>
-          <h3>Lịch sử đơn hàng</h3>
+          <h3>{t('orderHistory')}</h3>
           {historyError && <p style={styles.warningText}>{historyError}</p>}
-          {!historyError && orderHistory.length === 0 && <p>Bạn chưa có đơn hàng nào.</p>}
+          {!historyError && orderHistory.length === 0 && <p>{t('noOrdersYet')}</p>}
           <div style={styles.historyList}>
             {orderHistory.map((order) => (
               <article key={order.id} style={styles.historyItem}>
                 <div style={styles.historyTop}>
-                  <strong>#{order.id} - {order.restaurant_name || `Quán #${order.restaurant_id}`}</strong>
+                  <strong>#{order.id} - {translateDynamicText(order.restaurant_name) || `Quán #${order.restaurant_id}`}</strong>
                   <span>{getOrderStatusLabel(order.order_status)}</span>
                 </div>
-                <div>Loại đơn: {order.order_type === 'delivery' ? 'Giao hàng' : 'Đặt trước'}</div>
-                <div>Thanh toán: {order.payment_status === 'paid_demo' ? 'Online demo' : 'COD chờ thu'}</div>
-                {order.delivery_address && <div>Địa chỉ: {order.delivery_address}</div>}
-                <div>Món:</div>
+                <div>{t('orderType')}: {order.order_type === 'delivery' ? t('deliveryLabel') : t('pickupLabel')}</div>
+                <div>{t('payment')}: {order.payment_status === 'paid_demo' ? t('onlineDemoPaid') : t('codPending')}</div>
+                {order.delivery_address && <div>{t('deliveryAddress')}: {order.delivery_address}</div>}
+                <div>{t('dishes')}:</div>
                 <ul style={styles.itemList}>
                   {(order.items || []).map((item) => (
-                    <li key={item.id}>{item.item_name} x{item.quantity} - {formatCurrency(item.line_total)}</li>
+                    <li key={item.id}>{translateDynamicText(item.item_name)} x{item.quantity} - {formatCurrency(item.line_total)}</li>
                   ))}
                 </ul>
-                <div>Tổng: <strong>{formatCurrency(order.total_amount)}</strong></div>
+                <div>{t('totalPayment')}: <strong>{formatCurrency(order.total_amount)}</strong></div>
               </article>
             ))}
           </div>
@@ -498,6 +581,20 @@ const styles = {
   },
   title: {
     margin: 0
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+  languageSelect: {
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '2px solid #ddd',
+    background: '#fff',
+    minWidth: '110px',
+    fontSize: '13px',
+    cursor: 'pointer'
   },
   backButton: {
     padding: '10px 14px',

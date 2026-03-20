@@ -37,6 +37,9 @@ function AdminLogin({
 
   return (
     <div className="container">
+      <button type="button" onClick={() => navigate('/owner/login')} style={{ marginBottom: '16px' }}>
+        ← Quay lại đăng nhập chủ quán
+      </button>
       <h1>{title}</h1>
       <form onSubmit={handleLogin}>
         <input

@@ -31,9 +31,14 @@ CORS(
     app,
     resources={r"/*": {
         "origins": [
-            "http://127.0.0.1:5500",
-            "http://localhost:5500",
+            # Local development
+            "http://127.0.0.1:5000",
+            "http://localhost:5000",
+            "http://127.0.0.1:5173",
             "http://localhost:5173",
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+            # Production
             "https://nearbite.vercel.app",
             r"https://.*\.vercel\.app"
         ]
@@ -64,7 +69,7 @@ def handle_preflight():
         return response, 200
 
 # Tự động detect môi trường production (HTTPS)
-is_production = os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_STATIC_URL")
+is_production = bool(os.getenv("RENDER"))
 
 app.config.update(
     SESSION_COOKIE_SAMESITE="None" if is_production else "Lax",
@@ -92,7 +97,34 @@ if auto_create_tables:
 
 @app.route("/")
 def home():
+    # Serve index.html for SPA routing
+    frontend_index = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist', 'index.html')
+    if os.path.exists(frontend_index):
+        return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'), 'index.html')
     return jsonify({"status": "ok"})
+
+@app.route("/<path:path>")
+def serve_frontend(path):
+    # Serve frontend static files
+    frontend_dist = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
+    file_path = os.path.join(frontend_dist, path)
+    
+    # Security: prevent directory traversal
+    try:
+        file_path = os.path.abspath(file_path)
+        if not file_path.startswith(os.path.abspath(frontend_dist)):
+            return jsonify({"error": "Not Found"}), 404
+    except:
+        return jsonify({"error": "Not Found"}), 404
+    
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(frontend_dist, path)
+    
+    # Fallback to index.html for SPA routing
+    if os.path.exists(os.path.join(frontend_dist, 'index.html')):
+        return send_from_directory(frontend_dist, 'index.html')
+    
+    return jsonify({"error": "Not Found"}), 404
 
 @app.route("/admin/login", methods=["POST"])
 def login():

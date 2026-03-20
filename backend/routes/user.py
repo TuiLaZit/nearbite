@@ -1,7 +1,7 @@
 from flask import request, jsonify, session
 from models import Restaurant, Tag, LocationVisit, MenuItem, Order, OrderItem, db
 from services import calculate_distance, generate_narration
-from translate import translate_text, LANGUAGE_LABELS
+from translate import translate_text, translate_texts, LANGUAGE_LABELS
 from tts import text_to_speech
 from sqlalchemy import and_, or_
 from datetime import datetime
@@ -41,63 +41,42 @@ def register_user_routes(app):
                 "status": "success",
                 "translations": {text: text for text in texts}
             })
-        
-        # Batch dịch - gộp tất cả texts vào một string, dịch 1 lần
+
+        # Dịch theo batch để phản hồi nhanh hơn, vẫn bảo toàn placeholders.
         try:
-            # Bảo vệ placeholders {variable} trước khi dịch
             import re
-            import uuid
             placeholder_pattern = re.compile(r'\{([^}]+)\}')
-            
-            # Lưu mapping placeholders
-            placeholder_map = {}
+
             protected_texts = []
-            
+            placeholder_maps = []
+            original_texts = []
+
+            translations = {}
             for text in texts:
-                # Thay thế {placeholder} bằng __PHXX__ (XX là index)
+                local_placeholder_map = {}
+
                 def replace_placeholder(match):
-                    placeholder_id = f"__PH{len(placeholder_map)}__"
-                    placeholder_map[placeholder_id] = match.group(0)  # Lưu {count}, {variable}...
+                    placeholder_id = f"__PH_{len(local_placeholder_map)}__"
+                    local_placeholder_map[placeholder_id] = match.group(0)
                     return placeholder_id
-                
+
                 protected_text = placeholder_pattern.sub(replace_placeholder, text)
                 protected_texts.append(protected_text)
-            
-            # Dùng separator với UUID để tránh bị dịch
-            separator_id = str(uuid.uuid4())[:8]
-            separator = f"\n<<<{separator_id}>>>\n"
-            combined_text = separator.join(protected_texts)
-            
-            # Dịch 1 lần duy nhất
-            translated_combined = translate_text(combined_text, target_lang)
-            
-            # Tách lại thành array - thử nhiều cách
-            translated_parts = translated_combined.split(separator)
-            
-            # Nếu separator bị thay đổi, thử fallback
-            if len(translated_parts) != len(texts):
-                # Thử split bằng các biến thể khác
-                for alt_sep in [f"\n<<< {separator_id} >>>\n", f"<<< {separator_id} >>>", separator_id]:
-                    translated_parts = translated_combined.split(alt_sep)
-                    if len(translated_parts) == len(texts):
-                        break
-            
-            # Khôi phục placeholders và map lại với original texts
-            translations = {}
-            for i, text in enumerate(texts):
-                if i < len(translated_parts):
-                    translated_text = translated_parts[i].strip()
-                    # Khôi phục các placeholders
-                    for placeholder_id, original_placeholder in placeholder_map.items():
-                        translated_text = translated_text.replace(placeholder_id, original_placeholder)
-                    translations[text] = translated_text
-                else:
-                    translations[text] = text  # Fallback
-                    
+                placeholder_maps.append(local_placeholder_map)
+                original_texts.append(text)
+
+            translated_batch = translate_texts(protected_texts, target_lang)
+
+            for idx, translated_text in enumerate(translated_batch):
+                restored_text = translated_text or original_texts[idx]
+                for placeholder_id, original_placeholder in placeholder_maps[idx].items():
+                    restored_text = restored_text.replace(placeholder_id, original_placeholder)
+
+                translations[original_texts[idx]] = restored_text
+
         except Exception as e:
             import traceback
             traceback.print_exc()
-            # Fallback: trả về text gốc
             translations = {text: text for text in texts}
         
         return jsonify({

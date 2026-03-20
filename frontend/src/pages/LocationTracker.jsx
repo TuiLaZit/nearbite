@@ -5,6 +5,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
+import { useAppLanguage } from '../hooks/useAppLanguage'
 
 // Fix cho Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl
@@ -63,10 +64,7 @@ function MapUpdater({ center }) {
 function LocationTracker() {
   const navigate = useNavigate()
   const [isTracking, setIsTracking] = useState(false)
-  const [language, setLanguage] = useState(() => {
-    const saved = localStorage.getItem('language')
-    return saved || 'vi'
-  })
+  const { language, setLanguage } = useAppLanguage()
   const { t, loading: translationLoading } = useTranslation(language)
   const [languages, setLanguages] = useState([]) // Fetch từ API
   const [userLocation, setUserLocation] = useState(null)
@@ -75,6 +73,9 @@ function LocationTracker() {
   const [currentNarration, setCurrentNarration] = useState(null)
   const [currentDistance, setCurrentDistance] = useState(null) // State riêng cho distance
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
+  const [isPoiMenuModalOpen, setIsPoiMenuModalOpen] = useState(false)
+  const [translatedPoiMenu, setTranslatedPoiMenu] = useState({})
+  const [isTranslatingPoiMenu, setIsTranslatingPoiMenu] = useState(false)
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
     const saved = localStorage.getItem('narrationPanelCollapsed')
     return saved === 'true'
@@ -97,7 +98,6 @@ function LocationTracker() {
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
     languageRef.current = language
-    localStorage.setItem('language', language)
   }, [language])
 
   // Lưu state collapse panel
@@ -271,7 +271,8 @@ function LocationTracker() {
               narration: data.out_of_range_message,
               audioUrl: null,
               tags: data.nearest_place.tags || [],
-              images: data.nearest_place.images || []
+              images: data.nearest_place.images || [],
+              menu: data.nearest_place.menu || []
             })
             setCurrentDistance(distance)
             poiEntryTimeRef.current = null
@@ -299,7 +300,8 @@ function LocationTracker() {
               narration: data.narration,
               audioUrl: data.audio_url,
               tags: data.nearest_place.tags || [],
-              images: data.nearest_place.images || []
+              images: data.nearest_place.images || [],
+              menu: data.nearest_place.menu || []
             })
             setCurrentDistance(distance)
 
@@ -380,7 +382,8 @@ function LocationTracker() {
               narration: data.narration,
               audioUrl: data.audio_url,
               tags: data.nearest_place.tags || [],
-              images: data.nearest_place.images || []
+              images: data.nearest_place.images || [],
+              menu: data.nearest_place.menu || []
             })
             setCurrentDistance(distance)
 
@@ -559,7 +562,7 @@ function LocationTracker() {
   // Bắt đầu tracking
   const startTracking = () => {
     if (!navigator.geolocation) {
-      alert('Trình duyệt không hỗ trợ GPS')
+      alert(t('gpsNotSupported'))
       return
     }
 
@@ -573,7 +576,7 @@ function LocationTracker() {
       },
       (error) => {
         console.error('Geolocation error:', error)
-        alert('Không thể lấy vị trí GPS. Vui lòng bật GPS và cho phép truy cập.')
+        alert(t('gpsPermissionError'))
       }
     )
   }
@@ -632,8 +635,7 @@ function LocationTracker() {
     // Set flag đang đổi ngôn ngữ để skip cooldown tracking
     isChangingLanguageRef.current = true
     
-    // Lưu vào localStorage và update state
-    localStorage.setItem('language', newLang)
+    // Update ngôn ngữ global và state trang hiện tại
     setLanguage(newLang)
     languageRef.current = newLang // Update ref ngay lập tức
 
@@ -741,6 +743,44 @@ function LocationTracker() {
             error: true
           })
         })
+    }
+  }
+
+  const openPoiMenuModal = async () => {
+    if (!currentNarration?.menu?.length) {
+      setIsPoiMenuModalOpen(true)
+      setTranslatedPoiMenu({})
+      return
+    }
+
+    if (language === 'vi') {
+      setTranslatedPoiMenu({})
+      setIsPoiMenuModalOpen(true)
+      return
+    }
+
+    setIsTranslatingPoiMenu(true)
+    setIsPoiMenuModalOpen(true)
+
+    try {
+      const texts = [currentNarration.name, ...currentNarration.menu.map(item => item.name)].filter(Boolean)
+
+      const response = await fetch(`${BASE_URL}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts, target_lang: language })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data.status !== 'success') {
+        return
+      }
+
+      setTranslatedPoiMenu(data.translations || {})
+    } catch {
+      // Ignore translation failures and keep original menu text.
+    } finally {
+      setIsTranslatingPoiMenu(false)
     }
   }
 
@@ -855,7 +895,7 @@ function LocationTracker() {
             cursor: 'pointer'
           }}
         >
-          🚪 Đăng xuất
+          🚪 {t('logout')}
         </button>
       </div>
 
@@ -878,7 +918,7 @@ function LocationTracker() {
           {userLocation && (
             <Marker position={userLocation} icon={userIcon}>
               <Popup>
-                <strong>📍 {t('yourLocation')}</strong>
+                <strong>📍 {t('currentLocation')}</strong>
               </Popup>
             </Marker>
           )}
@@ -976,19 +1016,19 @@ function LocationTracker() {
                         {selectedRestaurant.loading ? (
                           <div style={{ margin: '10px 0', textAlign: 'center', padding: '15px' }}>
                             <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
-                            <p style={{ fontSize: '13px', color: '#666' }}>Đang tải thông tin...</p>
+                            <p style={{ fontSize: '13px', color: '#666' }}>{t('loadingRestaurantInfo')}</p>
                           </div>
                         ) : selectedRestaurant.error ? (
                           <div style={{ margin: '10px 0', padding: '10px', background: '#ffebee', borderRadius: '5px' }}>
                             <p style={{ fontSize: '13px', color: '#c62828', margin: 0 }}>
-                              ⚠️ Không thể tải thông tin. Vui lòng thử lại.
+                              ⚠️ {t('loadRestaurantInfoFailed')}
                             </p>
                           </div>
                         ) : (
                           <>
                             {selectedRestaurant.distance !== undefined && (
                               <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
-                                📍 Khoảng cách: {selectedRestaurant.distance.toFixed(3)} km
+                                📍 {t('yourDistance')}: {selectedRestaurant.distance.toFixed(3)} {t('km')}
                               </p>
                             )}
                             {selectedRestaurant.narration && (
@@ -1012,7 +1052,7 @@ function LocationTracker() {
                                     minWidth: '100px'
                                   }}
                                 >
-                                  {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe'}
+                                  {isAudioPlaying ? `⏹ ${t('stopButton')}` : `🔊 ${t('listenButton')}`}
                                 </button>
                               )}
                               <button
@@ -1029,7 +1069,7 @@ function LocationTracker() {
                                   minWidth: '100px'
                                 }}
                               >
-                                🧭 Chỉ đường
+                                🧭 {t('directionButton')}
                               </button>
                               <button
                                 onClick={() => navigate(`/customer/orders/${selectedRestaurant.id}`)}
@@ -1045,7 +1085,7 @@ function LocationTracker() {
                                   minWidth: '100px'
                                 }}
                               >
-                                🧾 Đặt món
+                                🧾 {t('orderFood')}
                               </button>
                             </div>
                           </>
@@ -1082,7 +1122,7 @@ function LocationTracker() {
             marginBottom: '15px'
           }}
         >
-          {isTracking ? '⏹ Dừng theo dõi' : '▶️ Bắt đầu theo dõi'}
+          {isTracking ? `⏹ ${t('stopTracking')}` : `▶️ ${t('startTracking')}`}
         </button>
 
         {/* Thông tin quán hiện tại */}
@@ -1212,29 +1252,121 @@ function LocationTracker() {
             <p style={{ margin: '8px 0', fontSize: '14px' }}>{currentNarration.narration}</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', gap: '10px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '13px', color: '#666' }}>
-                📍 {currentDistance?.toFixed(3) || '0.000'} km
+                📍 {t('yourDistance')}: {currentDistance?.toFixed(3) || '0.000'} {t('km')}
               </span>
-              {currentNarration.audioUrl && (
-                <button
-                  onClick={() => handleToggleAudio(`${BASE_URL}${currentNarration.audioUrl}`)}
-                  style={{
-                    padding: '8px 16px',
-                    background: isAudioPlaying ? '#EA4335' : '#4285F4',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  {isAudioPlaying ? '⏹ Dừng' : '🔊 Nghe thuyết minh'}
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {currentNarration.menu && currentNarration.menu.length > 0 && (
+                  <button
+                    onClick={openPoiMenuModal}
+                    style={{
+                      padding: '8px 14px',
+                      background: '#f59e0b',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    🍽️ {t('viewMenu')}
+                  </button>
+                )}
+                {currentNarration.audioUrl && (
+                  <button
+                    onClick={() => handleToggleAudio(`${BASE_URL}${currentNarration.audioUrl}`)}
+                    style={{
+                      padding: '8px 16px',
+                      background: isAudioPlaying ? '#EA4335' : '#4285F4',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {isAudioPlaying ? `⏹ ${t('stopButton')}` : `🔊 ${t('listenNarrationButton')}`}
+                  </button>
+                )}
+              </div>
             </div>
             </div>
           </div>
         )}
       </div>
+
+      {isPoiMenuModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2100,
+            padding: '16px'
+          }}
+          onClick={() => setIsPoiMenuModalOpen(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              background: '#fff',
+              borderRadius: '12px',
+              border: '1px solid #dbe4ef',
+              padding: '16px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0 }}>
+                🍜 {(translatedPoiMenu[currentNarration?.name] || currentNarration?.name)} - {t('menuAndPrice')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsPoiMenuModalOpen(false)}
+                style={{
+                  border: 'none',
+                  background: '#e2e8f0',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('close')}
+              </button>
+            </div>
+
+            {isTranslatingPoiMenu && <div style={{ marginBottom: '10px', color: '#64748b' }}>{t('loading')}</div>}
+
+            {(!currentNarration?.menu || currentNarration.menu.length === 0) && (
+              <p style={{ margin: 0 }}>{t('noMenuInPoi')}</p>
+            )}
+
+            <div style={{ display: 'grid', gap: '8px' }}>
+              {(currentNarration?.menu || []).map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <span>{translatedPoiMenu[item.name] || item.name}</span>
+                  <strong>{Number(item.price || 0).toLocaleString('vi-VN')}đ</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
