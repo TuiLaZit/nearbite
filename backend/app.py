@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 from db import db
+from sqlalchemy import inspect, text
 import os
 import re
 import threading
@@ -125,9 +126,12 @@ def _start_translation_prewarm_worker():
             return
 
     enabled_env = (os.getenv("PREWARM_TRANSLATIONS") or "").strip().lower()
-    # Default behavior: enabled for both local and production.
-    # Set PREWARM_TRANSLATIONS=false to disable explicitly.
+    # Default behavior:
+    # - production: enabled
+    # - local: disabled (can opt-in by PREWARM_TRANSLATIONS=true)
     if enabled_env in {"0", "false", "no", "off"}:
+        return
+    if not is_production and enabled_env not in {"1", "true", "yes", "on"}:
         return
 
     langs_env = (os.getenv("PREWARM_LANGS") or "").strip()
@@ -179,6 +183,31 @@ else:
 if auto_create_tables:
     with app.app_context():
         db.create_all()
+
+
+def _ensure_local_schema_compatibility():
+    """Best-effort local schema patching for drift between models and DB."""
+    if is_production:
+        return
+
+    try:
+        inspector = inspect(db.engine)
+        tables = set(inspector.get_table_names())
+        if "admin_user" not in tables:
+            return
+
+        columns = {col["name"] for col in inspector.get_columns("admin_user")}
+        if "password_hash" not in columns:
+            db.session.execute(text("ALTER TABLE admin_user ADD COLUMN password_hash VARCHAR(255)"))
+            db.session.commit()
+            print("[local-schema] Added missing column admin_user.password_hash")
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[local-schema] Compatibility patch skipped: {exc}")
+
+
+with app.app_context():
+    _ensure_local_schema_compatibility()
 
 
 @app.route("/")

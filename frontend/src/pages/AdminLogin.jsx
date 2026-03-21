@@ -242,6 +242,25 @@ function AdminLogin({
           padding: 10px 12px;
         }
 
+        .back-button {
+          margin-top: 0;
+          margin-bottom: 14px;
+          padding: 10px 14px;
+          background: rgba(18, 32, 54, 0.08);
+          color: #122036;
+          border: 1px solid #cad6e3;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 600;
+          box-shadow: none;
+        }
+
+        .back-button:hover {
+          background: rgba(18, 32, 54, 0.12);
+          transform: none;
+          filter: none;
+        }
+
         button {
           margin-top: 8px;
           padding: 14px 16px;
@@ -309,6 +328,10 @@ function AdminLogin({
           </aside>
 
           <div className="login-card">
+            <button type="button" className="back-button" onClick={() => navigate('/login')}>
+              ← Quay lại đăng nhập khách/chủ quán
+            </button>
+
             <div className="header">
               <svg className="shield-icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>

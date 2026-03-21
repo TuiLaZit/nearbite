@@ -113,6 +113,9 @@ export const useTranslation = (language) => {
       const translatedUpdates = {}
       Object.entries(textToKeys).forEach(([viText, mappedKeys]) => {
         const translatedText = (data.translations || {})[viText] || viText
+        if (translatedText === viText) {
+          return
+        }
         mappedKeys.forEach((key) => {
           translatedUpdates[key] = translatedText
         })

@@ -56,6 +56,17 @@ _CACHE_SAVE_EVERY = 20
 _pending_cache_writes = 0
 
 
+def _is_valid_translated_value(target_lang, original_text, translated_text):
+    if target_lang == "vi":
+        return True
+    if translated_text is None:
+        return False
+    value = str(translated_text).strip()
+    if not value:
+        return False
+    return value != str(original_text).strip()
+
+
 def _load_cache_from_disk():
     if not os.path.exists(_CACHE_FILE):
         return
@@ -65,7 +76,17 @@ def _load_cache_from_disk():
             data = json.load(f)
 
         if isinstance(data, dict):
-            _TRANSLATION_CACHE.update(data)
+            cleaned = {}
+            for cache_key, translated_value in data.items():
+                try:
+                    lang, original_text = cache_key.split("::", 1)
+                except ValueError:
+                    continue
+
+                if _is_valid_translated_value(lang, original_text, translated_value):
+                    cleaned[cache_key] = translated_value
+
+            _TRANSLATION_CACHE.update(cleaned)
     except Exception:
         # Ignore cache load errors and continue with empty in-memory cache.
         pass
@@ -101,6 +122,9 @@ def _cache_get(target_lang, text):
 
 
 def _cache_set(target_lang, text, translated):
+    if not _is_valid_translated_value(target_lang, text, translated):
+        return
+
     global _pending_cache_writes
     key = _cache_key(target_lang, text)
     with _CACHE_LOCK:
@@ -147,7 +171,7 @@ def translate_text(text, target_lang):
             _SINGLE_TIMEOUT_SECONDS
         )
 
-        if translated:
+        if _is_valid_translated_value(mapped_lang, text, translated):
             _cache_set(mapped_lang, text, translated)
             return translated
         return text
@@ -190,7 +214,8 @@ def translate_texts(texts, target_lang):
 
                 for j, original in enumerate(chunk):
                     translated_value = translated_chunk[j] if translated_chunk[j] else original
-                    _cache_set(mapped_lang, original, translated_value)
+                    if _is_valid_translated_value(mapped_lang, original, translated_value):
+                        _cache_set(mapped_lang, original, translated_value)
 
             _save_cache_to_disk(force=True)
 
@@ -243,7 +268,8 @@ def prewarm_translation_cache(texts, target_langs):
                     break
 
             # Always write something to cache to avoid repeated cold misses.
-            _cache_set(mapped_lang, text, translated_value or text)
+            if _is_valid_translated_value(mapped_lang, text, translated_value):
+                _cache_set(mapped_lang, text, translated_value)
 
     if langs:
         with ThreadPoolExecutor(max_workers=min(_PREWARM_LANG_WORKERS, len(langs))) as executor:
