@@ -4,7 +4,8 @@ import { TRANSLATION_KEYS } from '../translationKeys'
 
 const CACHE_KEY = 'translation_cache'
 const CACHE_EXPIRY = 30 * 24 * 60 * 60 * 1000 // 30 days
-const CACHE_VERSION = `v4-${Object.keys(TRANSLATION_KEYS).length}`
+const CACHE_VERSION = `v5-${Object.keys(TRANSLATION_KEYS).length}`
+const TRANSLATE_TIMEOUT_MS = 6000
 
 const hasAllTranslationKeys = (translations) => {
   if (!translations || typeof translations !== 'object') return false
@@ -87,16 +88,22 @@ export const useTranslation = (language) => {
 
     if (!texts.length) return
 
+    let timeoutId = null
     try {
       setLoading(true)
+      const controller = new AbortController()
+      timeoutId = setTimeout(() => controller.abort(), TRANSLATE_TIMEOUT_MS)
       const response = await fetch(`${BASE_URL}/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           texts,
           target_lang: language
         })
       })
+      clearTimeout(timeoutId)
+      timeoutId = null
 
       const data = await response.json().catch(() => ({}))
       if (!response.ok || data.status !== 'success') {
@@ -121,6 +128,9 @@ export const useTranslation = (language) => {
     } catch (error) {
       // Keep Vietnamese fallback when request fails.
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
       setLoading(false)
     }
   }, [language])
@@ -154,9 +164,14 @@ export const useTranslation = (language) => {
         return
       }
 
+      // Reset về tiếng Việt trước để tránh giữ text từ ngôn ngữ trước đó.
+      const baseTranslations = { ...TRANSLATION_KEYS }
+
       // Nếu cache có một phần thì hiển thị ngay để UX mượt.
       if (cache[language]?.translations) {
-        setTranslations((prev) => ({ ...prev, ...cache[language].translations }))
+        setTranslations({ ...baseTranslations, ...cache[language].translations })
+      } else {
+        setTranslations(baseTranslations)
       }
       setLoading(false)
     }

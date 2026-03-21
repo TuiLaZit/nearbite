@@ -5,8 +5,89 @@ from translate import translate_text, translate_texts, LANGUAGE_LABELS
 from tts import text_to_speech
 from sqlalchemy import and_, or_
 from datetime import datetime
+from threading import Lock
+import copy
+import hashlib
+import json
 import os
 import secrets
+
+
+_RESTAURANT_TRANSLATION_CACHE = {}
+_RESTAURANT_CACHE_LOCK = Lock()
+_RESTAURANT_CACHE_MAX_ITEMS = 5000
+
+
+def _cache_restaurant_payload(signature, payload):
+    with _RESTAURANT_CACHE_LOCK:
+        if len(_RESTAURANT_TRANSLATION_CACHE) >= _RESTAURANT_CACHE_MAX_ITEMS:
+            _RESTAURANT_TRANSLATION_CACHE.clear()
+        _RESTAURANT_TRANSLATION_CACHE[signature] = payload
+
+
+def _get_restaurant_payload_from_cache(signature):
+    with _RESTAURANT_CACHE_LOCK:
+        cached = _RESTAURANT_TRANSLATION_CACHE.get(signature)
+    return copy.deepcopy(cached) if cached is not None else None
+
+
+def _build_restaurant_translation_signature(restaurant_data, target_lang):
+    source = json.dumps(
+        {"lang": target_lang, "restaurant": restaurant_data},
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def _translate_restaurant_data(restaurant_data, target_lang):
+    if target_lang == "vi":
+        return restaurant_data
+
+    signature = _build_restaurant_translation_signature(restaurant_data, target_lang)
+    cached = _get_restaurant_payload_from_cache(signature)
+    if cached is not None:
+        return cached
+
+    translated_payload = copy.deepcopy(restaurant_data)
+    text_refs = {}
+    texts = []
+
+    def track(text, setter):
+        if not text or not isinstance(text, str):
+            return
+        if text not in text_refs:
+            text_refs[text] = []
+            texts.append(text)
+        text_refs[text].append(setter)
+
+    track(translated_payload.get("name"), lambda value: translated_payload.__setitem__("name", value))
+    track(translated_payload.get("description"), lambda value: translated_payload.__setitem__("description", value))
+
+    for tag in translated_payload.get("tags", []) or []:
+        track(tag.get("name"), lambda value, tag=tag: tag.__setitem__("name", value))
+        track(tag.get("description"), lambda value, tag=tag: tag.__setitem__("description", value))
+
+    for item in translated_payload.get("menu", []) or []:
+        track(item.get("name"), lambda value, item=item: item.__setitem__("name", value))
+
+    for image in translated_payload.get("images", []) or []:
+        track(image.get("caption"), lambda value, image=image: image.__setitem__("caption", value))
+
+    if texts:
+        translated_texts = translate_texts(texts, target_lang)
+        translation_map = {}
+        for idx, original in enumerate(texts):
+            translation_map[original] = translated_texts[idx] if idx < len(translated_texts) else original
+
+        for original, setters in text_refs.items():
+            translated_value = translation_map.get(original, original) or original
+            for setter in setters:
+                setter(translated_value)
+
+    _cache_restaurant_payload(signature, translated_payload)
+    return copy.deepcopy(translated_payload)
 
 
 def register_user_routes(app):
@@ -87,10 +168,19 @@ def register_user_routes(app):
     @app.route("/restaurants", methods=["GET"])
     def get_restaurants():
         """Lấy danh sách tất cả quán đang active với tags và images"""
+        target_lang = request.args.get('lang', 'vi')
         restaurants = Restaurant.query.filter_by(is_active=True).all()
+        restaurant_payloads = [r.to_dict(include_details=True) for r in restaurants]
+
+        if target_lang != 'vi':
+            restaurant_payloads = [
+                _translate_restaurant_data(payload, target_lang)
+                for payload in restaurant_payloads
+            ]
+
         return jsonify({
             "status": "success",
-            "restaurants": [r.to_dict(include_details=True) for r in restaurants]
+            "restaurants": restaurant_payloads
         })
 
     @app.route("/tags", methods=["GET"])
@@ -98,20 +188,34 @@ def register_user_routes(app):
         """Lấy danh sách tags với translation support (public endpoint)"""
         target_lang = request.args.get('lang', 'vi')
         tags = Tag.query.all()
-        
-        tags_data = []
-        for tag in tags:
-            tag_dict = tag.to_dict()
-            
-            # Dịch tag name nếu không phải tiếng Việt
-            if target_lang != 'vi' and tag.name:
-                try:
-                    tag_dict['name'] = translate_text(tag.name, target_lang)
-                except Exception as e:
-                    # Giữ nguyên tiếng Việt nếu lỗi
-                    pass
-            
-            tags_data.append(tag_dict)
+
+        tags_data = [tag.to_dict() for tag in tags]
+
+        if target_lang != 'vi':
+            texts = []
+            refs = {}
+
+            for idx, tag in enumerate(tags_data):
+                for field in ('name', 'description'):
+                    value = tag.get(field)
+                    if not value:
+                        continue
+                    if value not in refs:
+                        refs[value] = []
+                        texts.append(value)
+                    refs[value].append((idx, field))
+
+            if texts:
+                translated = translate_texts(texts, target_lang)
+                mapping = {
+                    original: translated[i] if i < len(translated) else original
+                    for i, original in enumerate(texts)
+                }
+
+                for original, positions in refs.items():
+                    translated_value = mapping.get(original, original) or original
+                    for idx, field in positions:
+                        tags_data[idx][field] = translated_value
         
         return jsonify({
             "status": "success",
@@ -149,18 +253,10 @@ def register_user_routes(app):
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
         out_of_range_msg = translate_text(out_of_range_msg_vi, language)
 
-        # Get restaurant data with translated tags
+        # Get restaurant data and reuse cached translation if unchanged.
         restaurant_data = nearest.to_dict(include_details=True)
-        
-        # Translate tag names if not Vietnamese
-        if language != 'vi' and 'tags' in restaurant_data:
-            for tag in restaurant_data['tags']:
-                if tag.get('name'):
-                    try:
-                        tag['name'] = translate_text(tag['name'], language)
-                    except Exception as e:
-                        # Keep original Vietnamese if translation fails
-                        pass
+        if language != 'vi':
+            restaurant_data = _translate_restaurant_data(restaurant_data, language)
 
         return jsonify({
             "status": "success",
