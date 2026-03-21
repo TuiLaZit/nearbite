@@ -64,6 +64,7 @@ function MapUpdater({ center }) {
 function LocationTracker() {
   const navigate = useNavigate()
   const [isTracking, setIsTracking] = useState(false)
+  const [customerAuthStatus, setCustomerAuthStatus] = useState('checking')
   const { language, setLanguage } = useAppLanguage()
   const { t, loading: translationLoading } = useTranslation(language)
   const [languages, setLanguages] = useState([]) // Fetch từ API
@@ -115,6 +116,27 @@ function LocationTracker() {
         }
       })
       .catch(err => console.error('Error fetching languages:', err))
+  }, [])
+
+  // Kiểm tra đăng nhập customer để bật/tắt tính năng nâng cao
+  useEffect(() => {
+    let isMounted = true
+
+    fetch(`${BASE_URL}/customer/check`, {
+      credentials: 'include'
+    })
+      .then((res) => {
+        if (!isMounted) return
+        setCustomerAuthStatus(res.ok ? 'authenticated' : 'guest')
+      })
+      .catch(() => {
+        if (!isMounted) return
+        setCustomerAuthStatus('guest')
+      })
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   // Fetch danh sách quán khi load
@@ -802,7 +824,8 @@ function LocationTracker() {
       method: 'POST',
       credentials: 'include'
     }).finally(() => {
-      navigate('/customer/login', { replace: true })
+      setCustomerAuthStatus('guest')
+      navigate('/', { replace: true })
     })
   }
 
@@ -819,6 +842,7 @@ function LocationTracker() {
   }, [])
 
   const mapCenter = userLocation || [10.760426862777551, 106.68198430250096] // Default: SGU area
+  const isCustomerAuthenticated = customerAuthStatus === 'authenticated'
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -845,23 +869,24 @@ function LocationTracker() {
           🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
         </div>
         
-        {/* Xếp Tour button */}
-        <button
-          onClick={() => navigate('/customer/tour-planner')}
-          style={{
-            padding: '10px 20px',
-            background: '#ff9800',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'background 0.2s'
-          }}
-        >
-          🗺️ {t('planTour')}
-        </button>
+        {isCustomerAuthenticated && (
+          <button
+            onClick={() => navigate('/customer/tour-planner')}
+            style={{
+              padding: '10px 20px',
+              background: '#ff9800',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+          >
+            🗺️ {t('planTour')}
+          </button>
+        )}
 
         {/* Language selector */}
         <select 
@@ -882,21 +907,39 @@ function LocationTracker() {
           ))}
         </select>
 
-        <button
-          onClick={handleCustomerLogout}
-          style={{
-            padding: '10px 16px',
-            background: '#ef4444',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          🚪 {t('logout')}
-        </button>
+        {isCustomerAuthenticated ? (
+          <button
+            onClick={handleCustomerLogout}
+            style={{
+              padding: '10px 16px',
+              background: '#ef4444',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            🚪 {t('logout')}
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate('/login')}
+            style={{
+              padding: '10px 16px',
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            🔐 Dang nhap
+          </button>
+        )}
       </div>
 
       {/* Leaflet Map */}
@@ -1071,22 +1114,24 @@ function LocationTracker() {
                               >
                                 🧭 {t('directionButton')}
                               </button>
-                              <button
-                                onClick={() => navigate(`/customer/orders/${selectedRestaurant.id}`)}
-                                style={{
-                                  padding: '8px 12px',
-                                  background: '#2563eb',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '5px',
-                                  cursor: 'pointer',
-                                  fontSize: '14px',
-                                  flex: '1',
-                                  minWidth: '100px'
-                                }}
-                              >
-                                🧾 {t('orderFood')}
-                              </button>
+                              {isCustomerAuthenticated && (
+                                <button
+                                  onClick={() => navigate(`/customer/orders/${selectedRestaurant.id}`)}
+                                  style={{
+                                    padding: '8px 12px',
+                                    background: '#2563eb',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    flex: '1',
+                                    minWidth: '100px'
+                                  }}
+                                >
+                                  🧾 {t('orderFood')}
+                                </button>
+                              )}
                             </div>
                           </>
                         )}
