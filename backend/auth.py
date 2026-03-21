@@ -25,31 +25,39 @@ def admin_login():
     email = (data.get("email") or "").strip().lower()
     password = data.get("password")
 
-    if not email:
-        return jsonify({"error": "Email không được để trống"}), 400
+    if not email or not password:
+        return jsonify({"error": "Email và mật khẩu không được để trống"}), 400
 
-    admin_password = os.getenv("ADMIN_PASSWORD", "dev")
-    admin_password_hash = generate_password_hash(admin_password)
-
-    if not password or not check_password_hash(admin_password_hash, password):
-        return jsonify({"error": "Unauthorized"}), 401
+    # Kiểm tra email và password từ database
+    db_admin = AdminUser.query.filter_by(email=email, is_active=True).first()
+    
+    if db_admin and db_admin.password_hash:
+        # Kiểm tra password từ database
+        if not check_password_hash(db_admin.password_hash, password):
+            return jsonify({"error": "Email hoặc mật khẩu không chính xác"}), 401
+    else:
+        # Fallback: kiểm tra từ environment variable ADMIN_PASSWORD
+        admin_password = os.getenv("ADMIN_PASSWORD", "dev")
+        admin_password_hash = generate_password_hash(admin_password)
+        
+        if not check_password_hash(admin_password_hash, password):
+            return jsonify({"error": "Email hoặc mật khẩu không chính xác"}), 401
 
     env_allowed = {
         e.strip().lower()
         for e in os.getenv("ADMIN_ALLOWED_EMAILS", "").split(",")
         if e.strip()
     }
-    db_allowed = AdminUser.query.filter_by(email=email, is_active=True).first()
     active_count = AdminUser.query.filter_by(is_active=True).count()
 
     # Bootstrap mode: allow first login and create initial admin account when list is empty.
-    if not env_allowed and active_count == 0 and not db_allowed:
-        admin_user = AdminUser(email=email, is_active=True)
+    if not env_allowed and active_count == 0 and not db_admin:
+        admin_user = AdminUser(email=email, password_hash=generate_password_hash(password), is_active=True)
         db.session.add(admin_user)
         db.session.commit()
-        db_allowed = admin_user
+        db_admin = admin_user
 
-    if email not in env_allowed and not db_allowed:
+    if email not in env_allowed and not db_admin:
         return jsonify({"error": "Email không có quyền đăng nhập admin"}), 403
 
     session["admin_logged_in"] = True

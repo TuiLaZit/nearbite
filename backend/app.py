@@ -2,6 +2,7 @@ from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 from db import db
 import os
+from werkzeug.security import generate_password_hash
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
 from auth import (
@@ -34,6 +35,7 @@ CORS(
             "http://127.0.0.1:5500",
             "http://localhost:5500",
             "http://localhost:5173",
+            "http://localhost:3000",
             "https://nearbite.vercel.app",
             r"https://.*\.vercel\.app"
         ]
@@ -72,11 +74,15 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True
 )
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+# Nếu không có DATABASE_URL thì dùng SQLite local
+if os.getenv("DATABASE_URL"):
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///local.db"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
-
 
 @app.route("/")
 def home():
@@ -135,5 +141,48 @@ register_user_routes(app)
 register_admin_routes(app)
 
 if __name__ == "__main__":
+    # Nếu dùng SQLite, tự động tạo bảng và dữ liệu mẫu nếu chưa có
+    with app.app_context():
+        db.create_all()
+        from models import Restaurant, MenuItem, Tag, RestaurantImage, AdminUser
+        
+        # Luôn tạo admin user nếu chưa tồn tại
+        admin_exists = AdminUser.query.filter_by(email="phattran280704@gmail.com").first()
+        if not admin_exists:
+            admin = AdminUser(
+                email="phattran280704@gmail.com",
+                password_hash=generate_password_hash("admin123"),
+                is_active=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("✓ Admin user đã tạo: phattran280704@gmail.com / admin123")
+        
+        # Thêm dữ liệu mẫu restaurant nếu chưa có
+        if not Restaurant.query.first():
+            tag1 = Tag(name="Món Việt", icon="🍜", color="#ff9800", description="Ẩm thực Việt Nam")
+            tag2 = Tag(name="Ăn nhanh", icon="🍔", color="#4caf50", description="Đồ ăn nhanh")
+            db.session.add_all([tag1, tag2])
+            db.session.commit()
+
+            r1 = Restaurant(name="Phở 24", lat=10.762622, lng=106.660172, description="Phở bò truyền thống", avg_eat_time=20, is_active=True)
+            r2 = Restaurant(name="Burger King", lat=10.762700, lng=106.660200, description="Burger & Fastfood", avg_eat_time=15, is_active=True)
+            r1.tags.append(tag1)
+            r2.tags.append(tag2)
+            db.session.add_all([r1, r2])
+            db.session.commit()
+
+            m1 = MenuItem(name="Phở bò đặc biệt", price=50000, restaurant_id=r1.id)
+            m2 = MenuItem(name="Burger bò", price=45000, restaurant_id=r2.id)
+            db.session.add_all([m1, m2])
+            db.session.commit()
+
+            img1 = RestaurantImage(restaurant_id=r1.id, image_url="https://images.unsplash.com/photo-1", caption="Phở bò", display_order=1, is_primary=True)
+            img2 = RestaurantImage(restaurant_id=r2.id, image_url="https://images.unsplash.com/photo-2", caption="Burger", display_order=1, is_primary=True)
+            db.session.add_all([img1, img2])
+            db.session.commit()
+
+            print("✓ Đã tạo dữ liệu mẫu cho SQLite!")
+
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))
 
