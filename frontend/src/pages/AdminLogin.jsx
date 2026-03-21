@@ -38,8 +38,20 @@ function AdminLogin({
         localStorage.setItem('activeRole', role)
         navigate(redirectPath)
       } else {
-        const payload = await response.json().catch(() => ({}))
-        setError(payload.error || 'Thông tin đăng nhập chưa chính xác')
+        const contentType = response.headers.get('content-type') || ''
+        const payload = contentType.includes('application/json')
+          ? await response.json().catch(() => ({}))
+          : {}
+
+        if (payload.error) {
+          setError(payload.error)
+        } else if (response.status >= 500) {
+          setError('Server đang lỗi nội bộ. Vui lòng kiểm tra backend logs.')
+        } else if (response.status === 404) {
+          setError('Không tìm thấy endpoint admin login. Kiểm tra cấu hình VITE_BASE_URL trên frontend deploy.')
+        } else {
+          setError(`Đăng nhập thất bại (HTTP ${response.status}).`)
+        }
       }
     } catch (error) {
       console.error('Login error:', error)

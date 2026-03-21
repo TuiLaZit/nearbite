@@ -12,6 +12,7 @@ from email.message import EmailMessage
 from functools import wraps
 from flask import request, jsonify, session
 from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy import text
 from models import Restaurant, AdminUser
 from db import db
 
@@ -39,15 +40,26 @@ def admin_login():
         for e in os.getenv("ADMIN_ALLOWED_EMAILS", "").split(",")
         if e.strip()
     }
-    db_allowed = AdminUser.query.filter_by(email=email, is_active=True).first()
-    active_count = AdminUser.query.filter_by(is_active=True).count()
+
+    # Query only columns required by login flow to stay compatible with legacy schemas.
+    db_allowed_row = db.session.execute(
+        text("SELECT id, email FROM admin_user WHERE email = :email AND is_active = true LIMIT 1"),
+        {"email": email}
+    ).mappings().first()
+    db_allowed = dict(db_allowed_row) if db_allowed_row else None
+
+    active_count = db.session.execute(
+        text("SELECT COUNT(*) FROM admin_user WHERE is_active = true")
+    ).scalar() or 0
 
     # Bootstrap mode: allow first login and create initial admin account when list is empty.
     if not env_allowed and active_count == 0 and not db_allowed:
-        admin_user = AdminUser(email=email, is_active=True)
-        db.session.add(admin_user)
+        db.session.execute(
+            text("INSERT INTO admin_user (email, is_active, created_at) VALUES (:email, true, NOW())"),
+            {"email": email}
+        )
         db.session.commit()
-        db_allowed = admin_user
+        db_allowed = {"email": email}
 
     if email not in env_allowed and not db_allowed:
         return jsonify({"error": "Email không có quyền đăng nhập admin"}), 403
