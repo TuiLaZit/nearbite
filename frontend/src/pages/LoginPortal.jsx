@@ -199,7 +199,7 @@ function LoginPortal() {
                     style={styles.input}
                   />
                   {devOtp && (
-                    <p style={{ color: '#1d4ed8', marginTop: '8px' }}>
+                    <p style={{ color: '#000', marginTop: '8px' }}>
                       {t('otpLocalLabel')}: <strong>{devOtp}</strong>
                     </p>
                   )}
@@ -299,7 +299,8 @@ const styles = {
     border: '1px solid #e2e8f0',
     borderRadius: '20px',
     boxShadow: '0 20px 40px rgba(15, 23, 42, 0.12)',
-    padding: '28px'
+    padding: '28px',
+    color: '#000'
   },
   topBar: {
     display: 'flex',
@@ -314,7 +315,8 @@ const styles = {
     padding: '8px 12px',
     cursor: 'pointer',
     background: '#e2e8f0',
-    fontWeight: '600'
+    fontWeight: '600',
+    color: '#000'
   },
   languageSelect: {
     padding: '10px 12px',
@@ -323,14 +325,15 @@ const styles = {
     fontSize: '13px',
     cursor: 'pointer',
     background: 'white',
-    minWidth: '110px'
+    minWidth: '110px',
+    color: '#000'
   },
   title: {
     marginTop: '8px',
     marginBottom: '18px',
     textAlign: 'center',
     fontSize: '34px',
-    color: '#0f172a'
+    color: '#000'
   },
   roleTabs: {
     display: 'grid',
@@ -344,7 +347,8 @@ const styles = {
     background: '#f8fafc',
     padding: '10px 12px',
     fontWeight: '600',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    color: '#000'
   },
   roleTabActive: {
     borderColor: '#2563eb',
@@ -353,19 +357,21 @@ const styles = {
   sectionTitle: {
     marginTop: 0,
     marginBottom: '14px',
-    color: '#0f172a'
+    color: '#000'
   },
   label: {
     display: 'block',
     marginBottom: '8px',
-    fontWeight: '600'
+    fontWeight: '600',
+    color: '#000'
   },
   input: {
     width: '100%',
     padding: '10px 12px',
     borderRadius: '8px',
     border: '1px solid #cbd5e1',
-    marginBottom: '10px'
+    marginBottom: '10px',
+    color: '#000'
   },
   submitButton: {
     width: '100%',
@@ -373,7 +379,7 @@ const styles = {
     borderRadius: '8px',
     padding: '10px 14px',
     background: '#2563eb',
-    color: 'white',
+    color: '#000',
     fontWeight: '700',
     cursor: 'pointer'
   },
@@ -395,7 +401,8 @@ const styles = {
     borderRadius: '8px',
     padding: '8px 10px',
     background: 'white',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    color: '#000'
   },
   ownerHint: {
     background: '#fff7ed',
@@ -403,12 +410,12 @@ const styles = {
     borderRadius: '8px',
     padding: '10px 12px',
     marginBottom: '14px',
-    color: '#9a3412'
+    color: '#000'
   },
   adminButton: {
     background: '#1e293b',
-    color: 'white',
-    border: 'none',
+    color: '#fff',
+    border: '1px solid #cbd5e1',
     borderRadius: '8px',
     padding: '10px 14px',
     cursor: 'pointer'

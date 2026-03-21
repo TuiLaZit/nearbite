@@ -35,12 +35,12 @@ function OwnerLogin() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: '460px', paddingTop: '48px' }}>
-      <button onClick={() => navigate('/')} style={{ marginBottom: '16px' }}>
+    <div className="container" style={{ maxWidth: '460px', paddingTop: '48px', color: '#000' }}>
+      <button onClick={() => navigate('/')} style={{ marginBottom: '16px', color: '#000' }}>
         ← Quay lại
       </button>
       <h1>🏪 Đăng nhập chủ quán</h1>
-      <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', color: '#9a3412' }}>
+      <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', color: '#000' }}>
         Trang này chỉ dành cho chủ quán.
         Tài khoản là <strong>username quán</strong> (ví dụ: bc4), không phải email.
       </div>
@@ -62,7 +62,7 @@ function OwnerLogin() {
           required
         />
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} style={{ color: '#000' }}>
           {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </button>
       </form>
@@ -73,8 +73,8 @@ function OwnerLogin() {
           onClick={() => navigate('/admin/login')}
           style={{
             background: '#1e293b',
-            color: 'white',
-            border: 'none',
+            color: '#fff',
+            border: '1px solid #cbd5e1',
             borderRadius: '8px',
             padding: '10px 14px',
             cursor: 'pointer'

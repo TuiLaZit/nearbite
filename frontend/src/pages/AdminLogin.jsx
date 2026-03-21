@@ -71,7 +71,7 @@ function AdminLogin({
             radial-gradient(900px 520px at 8% 12%, rgba(197, 156, 84, 0.2), transparent 60%),
             radial-gradient(820px 480px at 92% 88%, rgba(22, 77, 76, 0.16), transparent 65%),
             linear-gradient(135deg, #071217 0%, #0f172a 46%, #152238 100%);
-          color: #e7edf5;
+          color: #000;
           font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
         }
 
@@ -117,19 +117,20 @@ function AdminLogin({
           overflow: hidden;
           border: 1px solid rgba(223, 232, 244, 0.18);
           box-shadow: 0 34px 70px rgba(2, 7, 20, 0.45);
-          background: rgba(7, 13, 28, 0.72);
+          background: rgba(255, 255, 255, 0.94);
           backdrop-filter: blur(18px);
         }
 
         .admin-login-brand {
           padding: 54px 48px;
           background:
-            linear-gradient(160deg, rgba(11, 22, 44, 0.92) 0%, rgba(18, 38, 48, 0.88) 100%);
+            linear-gradient(160deg, rgba(247, 250, 255, 0.98) 0%, rgba(236, 242, 249, 0.94) 100%);
           border-right: 1px solid rgba(205, 214, 228, 0.16);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           gap: 20px;
+          color: #000;
         }
 
         .admin-login-brand h2 {
@@ -137,13 +138,13 @@ function AdminLogin({
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(42px, 4vw, 58px);
           letter-spacing: 0.8px;
-          color: #f9fbff;
+          color: #000;
           line-height: 0.95;
         }
 
         .admin-login-brand p {
           margin: 0;
-          color: rgba(226, 236, 247, 0.85);
+          color: #000;
           line-height: 1.65;
           font-size: 15px;
         }
@@ -158,18 +159,18 @@ function AdminLogin({
           padding: 14px;
           border-radius: 14px;
           border: 1px solid rgba(227, 236, 246, 0.16);
-          background: rgba(10, 20, 36, 0.58);
+          background: rgba(255, 255, 255, 0.95);
         }
 
         .admin-login-metric span {
           display: block;
           font-size: 22px;
           font-weight: 700;
-          color: #f4f7ff;
+          color: #000;
         }
 
         .admin-login-metric small {
-          color: rgba(212, 223, 238, 0.78);
+          color: #000;
           font-size: 12px;
         }
 
@@ -189,7 +190,7 @@ function AdminLogin({
 
         .header-text {
           margin: 0 0 26px;
-          color: #415062;
+          color: #000;
           font-size: 14px;
           line-height: 1.5;
         }
@@ -197,12 +198,12 @@ function AdminLogin({
         .shield-icon {
           width: 32px;
           height: 32px;
-          color: #0f5d5c;
+          color: #000;
         }
 
         h1 {
           margin: 0;
-          color: #122036;
+          color: #000;
           font-size: 30px;
           font-weight: 750;
           letter-spacing: -0.02em;
@@ -216,7 +217,7 @@ function AdminLogin({
 
         .field-label {
           font-size: 13px;
-          color: #516174;
+          color: #000;
           text-align: left;
           font-weight: 600;
           margin: 2px 0;
@@ -229,12 +230,12 @@ function AdminLogin({
           border-radius: 12px;
           font-size: 15px;
           background-color: rgba(255, 255, 255, 0.86);
-          color: #152035;
+          color: #000;
           transition: all 0.22s ease;
         }
 
         input::placeholder {
-          color: #7f8ea1;
+          color: #4b5563;
         }
 
         input:focus {
@@ -259,7 +260,7 @@ function AdminLogin({
           margin-bottom: 14px;
           padding: 10px 14px;
           background: rgba(18, 32, 54, 0.08);
-          color: #122036;
+          color: #000;
           border: 1px solid #cad6e3;
           border-radius: 10px;
           font-size: 13px;
@@ -277,7 +278,7 @@ function AdminLogin({
           margin-top: 8px;
           padding: 14px 16px;
           background: linear-gradient(140deg, #0f5d5c 0%, #164d66 100%);
-          color: #fff;
+          color: #000;
           border: none;
           border-radius: 12px;
           font-size: 15px;

@@ -822,14 +822,30 @@ function LocationTracker() {
     }
   }
 
-  const handleCustomerLogout = () => {
-    fetch(`${BASE_URL}/customer/logout`, {
-      method: 'POST',
-      credentials: 'include'
-    }).finally(() => {
+  const handleCustomerLogout = async () => {
+    try {
+      await fetch(`${BASE_URL}/customer/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } finally {
+      if (watchTimerRef.current) {
+        clearInterval(watchTimerRef.current)
+        watchTimerRef.current = null
+      }
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+
+      setIsTracking(false)
+      setIsAudioPlaying(false)
+      setCurrentNarration(null)
+      setSelectedRestaurant(null)
+      setCurrentDistance(null)
       setCustomerAuthStatus('guest')
-      navigate('/', { replace: true })
-    })
+      navigate('/login?role=customer', { replace: true })
+    }
   }
 
   // Cleanup khi component unmount

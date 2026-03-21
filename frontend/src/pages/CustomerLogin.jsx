@@ -78,7 +78,7 @@ function CustomerLogin() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: '460px', paddingTop: '48px' }}>
+    <div className="container" style={{ maxWidth: '460px', paddingTop: '48px', color: '#000' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
         <select
           value={language}
@@ -99,7 +99,7 @@ function CustomerLogin() {
         </select>
       </div>
 
-      <button onClick={() => navigate('/')} style={{ marginBottom: '16px' }}>
+      <button onClick={() => navigate('/')} style={{ marginBottom: '16px', color: '#000' }}>
         ← {t('back')}
       </button>
       <h1>📩 {t('customerLoginTitle')}</h1>
@@ -114,7 +114,7 @@ function CustomerLogin() {
           required
           disabled={otpSent}
         />
-        <button type="submit" disabled={loading || !email || otpSent}>
+        <button type="submit" disabled={loading || !email || otpSent} style={{ color: '#000' }}>
           {loading ? t('sending') : t('sendOtp')}
         </button>
       </form>
@@ -136,15 +136,15 @@ function CustomerLogin() {
               required
             />
             {devOtp && (
-              <p style={{ color: '#1d4ed8', marginTop: '8px' }}>
+              <p style={{ color: '#000', marginTop: '8px' }}>
                 {t('otpLocalLabel')}: <strong>{devOtp}</strong>
               </p>
             )}
             <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-              <button type="submit" disabled={loading || otp.length !== 6}>
+              <button type="submit" disabled={loading || otp.length !== 6} style={{ color: '#000' }}>
                 {loading ? t('verifying') : t('verifyOtp')}
               </button>
-              <button type="button" onClick={handleRequestOtp} disabled={loading}>
+              <button type="button" onClick={handleRequestOtp} disabled={loading} style={{ color: '#000' }}>
                 {t('resendOtp')}
               </button>
               <button
@@ -155,6 +155,7 @@ function CustomerLogin() {
                   setDevOtp('')
                 }}
                 disabled={loading}
+                style={{ color: '#000' }}
               >
                 {t('changeEmail')}
               </button>
