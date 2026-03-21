@@ -57,10 +57,28 @@ export const useTranslation = (language) => {
   const pendingKeysRef = useRef(new Set())
   const flushTimerRef = useRef(null)
   const translationsRef = useRef(TRANSLATION_KEYS)
+  const activeLanguageRef = useRef(language)
+  const requestControllerRef = useRef(null)
+  const requestSeqRef = useRef(0)
+  const CRITICAL_KEYS = [
+    'startTracking',
+    'stopTracking',
+    'currentLocation',
+    'listenButton',
+    'listenNarrationButton',
+    'directionButton',
+    'viewMenu',
+    'login',
+    'logout'
+  ]
 
   useEffect(() => {
     translationsRef.current = translations
   }, [translations])
+
+  useEffect(() => {
+    activeLanguageRef.current = language
+  }, [language])
 
   const flushPendingTranslations = useCallback(async () => {
     if (language === 'vi') return
@@ -89,9 +107,17 @@ export const useTranslation = (language) => {
     if (!texts.length) return
 
     let timeoutId = null
+    const langAtRequest = language
+    const requestSeq = ++requestSeqRef.current
     try {
       setLoading(true)
+
+      if (requestControllerRef.current) {
+        requestControllerRef.current.abort()
+      }
+
       const controller = new AbortController()
+      requestControllerRef.current = controller
       timeoutId = setTimeout(() => controller.abort(), TRANSLATE_TIMEOUT_MS)
       const response = await fetch(`${BASE_URL}/translate`, {
         method: 'POST',
@@ -99,11 +125,16 @@ export const useTranslation = (language) => {
         signal: controller.signal,
         body: JSON.stringify({
           texts,
-          target_lang: language
+          target_lang: langAtRequest
         })
       })
       clearTimeout(timeoutId)
       timeoutId = null
+
+      // Ignore stale response from older request/language.
+      if (requestSeq !== requestSeqRef.current || activeLanguageRef.current !== langAtRequest) {
+        return
+      }
 
       const data = await response.json().catch(() => ({}))
       if (!response.ok || data.status !== 'success') {
@@ -124,8 +155,11 @@ export const useTranslation = (language) => {
       if (!Object.keys(translatedUpdates).length) return
 
       setTranslations((prev) => {
+        if (activeLanguageRef.current !== langAtRequest) {
+          return prev
+        }
         const next = { ...prev, ...translatedUpdates }
-        setCache(language, next)
+        setCache(langAtRequest, next)
         return next
       })
     } catch (error) {
@@ -133,6 +167,9 @@ export const useTranslation = (language) => {
     } finally {
       if (timeoutId) {
         clearTimeout(timeoutId)
+      }
+      if (requestSeq === requestSeqRef.current) {
+        requestControllerRef.current = null
       }
       setLoading(false)
     }
@@ -154,9 +191,18 @@ export const useTranslation = (language) => {
     const loadTranslations = async () => {
       // Nếu là tiếng Việt, dùng keys gốc
       if (language === 'vi') {
+        if (requestControllerRef.current) {
+          requestControllerRef.current.abort()
+          requestControllerRef.current = null
+        }
         setTranslations(TRANSLATION_KEYS)
         setLoading(false)
         return
+      }
+
+      if (requestControllerRef.current) {
+        requestControllerRef.current.abort()
+        requestControllerRef.current = null
       }
 
       // Check cache trước
@@ -176,12 +222,21 @@ export const useTranslation = (language) => {
       } else {
         setTranslations(baseTranslations)
       }
+
+      // Preload các key hiển thị thường xuyên để tránh nhấp nháy tiếng Việt.
+      CRITICAL_KEYS.forEach((key) => pendingKeysRef.current.add(key))
+      flushPendingTranslations()
+
       setLoading(false)
     }
 
     loadTranslations()
 
     return () => {
+      if (requestControllerRef.current) {
+        requestControllerRef.current.abort()
+        requestControllerRef.current = null
+      }
       if (flushTimerRef.current) {
         clearTimeout(flushTimerRef.current)
         flushTimerRef.current = null

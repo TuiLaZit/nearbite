@@ -139,15 +139,15 @@ function LocationTracker() {
     }
   }, [])
 
-  // Fetch danh sách quán khi load
+  // Fetch danh sách quán theo ngôn ngữ hiện tại
   useEffect(() => {
-    fetch(`${BASE_URL}/restaurants`)
+    fetch(`${BASE_URL}/restaurants?lang=${encodeURIComponent(language)}`)
       .then(res => res.json())
       .then(data => {
         setRestaurants(data.restaurants)
       })
       .catch(err => console.error('Error fetching restaurants:', err))
-  }, [])
+  }, [language])
 
   // Track location visit khi user ở gần quán
   const trackLocationVisit = (lat, lng, durationSeconds, restaurantId = null) => {
@@ -674,15 +674,18 @@ function LocationTracker() {
     // Reset currentNarration hoàn toàn
     setCurrentNarration(null)
 
+    // Reset menu modal/translation cũ để không hiển thị sai ngôn ngữ trước đó.
+    setTranslatedPoiMenu({})
+    setIsTranslatingPoiMenu(false)
+    setIsPoiMenuModalOpen(false)
+
     // Reset và fetch lại với ngôn ngữ mới
     lastRestaurantIdRef.current = null
     
     if (isTracking && userLocation) {
-      // Dùng setTimeout để đảm bảo audio đã dừng hẳn
-      setTimeout(() => {
-        isChangingLanguageRef.current = false // Reset flag
-        fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
-      }, 200)
+      // Fetch lại ngay sau khi đổi ngôn ngữ để POI cập nhật tức thì.
+      isChangingLanguageRef.current = false // Reset flag
+      fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
     } else {
       isChangingLanguageRef.current = false // Reset flag
     }
@@ -937,7 +940,7 @@ function LocationTracker() {
               cursor: 'pointer'
             }}
           >
-            🔐 Dang nhap
+            🔐 {t('login')}
           </button>
         )}
       </div>
@@ -1095,7 +1098,7 @@ function LocationTracker() {
                                     minWidth: '100px'
                                   }}
                                 >
-                                  {isAudioPlaying ? `⏹ ${t('stopButton')}` : `🔊 ${t('listenButton')}`}
+                                  {isAudioPlaying ? '🔇' : '🔊'}
                                 </button>
                               )}
                               <button
@@ -1329,7 +1332,7 @@ function LocationTracker() {
                       fontSize: '14px'
                     }}
                   >
-                    {isAudioPlaying ? `⏹ ${t('stopButton')}` : `🔊 ${t('listenNarrationButton')}`}
+                    {isAudioPlaying ? '🔇' : '🔊'}
                   </button>
                 )}
               </div>

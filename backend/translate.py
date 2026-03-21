@@ -203,7 +203,7 @@ def translate_text(text, target_lang):
         return text
 
 
-def translate_texts(texts, target_lang, cache_only=False):
+def translate_texts(texts, target_lang, cache_only=False, fast_fail=None):
     if target_lang == "vi":
         return texts
 
@@ -229,6 +229,8 @@ def translate_texts(texts, target_lang, cache_only=False):
                 results[idx] = text
         return results
 
+    effective_fast_fail = _FAST_FAIL_TRANSLATION if fast_fail is None else bool(fast_fail)
+
     try:
         if missing_unique:
             for i in range(0, len(missing_unique), _BATCH_SIZE):
@@ -239,7 +241,7 @@ def translate_texts(texts, target_lang, cache_only=False):
                 )
 
                 if not isinstance(translated_chunk, list) or len(translated_chunk) != len(chunk):
-                    if _FAST_FAIL_TRANSLATION:
+                    if effective_fast_fail:
                         translated_chunk = chunk
                     else:
                         translated_chunk = [translate_text(text, target_lang) for text in chunk]

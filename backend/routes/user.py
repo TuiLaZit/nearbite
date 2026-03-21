@@ -147,7 +147,7 @@ def register_user_routes(app):
                 placeholder_maps.append(local_placeholder_map)
                 original_texts.append(text)
 
-            translated_batch = translate_texts(protected_texts, target_lang)
+            translated_batch = translate_texts(protected_texts, target_lang, fast_fail=False)
 
             for idx, translated_text in enumerate(translated_batch):
                 restored_text = translated_text or original_texts[idx]

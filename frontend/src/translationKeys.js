@@ -130,6 +130,7 @@ export const TRANSLATION_KEYS = {
   listenButton: 'Nghe',
   stopButton: 'Dừng',
   listenNarrationButton: 'Nghe thuyết minh',
+  login: 'Đăng nhập',
   logout: 'Đăng xuất',
   yourDistance: 'Khoảng cách',
   gpsNotSupported: 'Trình duyệt không hỗ trợ GPS',
