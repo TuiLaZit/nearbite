@@ -17,6 +17,7 @@ function OwnerDashboard() {
   const [orders, setOrders] = useState([])
   const [orderSummary, setOrderSummary] = useState(null)
   const [processingOrderId, setProcessingOrderId] = useState(null)
+  const [pendingOrderAction, setPendingOrderAction] = useState(null)
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -285,6 +286,48 @@ function OwnerDashboard() {
     }
   }
 
+  const handleOrderActionRequest = (order, entry) => {
+    const requireSecondConfirm = ['confirm', 'cancel', 'mark_completed'].includes(entry.action)
+    if (!requireSecondConfirm) {
+      handleOrderAction(order.id, entry.action)
+      return
+    }
+
+    setPendingOrderAction({
+      orderId: order.id,
+      action: entry.action,
+      label: entry.label,
+      orderType: order.order_type
+    })
+  }
+
+  const handleConfirmPendingAction = async () => {
+    if (!pendingOrderAction) return
+    const { orderId, action } = pendingOrderAction
+    setPendingOrderAction(null)
+    await handleOrderAction(orderId, action)
+  }
+
+  const getActionConfirmMessage = () => {
+    if (!pendingOrderAction) return ''
+
+    if (pendingOrderAction.action === 'cancel') {
+      return 'Đơn hàng sẽ bị hủy và không thể tiếp tục xử lý. Bạn có chắc chắn muốn hủy?'
+    }
+
+    if (pendingOrderAction.action === 'confirm') {
+      return pendingOrderAction.orderType === 'delivery'
+        ? 'Đơn hàng sẽ được xác nhận và chuyển sang trạng thái đang giao. Bạn xác nhận?'
+        : 'Đơn hàng sẽ được xác nhận để chuẩn bị món. Bạn xác nhận?'
+    }
+
+    if (pendingOrderAction.action === 'mark_completed') {
+      return 'Đơn hàng sẽ được đánh dấu hoàn tất. Bạn xác nhận?'
+    }
+
+    return 'Bạn có chắc chắn muốn thực hiện thao tác này?'
+  }
+
   const formatCurrency = (amount) => {
     return Number(amount || 0).toLocaleString('vi-VN') + 'đ'
   }
@@ -295,14 +338,14 @@ function OwnerDashboard() {
     }
 
     if (order.order_type === 'delivery') {
-      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận + bắt đầu giao' }]
-      if (order.order_status === 'confirmed') return [{ action: 'mark_in_transit', label: 'Đang giao' }]
-      if (order.order_status === 'delivering') return [{ action: 'mark_delivered', label: 'Đã giao xong' }]
+      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận + bắt đầu giao' }, { action: 'cancel', label: 'Hủy đơn' }]
+      if (order.order_status === 'confirmed') return [{ action: 'mark_in_transit', label: 'Đang giao' }, { action: 'cancel', label: 'Hủy đơn' }]
+      if (order.order_status === 'delivering') return [{ action: 'mark_delivered', label: 'Đã giao xong' }, { action: 'cancel', label: 'Hủy đơn' }]
     }
 
     if (order.order_type === 'pickup') {
-      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận chuẩn bị' }]
-      if (order.order_status === 'confirmed') return [{ action: 'mark_completed', label: 'Khách đã nhận món' }]
+      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận chuẩn bị' }, { action: 'cancel', label: 'Hủy đơn' }]
+      if (order.order_status === 'confirmed') return [{ action: 'mark_completed', label: 'Khách đã nhận món' }, { action: 'cancel', label: 'Hủy đơn' }]
     }
 
     return []
@@ -508,7 +551,7 @@ function OwnerDashboard() {
                         {getOrderActions(order).map((entry) => (
                           <button
                             key={entry.action}
-                            onClick={() => handleOrderAction(order.id, entry.action)}
+                            onClick={() => handleOrderActionRequest(order, entry)}
                             disabled={processingOrderId === order.id}
                           >
                             {entry.label}
@@ -524,6 +567,33 @@ function OwnerDashboard() {
           </div>
         )}
       </main>
+
+      {pendingOrderAction && (
+        <div style={styles.confirmOverlay}>
+          <div style={styles.confirmModal}>
+            <h3 style={{ marginTop: 0 }}>Xác nhận thao tác</h3>
+            <p style={{ marginBottom: '14px' }}>
+              Đơn #{pendingOrderAction.orderId}: {getActionConfirmMessage()}
+            </p>
+            <div style={styles.confirmActions}>
+              <button
+                type="button"
+                style={styles.secondaryActionBtn}
+                onClick={() => setPendingOrderAction(null)}
+              >
+                Quay lại
+              </button>
+              <button
+                type="button"
+                style={styles.primaryActionBtn}
+                onClick={handleConfirmPendingAction}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -686,6 +756,45 @@ const styles = {
   },
   noActionText: {
     color: '#64748b'
+  },
+  confirmOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+    padding: '16px'
+  },
+  confirmModal: {
+    width: '100%',
+    maxWidth: '460px',
+    background: 'white',
+    borderRadius: '12px',
+    border: '1px solid #dbe4ef',
+    padding: '18px'
+  },
+  confirmActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px'
+  },
+  secondaryActionBtn: {
+    background: '#e2e8f0',
+    color: '#0f172a',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '9px 14px',
+    cursor: 'pointer'
+  },
+  primaryActionBtn: {
+    background: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '9px 14px',
+    cursor: 'pointer'
   }
 }
 

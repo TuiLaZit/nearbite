@@ -22,6 +22,7 @@ function App() {
         <Route path="/customer" element={<LocationTracker />} />
         <Route path="/customer/tour-planner" element={<TourPlanner />} />
         <Route path="/customer/orders" element={<CustomerOrders />} />
+        <Route path="/customer/orders/:restaurantId" element={<CustomerOrders />} />
       </Route>
 
       <Route path="/tour-planner" element={<Navigate to="/customer/tour-planner" replace />} />

@@ -50,6 +50,7 @@ function AdminLogin({
   }
 
   return (
+<<<<<<< HEAD
     <>
       <style>{`
         body.admin-login-body {
@@ -345,6 +346,31 @@ function AdminLogin({
         </div>
       </div>
     </>
+=======
+    <div className="container">
+      <button type="button" onClick={() => navigate('/owner/login')} style={{ marginBottom: '16px' }}>
+        ← Quay lại đăng nhập chủ quán
+      </button>
+      <h1>{title}</h1>
+      <form onSubmit={handleLogin}>
+        <input
+          type="email"
+          placeholder="Email admin"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder={placeholder}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <button type="submit">Login</button>
+      </form>
+    </div>
+>>>>>>> origin/main
   )
 }
 

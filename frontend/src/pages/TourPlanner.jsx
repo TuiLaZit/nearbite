@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { BASE_URL } from '../config'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../hooks/useTranslation'
+import { useAppLanguage } from '../hooks/useAppLanguage'
 
 function TourPlanner() {
   const navigate = useNavigate()
-  const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'vi')
+  const { language, setLanguage } = useAppLanguage()
   const { t, loading: translationLoading } = useTranslation(language)
   const [languages, setLanguages] = useState([]) // Fetch từ API
   const [tags, setTags] = useState([])
@@ -16,11 +17,6 @@ function TourPlanner() {
   const [tours, setTours] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-
-  // Sync language with localStorage
-  useEffect(() => {
-    localStorage.setItem('language', language)
-  }, [language])
 
   // Fetch danh sách ngôn ngữ
   useEffect(() => {

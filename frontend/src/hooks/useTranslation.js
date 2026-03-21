@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { BASE_URL } from '../config'
-import { TRANSLATION_KEYS, getAllTranslatableTexts } from '../translationKeys'
+import { TRANSLATION_KEYS } from '../translationKeys'
 
 const CACHE_KEY = 'translation_cache'
-const CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000 // 7 days
+const CACHE_EXPIRY = 30 * 24 * 60 * 60 * 1000 // 30 days
+const CACHE_VERSION = `v5-${Object.keys(TRANSLATION_KEYS).length}`
+const TRANSLATE_TIMEOUT_MS = 6000
+
+const hasAllTranslationKeys = (translations) => {
+  if (!translations || typeof translations !== 'object') return false
+  return Object.keys(TRANSLATION_KEYS).every((key) => Object.prototype.hasOwnProperty.call(translations, key))
+}
 
 // Lấy cache từ localStorage
 const getCache = () => {
@@ -16,7 +23,9 @@ const getCache = () => {
     
     // Xóa cache hết hạn
     Object.keys(data).forEach(lang => {
-      if (data[lang].timestamp + CACHE_EXPIRY < now) {
+      const isExpired = data[lang].timestamp + CACHE_EXPIRY < now
+      const isVersionMismatch = data[lang].version !== CACHE_VERSION
+      if (isExpired || isVersionMismatch) {
         delete data[lang]
       }
     })
@@ -33,7 +42,8 @@ const setCache = (lang, translations) => {
     const cache = getCache()
     cache[lang] = {
       translations,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      version: CACHE_VERSION
     }
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
   } catch (e) {
@@ -44,6 +54,98 @@ const setCache = (lang, translations) => {
 export const useTranslation = (language) => {
   const [translations, setTranslations] = useState(TRANSLATION_KEYS) // Default to Vietnamese
   const [loading, setLoading] = useState(false) // Không block UI
+  const pendingKeysRef = useRef(new Set())
+  const flushTimerRef = useRef(null)
+  const translationsRef = useRef(TRANSLATION_KEYS)
+
+  useEffect(() => {
+    translationsRef.current = translations
+  }, [translations])
+
+  const flushPendingTranslations = useCallback(async () => {
+    if (language === 'vi') return
+
+    const keys = Array.from(pendingKeysRef.current)
+    pendingKeysRef.current.clear()
+    if (!keys.length) return
+
+    const texts = []
+    const textToKeys = {}
+
+    keys.forEach((key) => {
+      const viText = TRANSLATION_KEYS[key]
+      if (!viText) return
+
+      const currentValue = translationsRef.current[key]
+      if (currentValue && currentValue !== viText) return
+
+      if (!textToKeys[viText]) {
+        textToKeys[viText] = []
+        texts.push(viText)
+      }
+      textToKeys[viText].push(key)
+    })
+
+    if (!texts.length) return
+
+    let timeoutId = null
+    try {
+      setLoading(true)
+      const controller = new AbortController()
+      timeoutId = setTimeout(() => controller.abort(), TRANSLATE_TIMEOUT_MS)
+      const response = await fetch(`${BASE_URL}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          texts,
+          target_lang: language
+        })
+      })
+      clearTimeout(timeoutId)
+      timeoutId = null
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data.status !== 'success') {
+        return
+      }
+
+      const translatedUpdates = {}
+      Object.entries(textToKeys).forEach(([viText, mappedKeys]) => {
+        const translatedText = (data.translations || {})[viText] || viText
+        mappedKeys.forEach((key) => {
+          translatedUpdates[key] = translatedText
+        })
+      })
+
+      if (!Object.keys(translatedUpdates).length) return
+
+      setTranslations((prev) => {
+        const next = { ...prev, ...translatedUpdates }
+        setCache(language, next)
+        return next
+      })
+    } catch (error) {
+      // Keep Vietnamese fallback when request fails.
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      setLoading(false)
+    }
+  }, [language])
+
+  const queueKeyForTranslation = useCallback((key) => {
+    if (!key || language === 'vi') return
+
+    pendingKeysRef.current.add(key)
+    if (flushTimerRef.current) return
+
+    flushTimerRef.current = setTimeout(() => {
+      flushTimerRef.current = null
+      flushPendingTranslations()
+    }, 30)
+  }, [language, flushPendingTranslations])
 
   useEffect(() => {
     const loadTranslations = async () => {
@@ -56,56 +158,42 @@ export const useTranslation = (language) => {
 
       // Check cache trước
       const cache = getCache()
-      if (cache[language]) {
+      if (cache[language] && hasAllTranslationKeys(cache[language].translations)) {
         setTranslations(cache[language].translations)
         setLoading(false)
         return
       }
 
-      // Nếu không có cache, gọi API trong background
-      try {
-        setLoading(true)
-        const textsToTranslate = getAllTranslatableTexts()
-        
-        const response = await fetch(`${BASE_URL}/translate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            texts: textsToTranslate,
-            target_lang: language
-          })
-        })
+      // Reset về tiếng Việt trước để tránh giữ text từ ngôn ngữ trước đó.
+      const baseTranslations = { ...TRANSLATION_KEYS }
 
-        const data = await response.json()
-        
-        if (data.status === 'success') {
-          // Map lại từ array translations về object với keys
-          const translatedObj = {}
-          Object.keys(TRANSLATION_KEYS).forEach(key => {
-            const viText = TRANSLATION_KEYS[key]
-            translatedObj[key] = data.translations[viText] || viText
-          })
-          
-          setTranslations(translatedObj)
-          setCache(language, translatedObj)
-        } else {
-          // Fallback to Vietnamese
-          setTranslations(TRANSLATION_KEYS)
-        }
-      } catch (error) {
-        console.error('Translation error:', error)
-        setTranslations(TRANSLATION_KEYS) // Fallback
-      } finally {
-        setLoading(false)
+      // Nếu cache có một phần thì hiển thị ngay để UX mượt.
+      if (cache[language]?.translations) {
+        setTranslations({ ...baseTranslations, ...cache[language].translations })
+      } else {
+        setTranslations(baseTranslations)
       }
+      setLoading(false)
     }
 
     loadTranslations()
+
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current)
+        flushTimerRef.current = null
+      }
+    }
   }, [language])
 
   // Helper function để get translation
   const t = (key, replacements = {}) => {
-    let text = translations[key] || TRANSLATION_KEYS[key] || key
+    const fallbackText = TRANSLATION_KEYS[key] || key
+    let text = translations[key] || fallbackText
+
+    if (language !== 'vi' && text === fallbackText) {
+      queueKeyForTranslation(key)
+    }
     
     // Replace placeholders {variable}
     Object.keys(replacements).forEach(placeholder => {

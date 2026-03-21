@@ -1,7 +1,25 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BASE_URL } from '../config'
+import { useTranslation } from '../hooks/useTranslation'
+import { useAppLanguage } from '../hooks/useAppLanguage'
 
 function RoleSelection() {
   const navigate = useNavigate()
+  const { language, setLanguage } = useAppLanguage()
+  const [languages, setLanguages] = useState([])
+  const { t } = useTranslation(language)
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/languages`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.status === 'success') {
+          setLanguages(Array.isArray(data.languages) ? data.languages : [])
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const enterAs = (role) => {
     if (role === 'customer') {
@@ -16,20 +34,32 @@ function RoleSelection() {
     <div style={styles.page}>
       <div style={styles.gradient} />
       <div style={styles.panel}>
-        <h1 style={styles.title}>NearBite Portal</h1>
-        <p style={styles.subtitle}>Chọn loại tài khoản để đăng nhập</p>
+        <div style={styles.topBar}>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={styles.languageSelect}
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <h1 style={styles.title}>{t('portalTitle')}</h1>
+        <p style={styles.subtitle}>{t('chooseRoleToLogin')}</p>
 
         <div style={styles.grid}>
           <button style={{ ...styles.card, ...styles.customerCard }} onClick={() => enterAs('customer')}>
             <div style={styles.emoji}>🍜</div>
-            <h2 style={styles.cardTitle}>Khách hàng</h2>
-            <p style={styles.cardText}>Đăng nhập bằng email + OTP để khám phá và lập tour ăn uống.</p>
+            <h2 style={styles.cardTitle}>{t('customerRole')}</h2>
+            <p style={styles.cardText}>{t('customerRoleDesc')}</p>
           </button>
 
           <button style={{ ...styles.card, ...styles.ownerCard }} onClick={() => enterAs('owner')}>
             <div style={styles.emoji}>🏪</div>
-            <h2 style={styles.cardTitle}>Chủ quán</h2>
-            <p style={styles.cardText}>Đăng nhập bằng tài khoản do admin cấp để quản lý quán.</p>
+            <h2 style={styles.cardTitle}>{t('ownerRole')}</h2>
+            <p style={styles.cardText}>{t('ownerRoleDesc')}</p>
           </button>
         </div>
       </div>
@@ -63,6 +93,20 @@ const styles = {
     borderRadius: '20px',
     boxShadow: '0 20px 40px rgba(15, 23, 42, 0.12)',
     padding: '32px'
+  },
+  topBar: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '8px'
+  },
+  languageSelect: {
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '2px solid #ddd',
+    fontSize: '13px',
+    cursor: 'pointer',
+    background: 'white',
+    minWidth: '110px'
   },
   title: {
     margin: 0,

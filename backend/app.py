@@ -3,8 +3,11 @@ from flask_cors import CORS
 from db import db
 import os
 from werkzeug.security import generate_password_hash
+import re
+import threading
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
+from translate import prewarm_translation_cache, LANGUAGE_LABELS
 from auth import (
     admin_login,
     admin_check,
@@ -32,10 +35,14 @@ CORS(
     app,
     resources={r"/*": {
         "origins": [
-            "http://127.0.0.1:5500",
-            "http://localhost:5500",
+            # Local development
+            "http://127.0.0.1:5000",
+            "http://localhost:5000",
+            "http://127.0.0.1:5173",
             "http://localhost:5173",
+            "http://127.0.0.1:3000",
             "http://localhost:3000",
+            # Production
             "https://nearbite.vercel.app",
             r"https://.*\.vercel\.app"
         ]
@@ -66,7 +73,7 @@ def handle_preflight():
         return response, 200
 
 # Tự động detect môi trường production (HTTPS)
-is_production = os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_STATIC_URL")
+is_production = bool(os.getenv("RENDER"))
 
 app.config.update(
     SESSION_COOKIE_SAMESITE="None" if is_production else "Lax",
@@ -83,10 +90,130 @@ else:
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+_prewarm_started = False
+_prewarm_lock = threading.Lock()
 
+
+def _extract_translation_texts_for_prewarm():
+    keys_file = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "translationKeys.js")
+    )
+    if not os.path.exists(keys_file):
+        return []
+
+    try:
+        with open(keys_file, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return []
+
+    # Extract object values from lines like: key: 'Giá trị'
+    matches = re.findall(r":\s*'((?:\\'|[^'])*)'", content)
+
+    texts = []
+    seen = set()
+    for raw in matches:
+        text = raw.replace("\\'", "'").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        texts.append(text)
+
+    return texts
+
+
+def _start_translation_prewarm_worker():
+    global _prewarm_started
+
+    with _prewarm_lock:
+        if _prewarm_started:
+            return
+
+    enabled_env = (os.getenv("PREWARM_TRANSLATIONS") or "").strip().lower()
+    # Default behavior: enabled for both local and production.
+    # Set PREWARM_TRANSLATIONS=false to disable explicitly.
+    if enabled_env in {"0", "false", "no", "off"}:
+        return
+
+    langs_env = (os.getenv("PREWARM_LANGS") or "").strip()
+    if langs_env:
+        target_langs = [lang.strip() for lang in langs_env.split(",") if lang.strip()]
+    else:
+        target_langs = [code for code in LANGUAGE_LABELS.keys() if code != "vi"]
+
+    # Keep only supported and unique language codes, preserving order.
+    seen_langs = set()
+    filtered_langs = []
+    for code in target_langs:
+        if code == "vi" or code not in LANGUAGE_LABELS or code in seen_langs:
+            continue
+        seen_langs.add(code)
+        filtered_langs.append(code)
+
+    target_langs = filtered_langs
+    texts = _extract_translation_texts_for_prewarm()
+    if not texts or not target_langs:
+        return
+
+    def _run_prewarm():
+        try:
+            prewarm_translation_cache(texts, target_langs)
+            print(f"[prewarm] Completed for {len(target_langs)} languages, {len(texts)} texts")
+        except Exception as exc:
+            print(f"[prewarm] Failed: {exc}")
+
+    _prewarm_started = True
+    threading.Thread(target=_run_prewarm, daemon=True).start()
+
+
+@app.before_request
+def _ensure_prewarm_started_once():
+    if request.method == "OPTIONS":
+        return None
+    _start_translation_prewarm_worker()
+    return None
+
+# Auto create missing tables in local development so new features can run
+# without manual migration steps.
+auto_create_tables_env = (os.getenv("AUTO_CREATE_TABLES") or "").strip().lower()
+if auto_create_tables_env:
+    auto_create_tables = auto_create_tables_env in {"1", "true", "yes", "on"}
+else:
+    auto_create_tables = not bool(is_production)
+
+if auto_create_tables:
+    with app.app_context():
+        db.create_all()
 @app.route("/")
 def home():
+    # Serve index.html for SPA routing
+    frontend_index = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist', 'index.html')
+    if os.path.exists(frontend_index):
+        return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'), 'index.html')
     return jsonify({"status": "ok"})
+
+@app.route("/<path:path>")
+def serve_frontend(path):
+    # Serve frontend static files
+    frontend_dist = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
+    file_path = os.path.join(frontend_dist, path)
+    
+    # Security: prevent directory traversal
+    try:
+        file_path = os.path.abspath(file_path)
+        if not file_path.startswith(os.path.abspath(frontend_dist)):
+            return jsonify({"error": "Not Found"}), 404
+    except:
+        return jsonify({"error": "Not Found"}), 404
+    
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(frontend_dist, path)
+    
+    # Fallback to index.html for SPA routing
+    if os.path.exists(os.path.join(frontend_dist, 'index.html')):
+        return send_from_directory(frontend_dist, 'index.html')
+    
+    return jsonify({"error": "Not Found"}), 404
 
 @app.route("/admin/login", methods=["POST"])
 def login():
@@ -139,6 +266,7 @@ def serve_static(path):
 
 register_user_routes(app)
 register_admin_routes(app)
+_start_translation_prewarm_worker()
 
 if __name__ == "__main__":
     # Nếu dùng SQLite, tự động tạo bảng và dữ liệu mẫu nếu chưa có
