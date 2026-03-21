@@ -41,7 +41,7 @@ def _build_restaurant_translation_signature(restaurant_data, target_lang):
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-def _translate_restaurant_data(restaurant_data, target_lang):
+def _translate_restaurant_data(restaurant_data, target_lang, allow_network=True):
     if target_lang == "vi":
         return restaurant_data
 
@@ -76,7 +76,7 @@ def _translate_restaurant_data(restaurant_data, target_lang):
         track(image.get("caption"), lambda value, image=image: image.__setitem__("caption", value))
 
     if texts:
-        translated_texts = translate_texts(texts, target_lang)
+        translated_texts = translate_texts(texts, target_lang, cache_only=not allow_network)
         translation_map = {}
         for idx, original in enumerate(texts):
             translation_map[original] = translated_texts[idx] if idx < len(translated_texts) else original
@@ -86,7 +86,8 @@ def _translate_restaurant_data(restaurant_data, target_lang):
             for setter in setters:
                 setter(translated_value)
 
-    _cache_restaurant_payload(signature, translated_payload)
+    if allow_network:
+        _cache_restaurant_payload(signature, translated_payload)
     return copy.deepcopy(translated_payload)
 
 
@@ -256,7 +257,8 @@ def register_user_routes(app):
         # Get restaurant data and reuse cached translation if unchanged.
         restaurant_data = nearest.to_dict(include_details=True)
         if language != 'vi':
-            restaurant_data = _translate_restaurant_data(restaurant_data, language)
+            # /location is high-frequency; use cache-only translation path to avoid request timeouts.
+            restaurant_data = _translate_restaurant_data(restaurant_data, language, allow_network=False)
 
         return jsonify({
             "status": "success",

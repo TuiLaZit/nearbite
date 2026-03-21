@@ -44,7 +44,9 @@ LANGUAGE_LABELS = {
 _TRANSLATION_CACHE = {}
 _CACHE_LOCK = Lock()
 _MAX_CACHE_ITEMS = 20000
-_TRANSLATION_EXECUTOR = ThreadPoolExecutor(max_workers=8)
+_MAX_WORKERS = int((os.getenv("TRANSLATION_MAX_WORKERS") or "4").strip() or "4")
+_MAX_WORKERS = max(2, min(8, _MAX_WORKERS))
+_TRANSLATION_EXECUTOR = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
 _BATCH_SIZE = 40
 _BATCH_TIMEOUT_SECONDS = 6
 _SINGLE_TIMEOUT_SECONDS = 2.5
@@ -54,6 +56,14 @@ _PREWARM_LANG_WORKERS = 3
 _CACHE_FILE = os.path.join(os.path.dirname(__file__), "translation_cache.json")
 _CACHE_SAVE_EVERY = 20
 _pending_cache_writes = 0
+_CACHE_NAMESPACE = (
+    (os.getenv("CACHE_NAMESPACE") or "").strip()
+    or (os.getenv("RENDER_GIT_COMMIT") or "").strip()
+    or "default"
+)
+_FAST_FAIL_TRANSLATION = (os.getenv("FAST_FAIL_TRANSLATION") or "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 
 
 def _is_valid_translated_value(target_lang, original_text, translated_text):
@@ -75,9 +85,18 @@ def _load_cache_from_disk():
         with open(_CACHE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        if isinstance(data, dict):
+        raw_entries = {}
+        if isinstance(data, dict) and "entries" in data:
+            if data.get("namespace") != _CACHE_NAMESPACE:
+                return
+            raw_entries = data.get("entries") or {}
+        elif isinstance(data, dict):
+            # Backward compatibility with previous flat cache format.
+            raw_entries = data
+
+        if isinstance(raw_entries, dict):
             cleaned = {}
-            for cache_key, translated_value in data.items():
+            for cache_key, translated_value in raw_entries.items():
                 try:
                     lang, original_text = cache_key.split("::", 1)
                 except ValueError:
@@ -101,7 +120,11 @@ def _save_cache_to_disk(force=False):
 
         try:
             with open(_CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(_TRANSLATION_CACHE, f, ensure_ascii=False)
+                payload = {
+                    "namespace": _CACHE_NAMESPACE,
+                    "entries": _TRANSLATION_CACHE
+                }
+                json.dump(payload, f, ensure_ascii=False)
             _pending_cache_writes = 0
         except Exception:
             # Ignore disk save errors; in-memory cache still works.
@@ -180,7 +203,7 @@ def translate_text(text, target_lang):
         return text
 
 
-def translate_texts(texts, target_lang):
+def translate_texts(texts, target_lang, cache_only=False):
     if target_lang == "vi":
         return texts
 
@@ -200,6 +223,12 @@ def translate_texts(texts, target_lang):
             missing_seen.add(text)
             missing_unique.append(text)
 
+    if cache_only:
+        for idx, text in enumerate(texts):
+            if results[idx] is None:
+                results[idx] = text
+        return results
+
     try:
         if missing_unique:
             for i in range(0, len(missing_unique), _BATCH_SIZE):
@@ -210,7 +239,10 @@ def translate_texts(texts, target_lang):
                 )
 
                 if not isinstance(translated_chunk, list) or len(translated_chunk) != len(chunk):
-                    translated_chunk = [translate_text(text, target_lang) for text in chunk]
+                    if _FAST_FAIL_TRANSLATION:
+                        translated_chunk = chunk
+                    else:
+                        translated_chunk = [translate_text(text, target_lang) for text in chunk]
 
                 for j, original in enumerate(chunk):
                     translated_value = translated_chunk[j] if translated_chunk[j] else original
