@@ -1,3 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --nb-bg: #eef3fa;
+  --nb-text: #182740;
+  --nb-muted: #566781;
+  --nb-card: #ffffff;
+  --nb-border: #d9e4f2;
+  --nb-primary: #155f6e;
+  --nb-primary-strong: #114f63;
+  --nb-danger: #be2b40;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -5,12 +18,13 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding: 20px;
+  color: var(--nb-text);
+  background: var(--nb-bg);
+  min-height: 100vh;
+  padding: 0;
 }
 
 .container {
@@ -26,24 +40,28 @@ button {
   padding: 10px 20px;
   margin: 10px 0;
   cursor: pointer;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: #007bff;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background-color: var(--nb-primary);
   color: white;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.22s ease;
 }
 
 button:hover {
-  background-color: #0056b3;
+  background-color: var(--nb-primary-strong);
+  transform: translateY(-1px);
 }
 
 input, textarea, select {
-  padding: 8px;
+  padding: 10px 12px;
   margin: 5px 0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--nb-border);
+  border-radius: 10px;
   width: 100%;
   font-size: 14px;
+  background: #fff;
 }
 
 table {
@@ -59,11 +77,36 @@ th, td {
 }
 
 th {
-  background-color: #f2f2f2;
+  background-color: #f4f8ff;
 }
 
 h1, h2, h3 {
   margin: 20px 0;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c7d5e8;
+  border-radius: 20px;
+}
+
+::-webkit-scrollbar-track {
+  background: #eef3fa;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Animation for audio unlock button */

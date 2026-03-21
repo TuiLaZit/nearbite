@@ -196,338 +196,391 @@ function AdminDashboard({ role = 'admin' }) {
   }
 
   return (
-    <div style={styles.container}>
-      {/* Sidebar */}
-      <div style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <h2 style={styles.sidebarTitle}>{isOwner ? '🏪 Chủ quán Panel' : '🎛️ Admin Panel'}</h2>
-        </div>
+    <>
+      <style>{`
+        .topbar-nav-btn {
+          margin: 0;
+          border: 1px solid rgba(120, 148, 181, 0.34);
+          background: rgba(14, 33, 61, 0.5);
+          color: #d9e7f8;
+          border-radius: 12px;
+          height: 40px;
+          padding: 0 14px;
+          transition: all 0.22s ease;
+        }
 
-        <nav style={styles.nav}>
-          {!isOwner && (
-            <button
-              style={{
-                ...styles.navButton,
-                ...(activeTab === 'dashboard' ? styles.navButtonActive : {})
-              }}
-              onClick={() => {
-                setActiveTab('dashboard')
-                loadHeatmapData() // Refresh data when clicking dashboard
-              }}
-            >
-              📊 Dashboard
-            </button>
-          )}
-          <button
-            style={{
-              ...styles.navButton,
-              ...(activeTab === 'restaurants' ? styles.navButtonActive : {})
-            }}
-            onClick={() => setActiveTab('restaurants')}
-          >
-            🍽️ Quản lý Quán
-          </button>
-          {!isOwner && (
-            <button
-              style={{
-                ...styles.navButton,
-                ...(activeTab === 'hidden' ? styles.navButtonActive : {})
-              }}
-              onClick={() => setActiveTab('hidden')}
-            >
-              👻 Quán đã ẩn
-            </button>
-          )}
-          {!isOwner && (
-            <button
-              style={{
-                ...styles.navButton,
-                ...(activeTab === 'tags' ? styles.navButtonActive : {})
-              }}
-              onClick={() => setActiveTab('tags')}
-            >
-              🏷️ Quản lý Tags
-            </button>
-          )}
-          {!isOwner && (
-            <button
-              style={{
-                ...styles.navButton,
-                ...(activeTab === 'adminAccounts' ? styles.navButtonActive : {})
-              }}
-              onClick={() => setActiveTab('adminAccounts')}
-            >
-              👤 Tài khoản Admin
-            </button>
-          )}
-        </nav>
+        .topbar-nav-btn:hover {
+          border: 1px solid rgba(158, 193, 234, 0.68);
+          background: linear-gradient(128deg, rgba(42, 88, 156, 0.85), rgba(34, 119, 136, 0.72));
+          color: #f5fbff;
+          transform: translateY(-1px);
+          box-shadow: 0 10px 18px rgba(6, 18, 40, 0.24);
+        }
 
-        <div style={styles.sidebarFooter}>
-          <button style={styles.logoutButton} onClick={handleLogout}>
-            🚪 Đăng xuất
-          </button>
-        </div>
-      </div>
+        .topbar-nav-btn.active {
+          border: 1px solid rgba(196, 227, 255, 0.94);
+          background: linear-gradient(128deg, rgba(74, 145, 235, 0.94), rgba(72, 200, 220, 0.86));
+          color: #ffffff;
+          box-shadow: 0 12px 22px rgba(8, 24, 50, 0.3), 0 0 20px rgba(130, 207, 255, 0.35);
+        }
 
-      {/* Main content */}
-      <div style={styles.mainContent}>
-        {!isOwner && activeTab === 'dashboard' && (
-          <div style={styles.dashboardContent}>
-            <h1 style={styles.pageTitle}>� Dashboard Analytics</h1>
-            <p style={styles.pageDescription}>
-              Thống kê tổng quan và bản đồ quán ăn
-            </p>
-            
-            <div style={styles.dashboardLayout}>
-              {/* Left side - Top tables */}
-              <div style={styles.topTablesContainer}>
-                {/* Top 5 by visits */}
-                <div style={styles.topTableCard}>
-                  <h3 style={styles.topTableTitle}>🔥 Top 5 Quán được ghé nhiều nhất</h3>
-                  <table style={styles.topTable}>
-                    <thead>
-                      <tr>
-                        <th style={styles.topTableTh}>#</th>
-                        <th style={styles.topTableTh}>Quán</th>
-                        <th style={styles.topTableTh}>Lượt ghé</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topRestaurants.byVisits.length === 0 ? (
-                        <tr>
-                          <td colSpan="3" style={styles.topTableEmpty}>Chưa có dữ liệu</td>
-                        </tr>
-                      ) : (
-                        topRestaurants.byVisits.map((r, idx) => (
-                          <tr key={r.id} style={styles.topTableTr}>
-                            <td style={styles.topTableTd}>{idx + 1}</td>
-                            <td style={styles.topTableTd}>{r.name}</td>
-                            <td style={styles.topTableTd}><strong>{r.visit_count || 0}</strong></td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+        .topbar-logout-btn {
+          margin: 0;
+          border-radius: 12px;
+          border: 1px solid rgba(132, 160, 195, 0.42);
+          background: linear-gradient(135deg, rgba(18, 59, 117, 0.84) 0%, rgba(18, 98, 122, 0.84) 100%);
+          color: #f0f6ff;
+          height: 40px;
+          padding: 0 16px;
+          transition: all 0.2s ease;
+        }
 
-                {/* Top 5 by duration */}
-                <div style={styles.topTableCard}>
-                  <h3 style={styles.topTableTitle}>⏱️ Top 5 Quán được ghé lâu nhất</h3>
-                  <table style={styles.topTable}>
-                    <thead>
-                      <tr>
-                        <th style={styles.topTableTh}>#</th>
-                        <th style={styles.topTableTh}>Quán</th>
-                        <th style={styles.topTableTh}>TG TB (phút)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topRestaurants.byDuration.length === 0 ? (
-                        <tr>
-                          <td colSpan="3" style={styles.topTableEmpty}>Chưa có dữ liệu</td>
-                        </tr>
-                      ) : (
-                        topRestaurants.byDuration.map((r, idx) => (
-                          <tr key={r.id} style={styles.topTableTr}>
-                            <td style={styles.topTableTd}>{idx + 1}</td>
-                            <td style={styles.topTableTd}>{r.name}</td>
-                            <td style={styles.topTableTd}><strong>{r.avg_visit_duration ? r.avg_visit_duration.toFixed(1) : '0.0'}</strong></td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Top 5 by audio */}
-                <div style={styles.topTableCard}>
-                  <h3 style={styles.topTableTitle}>🎧 Top 5 Quán có audio được nghe nhiều nhất</h3>
-                  <table style={styles.topTable}>
-                    <thead>
-                      <tr>
-                        <th style={styles.topTableTh}>#</th>
-                        <th style={styles.topTableTh}>Quán</th>
-                        <th style={styles.topTableTh}>TG TB (giây)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topRestaurants.byAudio.length === 0 ? (
-                        <tr>
-                          <td colSpan="3" style={styles.topTableEmpty}>Chưa có dữ liệu</td>
-                        </tr>
-                      ) : (
-                        topRestaurants.byAudio.map((r, idx) => (
-                          <tr key={r.id} style={styles.topTableTr}>
-                            <td style={styles.topTableTd}>{idx + 1}</td>
-                            <td style={styles.topTableTd}>{r.name}</td>
-                            <td style={styles.topTableTd}><strong>{r.avg_audio_duration ? r.avg_audio_duration.toFixed(1) : '0.0'}</strong></td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Right side - Map */}
-              <div style={styles.mapContainer}>
-                <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
-                {restaurants.length === 0 && (
-                  <div style={styles.noDataMessage}>
-                    ℹ️ Chưa có quán ăn nào trong hệ thống.
-                  </div>
-                )}
-                <div style={styles.heatmapContainer}>
-                  <MapContainer
-                    center={[10.760426862777551, 106.68198430250096]}
-                    zoom={15}
-                    style={{ height: '100%', width: '100%' }}
-                    zoomControl={true}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-                      url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                    />
-                    
-                    {/* Heatmap layer */}
-                    <HeatmapLayer heatmapData={heatmapData} />
-
-                    {/* Marker các quán */}
-                    {restaurants.map(restaurant => (
-                      <Marker
-                        key={restaurant.id}
-                        position={[restaurant.lat, restaurant.lng]}
-                        icon={restaurantIcon}
-                      >
-                        <Popup maxWidth={300}>
-                          <div style={{ padding: '5px' }}>
-                            <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
-                            {restaurant.address && (
-                              <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
-                                📍 {restaurant.address}
-                              </p>
-                            )}
-                            {restaurant.description && (
-                              <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
-                                {restaurant.description}
-                              </p>
-                            )}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
-                  </MapContainer>
-                </div>
-              </div>
+        .topbar-logout-btn:hover {
+          transform: translateY(-1px);
+          border: 1px solid rgba(255, 171, 171, 0.72);
+          background: linear-gradient(135deg, #a61b2d 0%, #d62f46 100%) !important;
+          box-shadow: 0 12px 22px rgba(85, 9, 24, 0.42), inset 0 0 0 1px rgba(255, 211, 211, 0.26);
+        }
+      `}</style>
+      <div style={styles.container}>
+        <header style={styles.topbar}>
+          <div style={styles.topbarBrand}>
+            <div style={styles.brandDot} />
+            <div>
+              <div style={styles.topbarTitle}>{isOwner ? 'Owner Command' : 'Admin Command Center'}</div>
+              <div style={styles.topbarSub}>{isOwner ? 'Restaurant Operations' : 'NearBite Control Suite'}</div>
             </div>
           </div>
-        )}
 
-        {activeTab === 'restaurants' && (
-          <RestaurantManagement
-            isHidden={false}
-            loginPath={loginPath}
-            authCheckPath={`${authBase}/check`}
-            isOwnerView={isOwner}
-          />
-        )}
-        {!isOwner && activeTab === 'hidden' && (
-          <RestaurantManagement
-            isHidden={true}
-            loginPath={loginPath}
-            authCheckPath={`${authBase}/check`}
-          />
-        )}
-        {!isOwner && activeTab === 'tags' && <TagManagement loginPath={loginPath} />}
-        {!isOwner && activeTab === 'adminAccounts' && <AdminAccountManagement />}
+          <nav style={styles.topNav}>
+            {!isOwner && (
+              <button
+                className={`topbar-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+                style={styles.topNavButton}
+                onClick={() => {
+                  setActiveTab('dashboard')
+                  loadHeatmapData()
+                }}
+              >
+                Dashboard
+              </button>
+            )}
+            <button
+              className={`topbar-nav-btn ${activeTab === 'restaurants' ? 'active' : ''}`}
+              style={styles.topNavButton}
+              onClick={() => setActiveTab('restaurants')}
+            >
+              Quản lý quán
+            </button>
+            {!isOwner && (
+              <button
+                className={`topbar-nav-btn ${activeTab === 'hidden' ? 'active' : ''}`}
+                style={styles.topNavButton}
+                onClick={() => setActiveTab('hidden')}
+              >
+                Quán đã ẩn
+              </button>
+            )}
+            {!isOwner && (
+              <button
+                className={`topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`}
+                style={styles.topNavButton}
+                onClick={() => setActiveTab('tags')}
+              >
+                Quản lý tags
+              </button>
+            )}
+            {!isOwner && (
+              <button
+                className={`topbar-nav-btn ${activeTab === 'adminAccounts' ? 'active' : ''}`}
+                style={styles.topNavButton}
+                onClick={() => setActiveTab('adminAccounts')}
+              >
+                Tài khoản admin
+              </button>
+            )}
+          </nav>
+
+          <button className="topbar-logout-btn" style={styles.topbarLogout} onClick={handleLogout}>
+            Đăng xuất
+          </button>
+        </header>
+
+        {/* Main content */}
+        <div style={styles.mainContent}>
+          <div style={styles.contentFrame}>
+            {!isOwner && activeTab === 'dashboard' && (
+              <div style={styles.dashboardContent}>
+                <div style={styles.dashboardLayout}>
+                  {/* Left side - Top tables */}
+                  <div style={styles.topTablesContainer}>
+                    {/* Top 5 by visits */}
+                    <div style={styles.topTableCard}>
+                      <h3 style={styles.topTableTitle}>🔥 Top 5 Quán được ghé nhiều nhất</h3>
+                      <table style={styles.topTable}>
+                        <thead>
+                          <tr>
+                            <th style={styles.topTableTh}>#</th>
+                            <th style={styles.topTableTh}>Quán</th>
+                            <th style={styles.topTableTh}>Lượt ghé</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {topRestaurants.byVisits.length === 0 ? (
+                            <tr>
+                              <td colSpan="3" style={styles.topTableEmpty}>Chưa có dữ liệu</td>
+                            </tr>
+                          ) : (
+                            topRestaurants.byVisits.map((r, idx) => (
+                              <tr key={r.id} style={styles.topTableTr}>
+                                <td style={styles.topTableTd}>{idx + 1}</td>
+                                <td style={styles.topTableTd}>{r.name}</td>
+                                <td style={styles.topTableTd}><strong>{r.visit_count || 0}</strong></td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Top 5 by duration */}
+                    <div style={styles.topTableCard}>
+                      <h3 style={styles.topTableTitle}>⏱️ Top 5 Quán được ghé lâu nhất</h3>
+                      <table style={styles.topTable}>
+                        <thead>
+                          <tr>
+                            <th style={styles.topTableTh}>#</th>
+                            <th style={styles.topTableTh}>Quán</th>
+                            <th style={styles.topTableTh}>TG TB (phút)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {topRestaurants.byDuration.length === 0 ? (
+                            <tr>
+                              <td colSpan="3" style={styles.topTableEmpty}>Chưa có dữ liệu</td>
+                            </tr>
+                          ) : (
+                            topRestaurants.byDuration.map((r, idx) => (
+                              <tr key={r.id} style={styles.topTableTr}>
+                                <td style={styles.topTableTd}>{idx + 1}</td>
+                                <td style={styles.topTableTd}>{r.name}</td>
+                                <td style={styles.topTableTd}><strong>{r.avg_visit_duration ? r.avg_visit_duration.toFixed(1) : '0.0'}</strong></td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Top 5 by audio */}
+                    <div style={styles.topTableCard}>
+                      <h3 style={styles.topTableTitle}>🎧 Top 5 Quán có audio được nghe nhiều nhất</h3>
+                      <table style={styles.topTable}>
+                        <thead>
+                          <tr>
+                            <th style={styles.topTableTh}>#</th>
+                            <th style={styles.topTableTh}>Quán</th>
+                            <th style={styles.topTableTh}>TG TB (giây)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {topRestaurants.byAudio.length === 0 ? (
+                            <tr>
+                              <td colSpan="3" style={styles.topTableEmpty}>Chưa có dữ liệu</td>
+                            </tr>
+                          ) : (
+                            topRestaurants.byAudio.map((r, idx) => (
+                              <tr key={r.id} style={styles.topTableTr}>
+                                <td style={styles.topTableTd}>{idx + 1}</td>
+                                <td style={styles.topTableTd}>{r.name}</td>
+                                <td style={styles.topTableTd}><strong>{r.avg_audio_duration ? r.avg_audio_duration.toFixed(1) : '0.0'}</strong></td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Right side - Map */}
+                  <div style={styles.mapContainer}>
+                    <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
+                    {restaurants.length === 0 && (
+                      <div style={styles.noDataMessage}>
+                        ℹ️ Chưa có quán ăn nào trong hệ thống.
+                      </div>
+                    )}
+                    <div style={styles.heatmapContainer}>
+                      <MapContainer
+                        center={[10.760426862777551, 106.68198430250096]}
+                        zoom={15}
+                        style={{ height: '100%', width: '100%' }}
+                        zoomControl={true}
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                        />
+
+                        {/* Heatmap layer */}
+                        <HeatmapLayer heatmapData={heatmapData} />
+
+                        {/* Marker các quán */}
+                        {restaurants.map(restaurant => (
+                          <Marker
+                            key={restaurant.id}
+                            position={[restaurant.lat, restaurant.lng]}
+                            icon={restaurantIcon}
+                          >
+                            <Popup maxWidth={300}>
+                              <div style={{ padding: '5px' }}>
+                                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                                {restaurant.address && (
+                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
+                                    📍 {restaurant.address}
+                                  </p>
+                                )}
+                                {restaurant.description && (
+                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
+                                    {restaurant.description}
+                                  </p>
+                                )}
+                              </div>
+                            </Popup>
+                          </Marker>
+                        ))}
+                      </MapContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'restaurants' && (
+              <RestaurantManagement
+                isHidden={false}
+                loginPath={loginPath}
+                authCheckPath={`${authBase}/check`}
+                isOwnerView={isOwner}
+              />
+            )}
+            {!isOwner && activeTab === 'hidden' && (
+              <RestaurantManagement
+                isHidden={true}
+                loginPath={loginPath}
+                authCheckPath={`${authBase}/check`}
+              />
+            )}
+            {!isOwner && activeTab === 'tags' && <TagManagement loginPath={loginPath} />}
+            {!isOwner && activeTab === 'adminAccounts' && <AdminAccountManagement />}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
 const styles = {
   container: {
     display: 'flex',
+    flexDirection: 'column',
     height: '100vh',
     width: '100vw',
     overflow: 'hidden',
-    fontFamily: 'system-ui, -apple-system, sans-serif'
+    fontFamily: 'Plus Jakarta Sans, Segoe UI, sans-serif',
+    background: 'radial-gradient(1100px 420px at 10% -12%, rgba(62, 118, 201, 0.2), transparent 70%), radial-gradient(900px 360px at 90% 2%, rgba(50, 146, 162, 0.18), transparent 72%), linear-gradient(160deg, #ebf2fb 0%, #e4edf8 100%)'
   },
-  sidebar: {
-    width: '280px',
-    backgroundColor: '#1e293b',
-    color: 'white',
+  topbar: {
+    height: '82px',
+    padding: '0 18px',
     display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '2px 0 10px rgba(0,0,0,0.1)'
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '18px',
+    borderBottom: '1px solid rgba(136, 160, 195, 0.45)',
+    background: 'linear-gradient(145deg, #0b1b33 0%, #102847 52%, #113850 100%)',
+    boxShadow: '0 14px 28px rgba(12, 23, 43, 0.28)'
   },
-  sidebarHeader: {
-    padding: '24px 20px',
-    borderBottom: '1px solid #334155'
+  topbarBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    minWidth: '250px'
   },
-  sidebarTitle: {
-    margin: 0,
-    fontSize: '24px',
-    fontWeight: '600'
+  brandDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #79d8ff 0%, #77f2ce 100%)',
+    boxShadow: '0 0 16px rgba(121, 216, 255, 0.8)'
   },
-  nav: {
-    flex: 1,
-    padding: '20px 0',
-    overflowY: 'auto'
+  topbarTitle: {
+    color: '#f2f7ff',
+    fontSize: '18px',
+    fontWeight: '750',
+    lineHeight: 1.2
   },
-  navButton: {
-    width: '100%',
-    padding: '14px 20px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    color: '#cbd5e1',
-    fontSize: '16px',
-    textAlign: 'left',
+  topbarSub: {
+    color: 'rgba(208, 223, 243, 0.85)',
+    fontSize: '12px',
+    letterSpacing: '0.4px',
+    textTransform: 'uppercase',
+    marginTop: '2px'
+  },
+  topNav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+    justifyContent: 'center'
+  },
+  topNavButton: {
     cursor: 'pointer',
-    transition: 'all 0.2s',
-    borderLeft: '4px solid transparent'
+    fontSize: '14px',
+    fontWeight: '650'
   },
-  navButtonActive: {
-    backgroundColor: '#334155',
-    color: 'white',
-    borderLeft: '4px solid #3b82f6',
-    fontWeight: '600'
-  },
-  sidebarFooter: {
-    padding: '20px',
-    borderTop: '1px solid #334155'
-  },
-  logoutButton: {
-    width: '100%',
-    padding: '12px',
-    border: 'none',
-    backgroundColor: '#ef4444',
-    color: 'white',
-    fontSize: '16px',
-    borderRadius: '8px',
+  topbarLogout: {
+    border: '1px solid rgba(132, 160, 195, 0.42)',
+    background: 'rgba(20, 55, 99, 0.88)',
+    color: '#f0f6ff',
     cursor: 'pointer',
-    transition: 'background-color 0.2s'
+    fontSize: '14px',
+    fontWeight: '700'
   },
   mainContent: {
     flex: 1,
     overflowY: 'auto',
-    backgroundColor: '#f8fafc'
+    background:
+      'radial-gradient(800px 340px at 15% -10%, rgba(214, 167, 86, 0.15), transparent 70%), radial-gradient(900px 380px at 88% 8%, rgba(39, 104, 114, 0.12), transparent 72%), linear-gradient(160deg, #f2f6fb 0%, #ecf2fa 100%)'
+  },
+  contentFrame: {
+    margin: '14px 18px 18px',
+    borderRadius: '20px',
+    minHeight: 'calc(100vh - 114px)',
+    border: '1px solid rgba(133, 158, 193, 0.55)',
+    background:
+      'linear-gradient(158deg, rgba(255, 255, 255, 0.72) 0%, rgba(247, 251, 255, 0.66) 100%)',
+    boxShadow: '0 20px 40px rgba(26, 40, 67, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.58)',
+    backdropFilter: 'blur(8px)',
+    overflow: 'hidden'
   },
   dashboardContent: {
-    padding: '32px',
+    padding: '26px 34px 34px',
     width: '100%',
     height: '100%'
   },
   pageTitle: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: '8px'
+    fontSize: '34px',
+    fontWeight: '750',
+    color: '#11203a',
+    marginBottom: '6px',
+    letterSpacing: '-0.02em'
   },
   pageDescription: {
-    fontSize: '16px',
-    color: '#64748b',
-    marginBottom: '24px'
+    fontSize: '15px',
+    color: '#4f627e',
+    marginBottom: '24px',
+    fontWeight: '500'
   },
   dashboardLayout: {
     display: 'flex',
@@ -542,36 +595,44 @@ const styles = {
     overflowY: 'auto'
   },
   topTableCard: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
+    background: 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(246, 250, 255, 0.92) 100%)',
+    borderRadius: '16px',
     padding: '20px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    border: '1px solid #e2e8f0'
+    boxShadow: '0 16px 32px rgba(22, 35, 61, 0.13), 0 0 0 1px rgba(207, 222, 241, 0.5) inset',
+    border: '1px solid rgba(188, 208, 233, 0.92)',
+    backdropFilter: 'blur(8px)'
   },
   topTableTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#1e293b',
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#132745',
     marginBottom: '16px',
     marginTop: '0'
   },
   topTable: {
     width: '100%',
-    borderCollapse: 'collapse',
+    borderCollapse: 'separate',
+    borderSpacing: 0,
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: '1px solid #c6daf4',
+    boxShadow: '0 8px 20px rgba(20, 50, 92, 0.1)',
     fontSize: '14px'
   },
   topTableTh: {
     textAlign: 'left',
     padding: '8px',
-    borderBottom: '2px solid #e2e8f0',
-    color: '#64748b',
+    borderBottom: '2px solid #cfe0f4',
+    color: '#3f5678',
     fontWeight: '600',
-    fontSize: '13px'
+    fontSize: '13px',
+    background: 'linear-gradient(180deg, #fafdff 0%, #eaf3ff 100%)'
   },
   topTableTd: {
     padding: '10px 8px',
-    borderBottom: '1px solid #f1f5f9',
-    color: '#334155'
+    borderBottom: '1px solid #eaf1fa',
+    color: '#223653',
+    backgroundColor: 'rgba(255, 255, 255, 0.86)'
   },
   topTableTr: {
     transition: 'background-color 0.2s'
@@ -589,8 +650,8 @@ const styles = {
   },
   mapTitle: {
     fontSize: '18px',
-    fontWeight: '600',
-    color: '#1e293b',
+    fontWeight: '700',
+    color: '#132745',
     marginBottom: '12px',
     marginTop: '0'
   },
@@ -605,10 +666,10 @@ const styles = {
   },
   heatmapContainer: {
     flex: 1,
-    borderRadius: '12px',
+    borderRadius: '16px',
     overflow: 'hidden',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    border: '1px solid #e2e8f0'
+    boxShadow: '0 16px 34px rgba(20, 33, 58, 0.18)',
+    border: '1px solid rgba(182, 198, 221, 0.8)'
   }
 }
 

@@ -141,11 +141,18 @@ function TagManagement({ loginPath = '/admin/login' }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>🏷️ Quản lý Tags</h1>
-        <button style={styles.addButton} onClick={handleAdd}>
-          ➕ Thêm tag mới
-        </button>
+      <div style={styles.heroPanel}>
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.title}>Tag Management Studio</h1>
+            <p style={styles.titleSubtitle}>
+              Thiết kế hệ taxonomy rõ ràng để tối ưu phân loại nhà hàng, món ăn và trải nghiệm tìm kiếm.
+            </p>
+          </div>
+          <button style={styles.addButton} onClick={handleAdd}>
+            ➕ Thêm tag mới
+          </button>
+        </div>
       </div>
 
       <div style={styles.tagGrid}>
@@ -252,30 +259,48 @@ const styles = {
   container: {
     padding: '32px',
     maxWidth: '1400px',
-    margin: '0 auto'
+    margin: '0 auto',
+    animation: 'fadeInUp 0.45s ease'
+  },
+  heroPanel: {
+    borderRadius: '18px',
+    padding: '18px 20px',
+    marginBottom: '20px',
+    border: '1px solid rgba(168, 193, 226, 0.55)',
+    background:
+      'linear-gradient(144deg, rgba(241, 248, 255, 0.9) 0%, rgba(225, 236, 251, 0.76) 65%, rgba(227, 248, 255, 0.7) 100%)',
+    boxShadow: '0 12px 26px rgba(22, 42, 73, 0.11)'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '24px'
+    gap: '16px'
   },
   title: {
     fontSize: '32px',
-    fontWeight: '700',
-    color: '#1e293b',
+    fontWeight: '760',
+    color: '#10213c',
     margin: 0
+  },
+  titleSubtitle: {
+    margin: '8px 0 0',
+    color: '#486380',
+    fontSize: '14px',
+    maxWidth: '760px',
+    lineHeight: '1.45'
   },
   addButton: {
     padding: '12px 24px',
-    backgroundColor: '#9b59b6',
+    background: 'linear-gradient(130deg, #0d5f5f 0%, #1e5f88 100%)',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
+    borderRadius: '12px',
+    fontSize: '15px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'background-color 0.2s'
+    transition: 'transform 0.2s ease, filter 0.2s ease',
+    boxShadow: '0 14px 24px rgba(20, 78, 98, 0.28)'
   },
   tagGrid: {
     display: 'grid',
@@ -283,11 +308,11 @@ const styles = {
     gap: '20px'
   },
   tagCard: {
-    backgroundColor: 'white',
+    background: 'linear-gradient(168deg, rgba(255,255,255,0.96) 0%, rgba(245,250,255,0.92) 100%)',
     padding: '20px',
-    borderRadius: '12px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    border: '2px solid #e2e8f0'
+    borderRadius: '16px',
+    boxShadow: '0 12px 26px rgba(20, 35, 58, 0.11)',
+    border: '1px solid rgba(198, 214, 234, 0.75)'
   },
   tagHeader: {
     display: 'flex',
@@ -304,8 +329,8 @@ const styles = {
   tagName: {
     margin: '0 0 8px 0',
     fontSize: '18px',
-    fontWeight: '600',
-    color: '#1e293b'
+    fontWeight: '700',
+    color: '#132745'
   },
   colorBox: {
     width: '40px',
@@ -315,7 +340,7 @@ const styles = {
   },
   tagDescription: {
     fontSize: '14px',
-    color: '#64748b',
+    color: '#4f627e',
     marginBottom: '12px',
     lineHeight: '1.5'
   },
@@ -327,8 +352,8 @@ const styles = {
     flex: 1,
     padding: '8px 12px',
     border: 'none',
-    borderRadius: '6px',
-    backgroundColor: '#f59e0b',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #d48619 0%, #f59e0b 100%)',
     color: 'white',
     fontSize: '14px',
     fontWeight: '600',
@@ -338,8 +363,8 @@ const styles = {
     flex: 1,
     padding: '8px 12px',
     border: 'none',
-    borderRadius: '6px',
-    backgroundColor: '#ef4444',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #b41c2f 0%, #d82e44 100%)',
     color: 'white',
     fontSize: '14px',
     fontWeight: '600',
@@ -357,26 +382,27 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(10,18,34,0.56)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
+    background: 'linear-gradient(160deg, #ffffff 0%, #f4f8ff 100%)',
+    borderRadius: '16px',
     padding: '32px',
     maxWidth: '500px',
     width: '90%',
     maxHeight: '90vh',
     overflowY: 'auto',
-    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+    boxShadow: '0 26px 48px rgba(9, 18, 38, 0.28)',
+    border: '1px solid rgba(198, 214, 234, 0.75)'
   },
   modalTitle: {
     fontSize: '24px',
-    fontWeight: '700',
-    color: '#1e293b',
+    fontWeight: '760',
+    color: '#132745',
     marginBottom: '24px'
   },
   formGroup: {
@@ -392,8 +418,8 @@ const styles = {
   input: {
     width: '100%',
     padding: '10px 12px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '6px',
+    border: '1px solid #c9d5e5',
+    borderRadius: '10px',
     fontSize: '14px'
   },
   colorInput: {
@@ -406,8 +432,8 @@ const styles = {
   textarea: {
     width: '100%',
     padding: '10px 12px',
-    border: '1px solid #cbd5e1',
-    borderRadius: '6px',
+    border: '1px solid #c9d5e5',
+    borderRadius: '10px',
     fontSize: '14px',
     resize: 'vertical'
   },
@@ -430,8 +456,8 @@ const styles = {
   btnSave: {
     padding: '10px 20px',
     border: 'none',
-    borderRadius: '6px',
-    backgroundColor: '#9b59b6',
+    borderRadius: '10px',
+    background: 'linear-gradient(130deg, #0d5f5f 0%, #1e5f88 100%)',
     color: 'white',
     fontSize: '14px',
     fontWeight: '600',
