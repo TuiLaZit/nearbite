@@ -3,7 +3,7 @@ import hashlib
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from gtts import gTTS
-from supabase_client import supabase_client, ensure_bucket_exists
+from supabase_client import supabase_client, ensure_bucket_exists, get_public_url_for_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TTS_DIR = os.path.join(BASE_DIR, "static", "tts")
@@ -243,11 +243,13 @@ def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
                 audio_bytes,
                 {
                     "content-type": "audio/mpeg",
-                    "upsert": "true",
+                    "upsert": True,
                     "cache-control": str(ttl),
                 }
             )
-            public_url = supabase_client.storage.from_(TTS_BUCKET).get_public_url(storage_path)
+            public_url = get_public_url_for_path(storage_path, bucket_name=TTS_BUCKET)
+            if not public_url:
+                raise Exception("Unable to resolve public URL for generated TTS audio")
             persistent_key = _persistent_key(text, mapped_lang, restaurant_id=restaurant_id)
             _persistent_tts_set(
                 cache_key=persistent_key,

@@ -540,7 +540,6 @@ function LocationTracker() {
     const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
     
     const audio = new Audio(audioUrl)
-    audio.crossOrigin = "anonymous" // Cho phép CORS
     audioRef.current = audio
     
     // Sự kiện load thành công

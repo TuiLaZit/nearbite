@@ -33,7 +33,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 supabase_client: Client = None
 
 # Avoid repeated bucket checks on every upload.
-_bucket_checked = False
+_checked_buckets = set()
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -45,9 +45,7 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 def ensure_bucket_exists(bucket_name="restaurant-images"):
     """Ensure storage bucket exists, but only when storage operations are used."""
-    global _bucket_checked
-
-    if _bucket_checked or not supabase_client:
+    if bucket_name in _checked_buckets or not supabase_client:
         return
 
     try:
@@ -63,7 +61,23 @@ def ensure_bucket_exists(bucket_name="restaurant-images"):
         # Do not block app startup or request handling if storage bootstrap fails.
         pass
     finally:
-        _bucket_checked = True
+        _checked_buckets.add(bucket_name)
+
+
+def get_public_url_for_path(path, bucket_name="restaurant-images"):
+    if not supabase_client or not path:
+        return None
+
+    try:
+        value = supabase_client.storage.from_(bucket_name).get_public_url(path)
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            return value.get("publicUrl") or value.get("publicURL")
+    except Exception:
+        return None
+
+    return None
 
 
 def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
@@ -92,7 +106,7 @@ def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
         )
         
         # Get public URL
-        public_url = supabase_client.storage.from_(bucket_name).get_public_url(filename)
+        public_url = get_public_url_for_path(filename, bucket_name=bucket_name)
         
         return public_url
     
