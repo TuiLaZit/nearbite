@@ -88,6 +88,13 @@ def _is_origin_allowed(origin):
             return True
     return False
 
+
+def _normalize_database_url(raw_url):
+    url = (raw_url or "").strip()
+    if url.startswith("postgres://"):
+        return "postgresql://" + url[len("postgres://"):]
+    return url
+
 CORS(
     app,
     resources={r"/*": {
@@ -120,7 +127,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True
 )
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_DATABASE_URI"] = _normalize_database_url(os.getenv("DATABASE_URL"))
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)

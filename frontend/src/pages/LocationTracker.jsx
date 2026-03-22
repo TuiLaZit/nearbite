@@ -111,9 +111,12 @@ function LocationTracker() {
   // Fetch danh sách ngôn ngữ từ API
   useEffect(() => {
     fetch(`${BASE_URL}/languages`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+        return res.json()
+      })
       .then(data => {
-        if (data.status === 'success') {
+        if (data.status === 'success' && Array.isArray(data.languages)) {
           setLanguages(data.languages)
         }
       })
@@ -144,9 +147,12 @@ function LocationTracker() {
   // Fetch danh sách quán theo ngôn ngữ hiện tại
   useEffect(() => {
     fetch(`${BASE_URL}/restaurants?lang=${encodeURIComponent(language)}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+        return res.json()
+      })
       .then(data => {
-        setRestaurants(data.restaurants)
+        setRestaurants(Array.isArray(data.restaurants) ? data.restaurants : [])
       })
       .catch(err => console.error('Error fetching restaurants:', err))
   }, [language])
@@ -267,6 +273,11 @@ function LocationTracker() {
         return res.json()
       })
       .then(data => {
+        if (!data || !data.nearest_place || typeof data.distance_km !== 'number') {
+          console.warn('Invalid /location response payload:', data)
+          return
+        }
+
         const newId = data.nearest_place.id
         const distance = data.distance_km
 
@@ -721,8 +732,15 @@ function LocationTracker() {
           allow_network_translation: true
         })
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+          return res.json()
+        })
         .then(data => {
+          if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response payload')
+          }
+
           // Set selectedRestaurant với data mới
           const selectedPlace = data.nearest_place || {}
           const newData = {
@@ -757,8 +775,15 @@ function LocationTracker() {
           allow_network_translation: true
         })
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+          return res.json()
+        })
         .then(data => {
+          if (!data || typeof data !== 'object') {
+            throw new Error('Invalid response payload')
+          }
+
           const selectedPlace = data.nearest_place || {}
           setSelectedRestaurant({
             ...restaurant,
