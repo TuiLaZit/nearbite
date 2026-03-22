@@ -50,6 +50,8 @@ const activeRestaurantIcon = new L.Icon({
   popupAnchor: [0, -32],
 })
 
+const POI_DEBOUNCE_MS = 2000
+
 // Component để tự động center map khi user di chuyển
 function MapUpdater({ center }) {
   const map = useMap()
@@ -89,7 +91,7 @@ function LocationTracker() {
   const languageRef = useRef(language) // Track current language
   const audioUnlockedRef = useRef(false) // Track nếu audio đã được unlock
   const poiEntryTimeRef = useRef(null) // Track thời điểm bước vào POI
-  const poiDebounceTimerRef = useRef(null) // Timer cho debouncer 3s
+  const poiDebounceTimerRef = useRef(null) // Timer cho debouncer 2s
   const playedRestaurantsRef = useRef(new Map()) // Track quán đã phát: {restaurantId: timestamp}
   const visitStartTimeRef = useRef(null) // Track thời điểm bắt đầu visit (đứng gần quán > 10s)
   const audioStartTimeRef = useRef(null) // Track thời điểm bắt đầu nghe audio
@@ -353,7 +355,7 @@ function LocationTracker() {
                     playedRestaurantsRef.current.set(newId, Date.now())
                   }
                 }
-              }, 2000) // 2 giây
+              }, POI_DEBOUNCE_MS) // 2 giây
             }
           }
         } else {
@@ -433,7 +435,7 @@ function LocationTracker() {
                     playedRestaurantsRef.current.set(newId, Date.now())
                   }
                 }
-              }, 2000) // 2 giây
+              }, POI_DEBOUNCE_MS) // 2 giây
             }
           } else if (distanceChanged) {
             // CHỈ cập nhật distance state, KHÔNG động vào currentNarration - audio không bị ngắt
@@ -715,14 +717,17 @@ function LocationTracker() {
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: languageRef.current
+          language: languageRef.current,
+          allow_network_translation: true
         })
       })
         .then(res => res.json())
         .then(data => {
           // Set selectedRestaurant với data mới
+          const selectedPlace = data.nearest_place || {}
           const newData = {
             ...restaurant,
+            ...selectedPlace,
             narration: data.narration,
             audioUrl: data.audio_url,
             distance: distance,
@@ -748,13 +753,16 @@ function LocationTracker() {
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: languageRef.current
+          language: languageRef.current,
+          allow_network_translation: true
         })
       })
         .then(res => res.json())
         .then(data => {
+          const selectedPlace = data.nearest_place || {}
           setSelectedRestaurant({
             ...restaurant,
+            ...selectedPlace,
             narration: data.narration,
             audioUrl: data.audio_url,
             loading: false
@@ -986,7 +994,9 @@ function LocationTracker() {
           )}
 
           {/* Marker các quán */}
-          {restaurants.map(restaurant => (
+          {restaurants.map(restaurant => {
+            const popupRestaurant = selectedRestaurant?.id === restaurant.id ? selectedRestaurant : restaurant
+            return (
             <Marker
               key={restaurant.id}
               position={[restaurant.lat, restaurant.lng]}
@@ -997,17 +1007,17 @@ function LocationTracker() {
             >
               <Popup maxWidth={350}>
                   <div style={{ padding: '5px', maxHeight: '500px', overflowY: 'auto' }}>
-                    <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{popupRestaurant.name}</h3>
                     
                     {/* Hiển thị ảnh chính */}
-                    {restaurant.images && restaurant.images.length > 0 && (
+                    {popupRestaurant.images && popupRestaurant.images.length > 0 && (
                       <div style={{ marginBottom: '10px' }}>
                         {(() => {
-                          const primaryImage = restaurant.images.find(img => img.is_primary) || restaurant.images[0]
+                          const primaryImage = popupRestaurant.images.find(img => img.is_primary) || popupRestaurant.images[0]
                           return (
                             <img 
                               src={primaryImage.image_url} 
-                              alt={primaryImage.caption || restaurant.name}
+                              alt={primaryImage.caption || popupRestaurant.name}
                               style={{ 
                                 width: '100%', 
                                 height: '150px', 
@@ -1021,9 +1031,9 @@ function LocationTracker() {
                             />
                           )
                         })()}
-                        {restaurant.images.length > 1 && (
+                        {popupRestaurant.images.length > 1 && (
                           <div style={{ display: 'flex', gap: '5px', overflowX: 'auto' }}>
-                            {restaurant.images.slice(0, 4).map((img, idx) => (
+                            {popupRestaurant.images.slice(0, 4).map((img, idx) => (
                               <img 
                                 key={idx}
                                 src={img.image_url} 
@@ -1046,9 +1056,9 @@ function LocationTracker() {
                     )}
                     
                     {/* Hiển thị tags */}
-                    {restaurant.tags && restaurant.tags.length > 0 && (
+                    {popupRestaurant.tags && popupRestaurant.tags.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
-                        {restaurant.tags.map(tag => (
+                        {popupRestaurant.tags.map(tag => (
                           <span
                             key={tag.id}
                             style={{
@@ -1070,8 +1080,8 @@ function LocationTracker() {
                       </div>
                     )}
                     
-                    {restaurant.description && (
-                      <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>{restaurant.description}</p>
+                    {popupRestaurant.description && (
+                      <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>{popupRestaurant.description}</p>
                     )}
                     {selectedRestaurant?.id === restaurant.id && (
                       <>
@@ -1159,7 +1169,7 @@ function LocationTracker() {
                   </div>
                 </Popup>
               </Marker>
-          ))}
+            )})}
         </MapContainer>
       </div>
 

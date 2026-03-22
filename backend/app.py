@@ -31,21 +31,67 @@ app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 
 app.static_folder = 'static'
 
+
+def _is_true_env(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_production_environment():
+    # Railway does not set RENDER, so rely on common production indicators.
+    if _is_true_env(os.getenv("RENDER")):
+        return True
+    if _is_true_env(os.getenv("RAILWAY_ENVIRONMENT")):
+        return True
+    if os.getenv("RAILWAY_PROJECT_ID"):
+        return True
+
+    flask_env = str(os.getenv("FLASK_ENV") or "").strip().lower()
+    app_env = str(os.getenv("APP_ENV") or "").strip().lower()
+    return flask_env == "production" or app_env == "production"
+
+
+is_production = _is_production_environment()
+
+
+def _build_allowed_origins():
+    origins = [
+        # Local development
+        "http://127.0.0.1:5000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+        # Production
+        "https://nearbite.vercel.app",
+        r"https://.*\.vercel\.app",
+    ]
+
+    extra_origins = (os.getenv("CORS_ALLOWED_ORIGINS") or "").strip()
+    if extra_origins:
+        origins.extend([o.strip() for o in extra_origins.split(",") if o.strip()])
+
+    return origins
+
+
+ALLOWED_ORIGINS = _build_allowed_origins()
+
+
+def _is_origin_allowed(origin):
+    if not origin:
+        return False
+
+    for pattern in ALLOWED_ORIGINS:
+        if pattern == origin:
+            return True
+        if pattern.startswith("https://.*") and re.fullmatch(pattern, origin):
+            return True
+    return False
+
 CORS(
     app,
     resources={r"/*": {
-        "origins": [
-            # Local development
-            "http://127.0.0.1:5000",
-            "http://localhost:5000",
-            "http://127.0.0.1:5173",
-            "http://localhost:5173",
-            "http://127.0.0.1:3000",
-            "http://localhost:3000",
-            # Production
-            "https://nearbite.vercel.app",
-            r"https://.*\.vercel\.app"
-        ]
+        "origins": ALLOWED_ORIGINS
     }},
     supports_credentials=True,
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -58,22 +104,15 @@ CORS(
 def handle_preflight():
     if request.method == "OPTIONS":
         origin = request.headers.get('Origin')
+        if not _is_origin_allowed(origin):
+            return jsonify({"error": "Origin not allowed"}), 403
+
         response = jsonify({"status": "ok"})
-        
-        # KHÔNG DÙNG wildcard "*" khi có credentials
-        # Phải trả về specific origin
-        if origin:
-            response.headers.add("Access-Control-Allow-Origin", origin)
-        else:
-            response.headers.add("Access-Control-Allow-Origin", "https://nearbite.vercel.app")
-        
+        response.headers.add("Access-Control-Allow-Origin", origin)
         response.headers.add("Access-Control-Allow-Credentials", "true")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
         response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
         return response, 200
-
-# Tự động detect môi trường production (HTTPS)
-is_production = bool(os.getenv("RENDER"))
 
 app.config.update(
     SESSION_COOKIE_SAMESITE="None" if is_production else "Lax",

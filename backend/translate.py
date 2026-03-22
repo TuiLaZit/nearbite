@@ -1,4 +1,4 @@
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 import json
@@ -61,9 +61,11 @@ _CACHE_NAMESPACE = (
     or (os.getenv("RENDER_GIT_COMMIT") or "").strip()
     or "default"
 )
-_FAST_FAIL_TRANSLATION = (os.getenv("FAST_FAIL_TRANSLATION") or "true").strip().lower() in {
+_FAST_FAIL_TRANSLATION = (os.getenv("FAST_FAIL_TRANSLATION") or "false").strip().lower() in {
     "1", "true", "yes", "on"
 }
+_TRANSLATION_RETRY = int((os.getenv("TRANSLATION_RETRY") or "2").strip() or "2")
+_TRANSLATION_RETRY = max(1, min(5, _TRANSLATION_RETRY))
 
 
 def _is_valid_translated_value(target_lang, original_text, translated_text):
@@ -168,6 +170,10 @@ def _translate_batch_google(texts, mapped_lang):
     return GoogleTranslator(source="auto", target=mapped_lang).translate_batch(texts)
 
 
+def _translate_single_mymemory(text, mapped_lang):
+    return MyMemoryTranslator(source="auto", target=mapped_lang).translate(text)
+
+
 def _call_with_timeout(fn, timeout_seconds):
     future = _TRANSLATION_EXECUTOR.submit(fn)
     try:
@@ -176,6 +182,28 @@ def _call_with_timeout(fn, timeout_seconds):
         return None
     except Exception:
         return None
+
+
+def _translate_single_with_retries(text, mapped_lang):
+    translated = None
+
+    for _ in range(_TRANSLATION_RETRY):
+        translated = _call_with_timeout(
+            lambda: _translate_single_google(text, mapped_lang),
+            _SINGLE_TIMEOUT_SECONDS
+        )
+        if _is_valid_translated_value(mapped_lang, text, translated):
+            return translated
+
+    for _ in range(_TRANSLATION_RETRY):
+        translated = _call_with_timeout(
+            lambda: _translate_single_mymemory(text, mapped_lang),
+            _SINGLE_TIMEOUT_SECONDS
+        )
+        if _is_valid_translated_value(mapped_lang, text, translated):
+            return translated
+
+    return None
 
 def translate_text(text, target_lang):
     if target_lang == "vi":
@@ -188,19 +216,13 @@ def translate_text(text, target_lang):
     if cached is not None:
         return cached
 
-    try:
-        translated = _call_with_timeout(
-            lambda: _translate_single_google(text, mapped_lang),
-            _SINGLE_TIMEOUT_SECONDS
-        )
+    translated = _translate_single_with_retries(text, mapped_lang)
+    if _is_valid_translated_value(mapped_lang, text, translated):
+        _cache_set(mapped_lang, text, translated)
+        return translated
 
-        if _is_valid_translated_value(mapped_lang, text, translated):
-            _cache_set(mapped_lang, text, translated)
-            return translated
-        return text
-    except Exception as e:
-        # Fallback về tiếng Việt nếu lỗi
-        return text
+    # Fallback về tiếng Việt nếu lỗi
+    return text
 
 
 def translate_texts(texts, target_lang, cache_only=False, fast_fail=None):
@@ -235,19 +257,27 @@ def translate_texts(texts, target_lang, cache_only=False, fast_fail=None):
         if missing_unique:
             for i in range(0, len(missing_unique), _BATCH_SIZE):
                 chunk = missing_unique[i:i + _BATCH_SIZE]
-                translated_chunk = _call_with_timeout(
-                    lambda chunk=chunk: _translate_batch_google(chunk, mapped_lang),
-                    _BATCH_TIMEOUT_SECONDS
-                )
+                translated_chunk = None
+                for _ in range(_TRANSLATION_RETRY):
+                    candidate = _call_with_timeout(
+                        lambda chunk=chunk: _translate_batch_google(chunk, mapped_lang),
+                        _BATCH_TIMEOUT_SECONDS
+                    )
+                    if isinstance(candidate, list) and len(candidate) == len(chunk):
+                        translated_chunk = candidate
+                        break
 
                 if not isinstance(translated_chunk, list) or len(translated_chunk) != len(chunk):
-                    if effective_fast_fail:
-                        translated_chunk = chunk
-                    else:
-                        translated_chunk = [translate_text(text, target_lang) for text in chunk]
+                    translated_chunk = [None] * len(chunk)
 
                 for j, original in enumerate(chunk):
-                    translated_value = translated_chunk[j] if translated_chunk[j] else original
+                    translated_value = translated_chunk[j]
+                    if not _is_valid_translated_value(mapped_lang, original, translated_value):
+                        if effective_fast_fail:
+                            translated_value = original
+                        else:
+                            translated_value = _translate_single_with_retries(original, mapped_lang) or original
+
                     if _is_valid_translated_value(mapped_lang, original, translated_value):
                         _cache_set(mapped_lang, original, translated_value)
 

@@ -231,6 +231,7 @@ def register_user_routes(app):
         user_lat = data.get("latitude")
         user_lng = data.get("longitude")
         language = data.get("language", "vi")
+        allow_network_translation = bool(data.get("allow_network_translation", False))
 
         restaurants = Restaurant.query.filter_by(is_active=True).all()
 
@@ -257,8 +258,13 @@ def register_user_routes(app):
         # Get restaurant data and reuse cached translation if unchanged.
         restaurant_data = nearest.to_dict(include_details=True)
         if language != 'vi':
-            # /location is high-frequency; use cache-only translation path to avoid request timeouts.
-            restaurant_data = _translate_restaurant_data(restaurant_data, language, allow_network=False)
+            # /location defaults to cache-only for tracking performance.
+            # Marker-click flow can opt in network translation for complete translated fields.
+            restaurant_data = _translate_restaurant_data(
+                restaurant_data,
+                language,
+                allow_network=allow_network_translation,
+            )
 
         return jsonify({
             "status": "success",
