@@ -44,6 +44,10 @@ def _is_production_environment():
         return True
     if os.getenv("RAILWAY_PROJECT_ID"):
         return True
+    if any(key.startswith("RAILWAY_") for key in os.environ.keys()):
+        return True
+    if os.getenv("PORT") and not _is_true_env(os.getenv("LOCAL_DEV")):
+        return True
 
     flask_env = str(os.getenv("FLASK_ENV") or "").strip().lower()
     app_env = str(os.getenv("APP_ENV") or "").strip().lower()
@@ -227,8 +231,12 @@ else:
     auto_create_tables = not bool(is_production)
 
 if auto_create_tables:
-    with app.app_context():
-        db.create_all()
+    try:
+        with app.app_context():
+            db.create_all()
+    except Exception as exc:
+        # Never crash app startup due to best-effort local table bootstrap.
+        print(f"[startup] Skipped db.create_all(): {exc}")
 
 
 def _ensure_local_schema_compatibility():
