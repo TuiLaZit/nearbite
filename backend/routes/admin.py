@@ -4,6 +4,8 @@ from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
 from supabase_client import upload_image, delete_image, supabase_client
+from translate import invalidate_translation_cache
+from tts import invalidate_tts_cache
 import uuid
 import re
 import secrets
@@ -14,6 +16,22 @@ from sqlalchemy import func, extract
 from werkzeug.security import generate_password_hash
 
 def register_admin_routes(app):
+
+    def invalidate_restaurant_content_cache(restaurant_id):
+        try:
+            invalidate_translation_cache(cache_scope_id=restaurant_id)
+        except Exception:
+            pass
+        try:
+            invalidate_tts_cache(restaurant_id=restaurant_id)
+        except Exception:
+            pass
+
+    def invalidate_all_translation_cache():
+        try:
+            invalidate_translation_cache(cache_scope_id=None)
+        except Exception:
+            pass
 
     def is_admin_session():
         return bool(session.get("admin_logged_in"))
@@ -251,6 +269,7 @@ def register_admin_routes(app):
 
         db.session.add(restaurant)
         db.session.commit()
+        invalidate_restaurant_content_cache(restaurant.id)
 
         return jsonify({
             "status": "success",
@@ -279,6 +298,7 @@ def register_admin_routes(app):
         restaurant.poi_radius_km = data.get("poi_radius_km", restaurant.poi_radius_km)
 
         db.session.commit()
+        invalidate_restaurant_content_cache(restaurant.id)
 
         return jsonify({
             "status": "success",
@@ -300,6 +320,7 @@ def register_admin_routes(app):
             # Permanent delete - remove everything
             db.session.delete(restaurant)
             db.session.commit()
+            invalidate_restaurant_content_cache(id)
             return jsonify({
                 "status": "permanently_deleted",
                 "id": id
@@ -308,6 +329,7 @@ def register_admin_routes(app):
         # Otherwise, soft delete (hide the restaurant)
         restaurant.is_active = False
         db.session.commit()
+        invalidate_restaurant_content_cache(id)
 
         return jsonify({
             "status": "hidden",
@@ -358,6 +380,7 @@ def register_admin_routes(app):
         restaurant = Restaurant.query.get_or_404(id)
         restaurant.is_active = True
         db.session.commit()
+        invalidate_restaurant_content_cache(id)
         return jsonify({"status": "restored"})
 
     @app.route("/admin/restaurants/hidden", methods=["GET"])
@@ -376,6 +399,43 @@ def register_admin_routes(app):
             joinedload(Restaurant.images)
         ).filter_by(is_active=False).all()
         return jsonify([r.to_dict(include_admin_fields=True) for r in restaurants])
+
+    @app.route("/admin/cache/invalidate", methods=["POST"])
+    @admin_required
+    def invalidate_cache():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        data = request.get_json() or {}
+        restaurant_id = data.get("restaurant_id")
+        include_translation = bool(data.get("translation", True))
+        include_tts = bool(data.get("tts", True))
+
+        try:
+            if restaurant_id is not None:
+                restaurant_id = int(restaurant_id)
+        except Exception:
+            return jsonify({"error": "restaurant_id must be an integer"}), 400
+
+        if include_translation:
+            try:
+                invalidate_translation_cache(cache_scope_id=restaurant_id)
+            except Exception:
+                pass
+
+        if include_tts:
+            try:
+                invalidate_tts_cache(restaurant_id=restaurant_id)
+            except Exception:
+                pass
+
+        return jsonify({
+            "status": "success",
+            "scope": "global" if restaurant_id is None else f"restaurant:{restaurant_id}",
+            "translation": include_translation,
+            "tts": include_tts
+        })
 
     # ======================
     # MENU CRUD
@@ -413,6 +473,7 @@ def register_admin_routes(app):
 
         db.session.add(item)
         db.session.commit()
+        invalidate_restaurant_content_cache(restaurant_id)
 
         return jsonify({
             "status": "success",
@@ -437,6 +498,7 @@ def register_admin_routes(app):
         item.price = data.get("price", item.price)
 
         db.session.commit()
+        invalidate_restaurant_content_cache(item.restaurant_id)
 
         return jsonify({
             "status": "success",
@@ -451,8 +513,10 @@ def register_admin_routes(app):
         if access_error:
             return access_error
 
+        restaurant_id = item.restaurant_id
         db.session.delete(item)
         db.session.commit()
+        invalidate_restaurant_content_cache(restaurant_id)
 
         return jsonify({
             "status": "deleted",
@@ -495,6 +559,7 @@ def register_admin_routes(app):
         
         db.session.add(tag)
         db.session.commit()
+        invalidate_all_translation_cache()
         
         return jsonify({
             "status": "success",
@@ -525,6 +590,7 @@ def register_admin_routes(app):
         tag.description = data.get("description", tag.description)
         
         db.session.commit()
+        invalidate_all_translation_cache()
         
         return jsonify({
             "status": "success",
@@ -538,6 +604,7 @@ def register_admin_routes(app):
         tag = Tag.query.get_or_404(id)
         db.session.delete(tag)
         db.session.commit()
+        invalidate_all_translation_cache()
         
         return jsonify({
             "status": "deleted",
@@ -573,6 +640,7 @@ def register_admin_routes(app):
         if tag not in restaurant.tags:
             restaurant.tags.append(tag)
             db.session.commit()
+            invalidate_restaurant_content_cache(restaurant_id)
             return jsonify({
                 "status": "success",
                 "message": "Tag đã được thêm vào quán"
@@ -597,6 +665,7 @@ def register_admin_routes(app):
         if tag in restaurant.tags:
             restaurant.tags.remove(tag)
             db.session.commit()
+            invalidate_restaurant_content_cache(restaurant_id)
             return jsonify({
                 "status": "success",
                 "message": "Tag đã được gỡ khỏi quán"
@@ -655,6 +724,7 @@ def register_admin_routes(app):
         
         db.session.add(image)
         db.session.commit()
+        invalidate_restaurant_content_cache(restaurant_id)
         
         return jsonify({
             "status": "success",
@@ -691,6 +761,7 @@ def register_admin_routes(app):
         image.is_primary = data.get("is_primary", image.is_primary)
         
         db.session.commit()
+        invalidate_restaurant_content_cache(image.restaurant_id)
         
         return jsonify({
             "status": "success",
@@ -706,8 +777,10 @@ def register_admin_routes(app):
         if access_error:
             return access_error
 
+        restaurant_id = image.restaurant_id
         db.session.delete(image)
         db.session.commit()
+        invalidate_restaurant_content_cache(restaurant_id)
         
         return jsonify({
             "status": "deleted",

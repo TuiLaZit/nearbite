@@ -242,6 +242,12 @@ function LocationTracker() {
     return R * c
   }
 
+  const resolveAudioUrl = (audioPath) => {
+    if (!audioPath) return null
+    if (/^https?:\/\//i.test(audioPath)) return audioPath
+    return `${BASE_URL}${audioPath}`
+  }
+
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
   const fetchAndUpdateLocation = (pos, lang = null) => {
     const currentLang = lang || languageRef.current
@@ -360,7 +366,7 @@ function LocationTracker() {
                 // Kiểm tra xem user vẫn còn trong POI không
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
 
-                  playAudio(`${BASE_URL}${data.audio_url}`)
+                  playAudio(resolveAudioUrl(data.audio_url))
                   // Lưu timestamp đã phát (nếu không đang đổi ngôn ngữ)
                   if (!isChangingLanguageRef.current) {
                     playedRestaurantsRef.current.set(newId, Date.now())
@@ -440,7 +446,7 @@ function LocationTracker() {
               poiDebounceTimerRef.current = setTimeout(() => {
                 if (poiEntryTimeRef.current === now && !isAudioPlaying) {
 
-                  playAudio(`${BASE_URL}${data.audio_url}`)
+                  playAudio(resolveAudioUrl(data.audio_url))
                   // Lưu timestamp (nếu không đang đổi ngôn ngữ)
                   if (!isChangingLanguageRef.current) {
                     playedRestaurantsRef.current.set(newId, Date.now())

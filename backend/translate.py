@@ -3,6 +3,9 @@ from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 import json
 import os
+import hashlib
+from datetime import datetime, timedelta, timezone
+from supabase_client import supabase_client
 
 # Map language codes để tương thích với Google Translate
 LANG_MAP = {
@@ -56,6 +59,9 @@ _PREWARM_LANG_WORKERS = 3
 _CACHE_FILE = os.path.join(os.path.dirname(__file__), "translation_cache.json")
 _CACHE_SAVE_EVERY = 20
 _pending_cache_writes = 0
+_CACHE_TTL_SECONDS = int((os.getenv("TRANSLATION_CACHE_TTL_SECONDS") or "3600").strip() or "3600")
+_CACHE_TTL_SECONDS = max(60, min(86400, _CACHE_TTL_SECONDS))
+_PERSISTENT_CACHE_TABLE = os.getenv("TRANSLATION_CACHE_TABLE", "translation_cache_entry").strip() or "translation_cache_entry"
 _CACHE_NAMESPACE = (
     (os.getenv("CACHE_NAMESPACE") or "").strip()
     or (os.getenv("RENDER_GIT_COMMIT") or "").strip()
@@ -66,6 +72,116 @@ _FAST_FAIL_TRANSLATION = (os.getenv("FAST_FAIL_TRANSLATION") or "false").strip()
 }
 _TRANSLATION_RETRY = int((os.getenv("TRANSLATION_RETRY") or "2").strip() or "2")
 _TRANSLATION_RETRY = max(1, min(5, _TRANSLATION_RETRY))
+
+
+def _utc_now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _expires_at_iso(ttl_seconds):
+    return (datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)).isoformat()
+
+
+def _persistent_cache_key(target_lang, text, cache_scope_id=None):
+    scope = str(cache_scope_id) if cache_scope_id is not None else "global"
+    source = f"{_CACHE_NAMESPACE}::{scope}::{target_lang}::{text}"
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def _persistent_cache_get(target_lang, text, cache_scope_id=None):
+    if not supabase_client:
+        return None
+
+    try:
+        cache_key = _persistent_cache_key(target_lang, text, cache_scope_id)
+        response = (
+            supabase_client
+            .table(_PERSISTENT_CACHE_TABLE)
+            .select("translated_text,expires_at")
+            .eq("cache_key", cache_key)
+            .gt("expires_at", _utc_now_iso())
+            .limit(1)
+            .execute()
+        )
+
+        rows = response.data or []
+        if not rows:
+            return None
+
+        value = rows[0].get("translated_text")
+        if _is_valid_translated_value(target_lang, text, value):
+            return value
+    except Exception:
+        return None
+
+    return None
+
+
+def _persistent_cache_set(target_lang, text, translated, cache_scope_id=None, ttl_seconds=None):
+    if not supabase_client:
+        return
+
+    ttl = _CACHE_TTL_SECONDS if ttl_seconds is None else max(60, int(ttl_seconds))
+
+    try:
+        cache_key = _persistent_cache_key(target_lang, text, cache_scope_id)
+        payload = {
+            "cache_key": cache_key,
+            "restaurant_id": cache_scope_id,
+            "target_lang": target_lang,
+            "source_text": text,
+            "translated_text": translated,
+            "expires_at": _expires_at_iso(ttl),
+            "updated_at": _utc_now_iso(),
+        }
+
+        supabase_client.table(_PERSISTENT_CACHE_TABLE).upsert(payload, on_conflict="cache_key").execute()
+    except Exception:
+        return
+
+
+def invalidate_translation_cache(cache_scope_id=None):
+    """Invalidate translation cache globally or by restaurant scope."""
+    try:
+        with _CACHE_LOCK:
+            if cache_scope_id is None:
+                _TRANSLATION_CACHE.clear()
+            else:
+                prefix = f"{cache_scope_id}::"
+                keys = [key for key in _TRANSLATION_CACHE.keys() if key.startswith(prefix)]
+                for key in keys:
+                    _TRANSLATION_CACHE.pop(key, None)
+    except Exception:
+        pass
+
+    if not supabase_client:
+        return
+
+    try:
+        query = supabase_client.table(_PERSISTENT_CACHE_TABLE).delete()
+        if cache_scope_id is None:
+            query = query.gte("id", 0)
+        else:
+            query = query.eq("restaurant_id", int(cache_scope_id))
+        query.execute()
+    except Exception:
+        pass
+
+
+def cleanup_expired_translation_cache():
+    if not supabase_client:
+        return
+
+    try:
+        (
+            supabase_client
+            .table(_PERSISTENT_CACHE_TABLE)
+            .delete()
+            .lt("expires_at", _utc_now_iso())
+            .execute()
+        )
+    except Exception:
+        pass
 
 
 def _is_valid_translated_value(target_lang, original_text, translated_text):
@@ -136,22 +252,33 @@ def _save_cache_to_disk(force=False):
 _load_cache_from_disk()
 
 
-def _cache_key(target_lang, text):
-    return f"{target_lang}::{text}"
+def _cache_key(target_lang, text, cache_scope_id=None):
+    scope = str(cache_scope_id) if cache_scope_id is not None else "global"
+    return f"{scope}::{target_lang}::{text}"
 
 
-def _cache_get(target_lang, text):
-    key = _cache_key(target_lang, text)
+def _cache_get(target_lang, text, cache_scope_id=None):
+    key = _cache_key(target_lang, text, cache_scope_id)
     with _CACHE_LOCK:
-        return _TRANSLATION_CACHE.get(key)
+        cached = _TRANSLATION_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    persistent = _persistent_cache_get(target_lang, text, cache_scope_id=cache_scope_id)
+    if persistent is not None:
+        with _CACHE_LOCK:
+            _TRANSLATION_CACHE[key] = persistent
+        return persistent
+
+    return None
 
 
-def _cache_set(target_lang, text, translated):
+def _cache_set(target_lang, text, translated, cache_scope_id=None):
     if not _is_valid_translated_value(target_lang, text, translated):
         return
 
     global _pending_cache_writes
-    key = _cache_key(target_lang, text)
+    key = _cache_key(target_lang, text, cache_scope_id)
     with _CACHE_LOCK:
         if len(_TRANSLATION_CACHE) >= _MAX_CACHE_ITEMS:
             # Clear whole cache when full to keep implementation lightweight.
@@ -160,6 +287,7 @@ def _cache_set(target_lang, text, translated):
         _pending_cache_writes += 1
 
     _save_cache_to_disk()
+    _persistent_cache_set(target_lang, text, translated, cache_scope_id=cache_scope_id)
 
 
 def _translate_single_google(text, mapped_lang):
@@ -205,27 +333,27 @@ def _translate_single_with_retries(text, mapped_lang):
 
     return None
 
-def translate_text(text, target_lang):
+def translate_text(text, target_lang, cache_scope_id=None):
     if target_lang == "vi":
         return text
 
     # Map language code
     mapped_lang = LANG_MAP.get(target_lang, target_lang)
 
-    cached = _cache_get(mapped_lang, text)
+    cached = _cache_get(mapped_lang, text, cache_scope_id=cache_scope_id)
     if cached is not None:
         return cached
 
     translated = _translate_single_with_retries(text, mapped_lang)
     if _is_valid_translated_value(mapped_lang, text, translated):
-        _cache_set(mapped_lang, text, translated)
+        _cache_set(mapped_lang, text, translated, cache_scope_id=cache_scope_id)
         return translated
 
     # Fallback về tiếng Việt nếu lỗi
     return text
 
 
-def translate_texts(texts, target_lang, cache_only=False, fast_fail=None):
+def translate_texts(texts, target_lang, cache_only=False, fast_fail=None, cache_scope_id=None):
     if target_lang == "vi":
         return texts
 
@@ -236,7 +364,7 @@ def translate_texts(texts, target_lang, cache_only=False, fast_fail=None):
     missing_seen = set()
 
     for idx, text in enumerate(texts):
-        cached = _cache_get(mapped_lang, text)
+        cached = _cache_get(mapped_lang, text, cache_scope_id=cache_scope_id)
         if cached is not None:
             results[idx] = cached
             continue
@@ -279,17 +407,17 @@ def translate_texts(texts, target_lang, cache_only=False, fast_fail=None):
                             translated_value = _translate_single_with_retries(original, mapped_lang) or original
 
                     if _is_valid_translated_value(mapped_lang, original, translated_value):
-                        _cache_set(mapped_lang, original, translated_value)
+                        _cache_set(mapped_lang, original, translated_value, cache_scope_id=cache_scope_id)
 
             _save_cache_to_disk(force=True)
 
         for idx, text in enumerate(texts):
             if results[idx] is None:
-                results[idx] = _cache_get(mapped_lang, text) or text
+                results[idx] = _cache_get(mapped_lang, text, cache_scope_id=cache_scope_id) or text
 
         return results
     except Exception:
-        return [translate_text(text, target_lang) for text in texts]
+        return [translate_text(text, target_lang, cache_scope_id=cache_scope_id) for text in texts]
 
 
 def prewarm_translation_cache(texts, target_langs):

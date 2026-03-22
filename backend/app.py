@@ -7,7 +7,8 @@ import re
 import threading
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
-from translate import prewarm_translation_cache, LANGUAGE_LABELS
+from translate import prewarm_translation_cache, LANGUAGE_LABELS, cleanup_expired_translation_cache
+from tts import cleanup_expired_tts_cache
 from auth import (
     admin_login,
     admin_check,
@@ -138,6 +139,10 @@ db.init_app(app)
 
 _prewarm_started = False
 _prewarm_lock = threading.Lock()
+_cache_cleanup_lock = threading.Lock()
+_request_counter = 0
+_cleanup_every_requests = int((os.getenv("CACHE_CLEANUP_EVERY_REQUESTS") or "50").strip() or "50")
+_cleanup_every_requests = max(10, min(500, _cleanup_every_requests))
 
 
 def _extract_translation_texts_for_prewarm():
@@ -215,11 +220,31 @@ def _start_translation_prewarm_worker():
     threading.Thread(target=_run_prewarm, daemon=True).start()
 
 
+def _start_cache_cleanup_worker_if_needed():
+    global _request_counter
+    _request_counter += 1
+    if _request_counter % _cleanup_every_requests != 0:
+        return
+
+    if not _cache_cleanup_lock.acquire(blocking=False):
+        return
+
+    def _run_cleanup():
+        try:
+            cleanup_expired_translation_cache()
+            cleanup_expired_tts_cache()
+        finally:
+            _cache_cleanup_lock.release()
+
+    threading.Thread(target=_run_cleanup, daemon=True).start()
+
+
 @app.before_request
 def _ensure_prewarm_started_once():
     if request.method == "OPTIONS":
         return None
     _start_translation_prewarm_worker()
+    _start_cache_cleanup_worker_if_needed()
     return None
 
 # Auto create missing tables in local development so new features can run
@@ -260,7 +285,73 @@ def _ensure_local_schema_compatibility():
         print(f"[local-schema] Compatibility patch skipped: {exc}")
 
 
+def _ensure_cache_tables():
+    """Create cache tables used by translation/TTS persistent cache."""
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS translation_cache_entry (
+            id BIGSERIAL PRIMARY KEY,
+            cache_key VARCHAR(255) UNIQUE NOT NULL,
+            restaurant_id INTEGER NULL,
+            target_lang VARCHAR(16) NOT NULL,
+            source_text TEXT NOT NULL,
+            translated_text TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_translation_cache_key
+            ON translation_cache_entry(cache_key)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_translation_cache_restaurant
+            ON translation_cache_entry(restaurant_id)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_translation_cache_expires
+            ON translation_cache_entry(expires_at)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS tts_cache_entry (
+            id BIGSERIAL PRIMARY KEY,
+            cache_key VARCHAR(255) UNIQUE NOT NULL,
+            restaurant_id INTEGER NULL,
+            language_code VARCHAR(16) NOT NULL,
+            text_hash VARCHAR(64) NOT NULL,
+            storage_path TEXT NOT NULL,
+            public_url TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_tts_cache_key
+            ON tts_cache_entry(cache_key)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_tts_cache_restaurant
+            ON tts_cache_entry(restaurant_id)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_tts_cache_expires
+            ON tts_cache_entry(expires_at)
+        """,
+    ]
+
+    try:
+        for statement in statements:
+            db.session.execute(text(statement))
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[cache-schema] Ensure cache tables skipped: {exc}")
+
+
 with app.app_context():
+    _ensure_cache_tables()
     _ensure_local_schema_compatibility()
 
 

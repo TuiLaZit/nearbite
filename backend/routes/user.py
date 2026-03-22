@@ -75,8 +75,15 @@ def _translate_restaurant_data(restaurant_data, target_lang, allow_network=True)
     for image in translated_payload.get("images", []) or []:
         track(image.get("caption"), lambda value, image=image: image.__setitem__("caption", value))
 
+    restaurant_id = restaurant_data.get("id")
+
     if texts:
-        translated_texts = translate_texts(texts, target_lang, cache_only=not allow_network)
+        translated_texts = translate_texts(
+            texts,
+            target_lang,
+            cache_only=not allow_network,
+            cache_scope_id=restaurant_id,
+        )
         translation_map = {}
         for idx, original in enumerate(texts):
             translation_map[original] = translated_texts[idx] if idx < len(translated_texts) else original
@@ -245,15 +252,15 @@ def register_user_routes(app):
                 nearest = r
 
         narration_vi = generate_narration(nearest, min_dist)
-        narration_final = translate_text(narration_vi, language)
-        audio_url = text_to_speech(narration_final, language)
+        narration_final = translate_text(narration_vi, language, cache_scope_id=nearest.id)
+        audio_url = text_to_speech(narration_final, language, restaurant_id=nearest.id)
         
         # Lấy bán kính POI từ database (mặc định 0.030 km nếu không có)
         poi_radius = nearest.poi_radius_km if hasattr(nearest, 'poi_radius_km') and nearest.poi_radius_km else 0.030
         
         # Message khi chưa đến gần quán
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
-        out_of_range_msg = translate_text(out_of_range_msg_vi, language)
+        out_of_range_msg = translate_text(out_of_range_msg_vi, language, cache_scope_id=nearest.id)
 
         # Get restaurant data and reuse cached translation if unchanged.
         restaurant_data = nearest.to_dict(include_details=True)
