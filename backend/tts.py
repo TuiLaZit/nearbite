@@ -1,5 +1,6 @@
 import os
 import hashlib
+import re
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from gtts import gTTS
@@ -86,6 +87,34 @@ def _generate_tts_bytes(text, mapped_lang):
     return audio_buffer.getvalue()
 
 
+def _extract_http_url(value):
+    if not isinstance(value, str):
+        return None
+    match = re.search(r"https?://[^\s\"'}]+", value)
+    return match.group(0) if match else None
+
+
+def _normalize_cached_audio_url(raw_value, storage_path=None):
+    if isinstance(raw_value, str):
+        value = raw_value.strip()
+        if not value:
+            value = ""
+        if value.startswith("http://") or value.startswith("https://"):
+            return value
+        if value.startswith("//"):
+            return f"https:{value}"
+        embedded = _extract_http_url(value)
+        if embedded:
+            return embedded
+        if value.startswith("/"):
+            return value
+
+    if storage_path:
+        return get_public_url_for_path(storage_path, bucket_name=TTS_BUCKET)
+
+    return None
+
+
 def _persistent_tts_get(cache_key):
     if not supabase_client:
         return None
@@ -94,7 +123,7 @@ def _persistent_tts_get(cache_key):
         response = (
             supabase_client
             .table(TTS_TABLE)
-            .select("public_url,expires_at")
+            .select("id,public_url,storage_path,expires_at")
             .eq("cache_key", cache_key)
             .gt("expires_at", _utc_now_iso())
             .limit(1)
@@ -102,7 +131,28 @@ def _persistent_tts_get(cache_key):
         )
         rows = response.data or []
         if rows:
-            return rows[0].get("public_url")
+            row = rows[0]
+            normalized_url = _normalize_cached_audio_url(
+                row.get("public_url"),
+                storage_path=row.get("storage_path")
+            )
+            if not normalized_url:
+                try:
+                    supabase_client.table(TTS_TABLE).delete().eq("id", row.get("id")).execute()
+                except Exception:
+                    pass
+                return None
+
+            if normalized_url != row.get("public_url"):
+                try:
+                    supabase_client.table(TTS_TABLE).update({
+                        "public_url": normalized_url,
+                        "updated_at": _utc_now_iso(),
+                    }).eq("id", row.get("id")).execute()
+                except Exception:
+                    pass
+
+            return normalized_url
     except Exception:
         return None
 

@@ -244,8 +244,26 @@ function LocationTracker() {
 
   const resolveAudioUrl = (audioPath) => {
     if (!audioPath) return null
-    if (/^https?:\/\//i.test(audioPath)) return audioPath
-    return `${BASE_URL}${audioPath}`
+    const raw = String(audioPath).trim()
+    if (!raw) return null
+
+    if (/^https?:\/\//i.test(raw)) return raw
+    if (/^\/\//.test(raw)) return `https:${raw}`
+
+    const embeddedMatch = raw.match(/https?:\/\/[^\s"'}]+/i)
+    if (embeddedMatch?.[0]) return embeddedMatch[0]
+
+    if (raw.startsWith('/')) return `${BASE_URL}${raw}`
+
+    if (/^[a-zA-Z0-9_-]+\.mp3$/i.test(raw)) {
+      return `${BASE_URL}/static/tts/${raw}`
+    }
+
+    if (/\.supabase\.co\//i.test(raw)) {
+      return `https://${raw.replace(/^https?:\/\//i, '')}`
+    }
+
+    return null
   }
 
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
@@ -644,8 +662,9 @@ function LocationTracker() {
   // Toggle audio
   const handleToggleAudio = (audioUrl) => {
 
-    
-    if (!audioUrl) {
+    const playableUrl = resolveAudioUrl(audioUrl)
+
+    if (!playableUrl) {
 
       return
     }
@@ -658,7 +677,7 @@ function LocationTracker() {
     } else {
 
       // Tạo audio mới và phát từ đầu
-      playAudio(audioUrl)
+      playAudio(playableUrl)
       // Lưu timestamp khi user tự bấm (nếu không đang đổi ngôn ngữ)
       if (currentNarration?.restaurantId && !isChangingLanguageRef.current) {
         playedRestaurantsRef.current.set(currentNarration.restaurantId, Date.now())
