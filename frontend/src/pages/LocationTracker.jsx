@@ -250,8 +250,12 @@ function LocationTracker() {
     if (/^https?:\/\//i.test(raw)) return raw
     if (/^\/\//.test(raw)) return `https:${raw}`
 
-    const embeddedMatch = raw.match(/https?:\/\/[^\s"'}]+/i)
-    if (embeddedMatch?.[0]) return embeddedMatch[0]
+    const embeddedMatches = raw.match(/https?:\/\/[^\s"'}]+/gi)
+    if (embeddedMatches?.length) {
+      // If malformed concatenation contains multiple absolute URLs,
+      // prefer the last one (usually the actual Supabase audio URL).
+      return embeddedMatches[embeddedMatches.length - 1]
+    }
 
     if (raw.startsWith('/')) return `${BASE_URL}${raw}`
 
@@ -1160,7 +1164,7 @@ function LocationTracker() {
                             <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               {selectedRestaurant.audioUrl && (
                                 <button 
-                                  onClick={() => handleToggleAudio(`${BASE_URL}${selectedRestaurant.audioUrl}`)}
+                                  onClick={() => handleToggleAudio(selectedRestaurant.audioUrl)}
                                   style={{
                                     padding: '8px 12px',
                                     background: '#4285F4',
@@ -1396,7 +1400,7 @@ function LocationTracker() {
                 )}
                 {currentNarration.audioUrl && (
                   <button
-                    onClick={() => handleToggleAudio(`${BASE_URL}${currentNarration.audioUrl}`)}
+                    onClick={() => handleToggleAudio(currentNarration.audioUrl)}
                     style={{
                       padding: '8px 16px',
                       background: isAudioPlaying ? '#EA4335' : '#4285F4',
