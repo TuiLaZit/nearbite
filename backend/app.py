@@ -264,6 +264,11 @@ with app.app_context():
     _ensure_local_schema_compatibility()
 
 
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status": "ok"}), 200
+
+
 @app.route("/")
 def home():
     # Serve index.html for SPA routing
