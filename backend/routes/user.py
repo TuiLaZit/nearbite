@@ -1,18 +1,23 @@
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from models import Restaurant, Tag, LocationVisit, db
 from services import calculate_distance, generate_narration
 from translate import translate_text, translate_texts, LANGUAGE_LABELS
 from tts import text_to_speech
+from queue_manager import add_to_queue, QueueFullError
 from sqlalchemy import and_, or_
 from threading import Lock
 import copy
 import hashlib
 import json
+from datetime import datetime
 
 
 _RESTAURANT_TRANSLATION_CACHE = {}
 _RESTAURANT_CACHE_LOCK = Lock()
 _RESTAURANT_CACHE_MAX_ITEMS = 5000
+_DEMO_ORDER_LOCK = Lock()
+_DEMO_ORDER_SEQUENCE = 0
+_DEMO_ORDERS = []
 
 
 def _cache_restaurant_payload(signature, payload):
@@ -244,7 +249,18 @@ def register_user_routes(app):
 
         narration_vi = generate_narration(nearest, min_dist)
         narration_final = translate_text(narration_vi, language, cache_scope_id=nearest.id)
-        audio_url = text_to_speech(narration_final, language, restaurant_id=nearest.id)
+
+        # Queue theo restaurant để hạn chế đồng thời khi nhiều người cùng nghe audio.
+        try:
+            audio_url = add_to_queue(
+                nearest.id,
+                lambda: text_to_speech(narration_final, language, restaurant_id=nearest.id),
+            )
+        except QueueFullError:
+            return jsonify({
+                "status": "error",
+                "message": "Too Many Requests: queue is full for this restaurant"
+            }), 429
         
         # Lấy bán kính POI từ database (mặc định 0.030 km nếu không có)
         poi_radius = nearest.poi_radius_km if hasattr(nearest, 'poi_radius_km') and nearest.poi_radius_km else 0.030
@@ -274,6 +290,61 @@ def register_user_routes(app):
             "nearest_place": restaurant_data,
             "out_of_range_message": out_of_range_msg
         })
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        """
+        Ví dụ route tạo order có queue theo restaurant.
+
+        Lưu ý: Dự án hiện chưa có model order chính thức, nên route này lưu demo
+        vào bộ nhớ để minh họa cách tích hợp add_to_queue trong Flask.
+        """
+        data = request.get_json(silent=True) or {}
+
+        restaurant_id = data.get("restaurant_id")
+        customer_name = (data.get("customer_name") or "Guest").strip() or "Guest"
+        items = data.get("items")
+
+        if restaurant_id is None:
+            return jsonify({"status": "error", "message": "restaurant_id is required"}), 400
+
+        if not isinstance(items, list) or len(items) == 0:
+            return jsonify({"status": "error", "message": "items must be a non-empty array"}), 400
+
+        app_obj = current_app._get_current_object()
+
+        def _create_order_job():
+            with app_obj.app_context():
+                restaurant = Restaurant.query.get(restaurant_id)
+                if not restaurant or not restaurant.is_active:
+                    raise LookupError("Restaurant not found")
+
+                global _DEMO_ORDER_SEQUENCE
+                with _DEMO_ORDER_LOCK:
+                    _DEMO_ORDER_SEQUENCE += 1
+                    order_record = {
+                        "order_id": _DEMO_ORDER_SEQUENCE,
+                        "restaurant_id": restaurant_id,
+                        "customer_name": customer_name,
+                        "items": items,
+                        "status": "created",
+                        "created_at": datetime.utcnow().isoformat() + "Z",
+                    }
+                    _DEMO_ORDERS.append(order_record)
+                return order_record
+
+        try:
+            order_result = add_to_queue(restaurant_id, _create_order_job)
+            return jsonify({"status": "success", "data": order_result}), 201
+        except QueueFullError:
+            return jsonify({
+                "status": "error",
+                "message": "Too Many Requests: queue is full for this restaurant"
+            }), 429
+        except LookupError:
+            return jsonify({"status": "error", "message": "Restaurant not found"}), 404
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
 
     @app.route("/plan-tour", methods=["POST"])
     def plan_tour():
@@ -482,26 +553,43 @@ def register_user_routes(app):
             
             if not all([restaurant_id, duration_seconds]):
                 return jsonify({"error": "Missing required fields"}), 400
+
+            app_obj = current_app._get_current_object()
+
+            def _track_audio_job():
+                with app_obj.app_context():
+                    try:
+                        restaurant = Restaurant.query.get(restaurant_id)
+                        if not restaurant:
+                            raise LookupError("Restaurant not found")
+
+                        # Tính trung bình đúng cho avg_audio_duration (giây)
+                        # Công thức: New_Avg = (Old_Avg * Old_Count + New_Value) / (Old_Count + 1)
+                        if restaurant.audio_play_count == 0 or restaurant.avg_audio_duration == 0:
+                            restaurant.avg_audio_duration = duration_seconds
+                        else:
+                            restaurant.avg_audio_duration = int(
+                                (restaurant.avg_audio_duration * restaurant.audio_play_count + duration_seconds) / (restaurant.audio_play_count + 1)
+                            )
+
+                        # Tăng audio play count SAU KHI tính average
+                        restaurant.audio_play_count += 1
+                        db.session.commit()
+                        return {"status": "success"}
+                    except Exception:
+                        db.session.rollback()
+                        raise
+
+            result = add_to_queue(restaurant_id, _track_audio_job)
+            return jsonify(result)
+        except QueueFullError:
+            return jsonify({
+                "status": "error",
+                "message": "Too Many Requests: queue is full for this restaurant"
+            }), 429
+        except LookupError:
+            return jsonify({"error": "Restaurant not found"}), 404
             
-            restaurant = Restaurant.query.get(restaurant_id)
-            if restaurant:
-                # Tính trung bình đúng cho avg_audio_duration (giây)
-                # Công thức: New_Avg = (Old_Avg * Old_Count + New_Value) / (Old_Count + 1)
-                if restaurant.audio_play_count == 0 or restaurant.avg_audio_duration == 0:
-                    restaurant.avg_audio_duration = duration_seconds
-                else:
-                    restaurant.avg_audio_duration = int(
-                        (restaurant.avg_audio_duration * restaurant.audio_play_count + duration_seconds) / (restaurant.audio_play_count + 1)
-                    )
-                
-                # Tăng audio play count SAU KHI tính average
-                restaurant.audio_play_count += 1
-                
-                db.session.commit()
-            else:
-                return jsonify({"error": "Restaurant not found"}), 404
-            
-            return jsonify({"status": "success"})
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
