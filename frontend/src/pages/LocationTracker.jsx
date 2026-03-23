@@ -1196,24 +1196,6 @@ function LocationTracker() {
                               >
                                 🧭 {t('directionButton')}
                               </button>
-                              {isCustomerAuthenticated && (
-                                <button
-                                  onClick={() => navigate(`/customer/orders/${selectedRestaurant.id}`)}
-                                  style={{
-                                    padding: '8px 12px',
-                                    background: '#2563eb',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '5px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    flex: '1',
-                                    minWidth: '100px'
-                                  }}
-                                >
-                                  🧾 {t('orderFood')}
-                                </button>
-                              )}
                             </div>
                           </>
                         )}

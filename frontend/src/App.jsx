@@ -6,7 +6,6 @@ import AdminDashboard from './pages/AdminDashboard'
 import TagManagement from './pages/TagManagement'
 import LoginPortal from './pages/LoginPortal'
 import OwnerDashboard from './pages/OwnerDashboard'
-import CustomerOrders from './pages/CustomerOrders'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -22,8 +21,6 @@ function App() {
 
       <Route element={<ProtectedRoute authPath="/customer/check" redirectTo="/login?role=customer" />}>
         <Route path="/customer/tour-planner" element={<TourPlanner />} />
-        <Route path="/customer/orders" element={<CustomerOrders />} />
-        <Route path="/customer/orders/:restaurantId" element={<CustomerOrders />} />
       </Route>
 
       <Route path="/tour-planner" element={<Navigate to="/customer/tour-planner" replace />} />

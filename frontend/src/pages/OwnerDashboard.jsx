@@ -14,10 +14,6 @@ function OwnerDashboard() {
   const [imageForm, setImageForm] = useState({ caption: '', is_primary: false })
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadingImage, setUploadingImage] = useState(false)
-  const [orders, setOrders] = useState([])
-  const [orderSummary, setOrderSummary] = useState(null)
-  const [processingOrderId, setProcessingOrderId] = useState(null)
-  const [pendingOrderAction, setPendingOrderAction] = useState(null)
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -69,39 +65,6 @@ function OwnerDashboard() {
         setLoading(false)
       })
   }, [])
-
-  useEffect(() => {
-    if (activeTab === 'orders') {
-      loadOrders().catch((error) => alert(error.message))
-      loadOrderSummary().catch((error) => alert(error.message))
-    }
-  }, [activeTab])
-
-  const loadOrders = async () => {
-    const response = await fetch(`${BASE_URL}/owner/orders`, {
-      credentials: 'include'
-    })
-
-    if (!response.ok) {
-      throw new Error('Không thể tải danh sách đơn hàng')
-    }
-
-    const data = await response.json()
-    setOrders(Array.isArray(data) ? data : [])
-  }
-
-  const loadOrderSummary = async () => {
-    const response = await fetch(`${BASE_URL}/owner/orders/summary`, {
-      credentials: 'include'
-    })
-
-    if (!response.ok) {
-      throw new Error('Không thể tải thống kê đơn hàng')
-    }
-
-    const data = await response.json()
-    setOrderSummary(data)
-  }
 
   const handleLogout = () => {
     fetch(`${BASE_URL}/owner/logout`, {
@@ -261,108 +224,6 @@ function OwnerDashboard() {
     await loadOwnerRestaurant()
   }
 
-  const handleOrderAction = async (orderId, action) => {
-    setProcessingOrderId(orderId)
-
-    try {
-      const response = await fetch(`${BASE_URL}/owner/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action })
-      })
-
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(data.error || 'Không thể cập nhật trạng thái đơn hàng')
-      }
-
-      await loadOrders()
-      await loadOrderSummary()
-    } catch (error) {
-      alert(error.message)
-    } finally {
-      setProcessingOrderId(null)
-    }
-  }
-
-  const handleOrderActionRequest = (order, entry) => {
-    const requireSecondConfirm = ['confirm', 'cancel', 'mark_completed'].includes(entry.action)
-    if (!requireSecondConfirm) {
-      handleOrderAction(order.id, entry.action)
-      return
-    }
-
-    setPendingOrderAction({
-      orderId: order.id,
-      action: entry.action,
-      label: entry.label,
-      orderType: order.order_type
-    })
-  }
-
-  const handleConfirmPendingAction = async () => {
-    if (!pendingOrderAction) return
-    const { orderId, action } = pendingOrderAction
-    setPendingOrderAction(null)
-    await handleOrderAction(orderId, action)
-  }
-
-  const getActionConfirmMessage = () => {
-    if (!pendingOrderAction) return ''
-
-    if (pendingOrderAction.action === 'cancel') {
-      return 'Đơn hàng sẽ bị hủy và không thể tiếp tục xử lý. Bạn có chắc chắn muốn hủy?'
-    }
-
-    if (pendingOrderAction.action === 'confirm') {
-      return pendingOrderAction.orderType === 'delivery'
-        ? 'Đơn hàng sẽ được xác nhận và chuyển sang trạng thái đang giao. Bạn xác nhận?'
-        : 'Đơn hàng sẽ được xác nhận để chuẩn bị món. Bạn xác nhận?'
-    }
-
-    if (pendingOrderAction.action === 'mark_completed') {
-      return 'Đơn hàng sẽ được đánh dấu hoàn tất. Bạn xác nhận?'
-    }
-
-    return 'Bạn có chắc chắn muốn thực hiện thao tác này?'
-  }
-
-  const formatCurrency = (amount) => {
-    return Number(amount || 0).toLocaleString('vi-VN') + 'đ'
-  }
-
-  const getOrderActions = (order) => {
-    if (order.order_status === 'cancelled' || order.order_status === 'delivered' || order.order_status === 'completed') {
-      return []
-    }
-
-    if (order.order_type === 'delivery') {
-      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận + bắt đầu giao' }, { action: 'cancel', label: 'Hủy đơn' }]
-      if (order.order_status === 'confirmed') return [{ action: 'mark_in_transit', label: 'Đang giao' }, { action: 'cancel', label: 'Hủy đơn' }]
-      if (order.order_status === 'delivering') return [{ action: 'mark_delivered', label: 'Đã giao xong' }, { action: 'cancel', label: 'Hủy đơn' }]
-    }
-
-    if (order.order_type === 'pickup') {
-      if (order.order_status === 'pending') return [{ action: 'confirm', label: 'Xác nhận chuẩn bị' }, { action: 'cancel', label: 'Hủy đơn' }]
-      if (order.order_status === 'confirmed') return [{ action: 'mark_completed', label: 'Khách đã nhận món' }, { action: 'cancel', label: 'Hủy đơn' }]
-    }
-
-    return []
-  }
-
-  const getStatusLabel = (order) => {
-    const map = {
-      pending: 'Chờ xác nhận',
-      confirmed: 'Đã xác nhận',
-      delivering: 'Đang giao',
-      delivered: 'Đã giao xong',
-      completed: 'Hoàn tất',
-      cancelled: 'Đã hủy'
-    }
-    return map[order.order_status] || order.order_status
-  }
-
   if (loading) {
     return <div style={styles.loading}>Đang tải dashboard chủ quán...</div>
   }
@@ -383,9 +244,6 @@ function OwnerDashboard() {
         </button>
         <button style={{ ...styles.navBtn, ...(activeTab === 'images' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('images')}>
           🖼️ Quản lý Hình ảnh
-        </button>
-        <button style={{ ...styles.navBtn, ...(activeTab === 'orders' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('orders')}>
-          🧾 Đơn hàng
         </button>
 
         <button style={styles.logoutBtn} onClick={handleLogout}>🚪 Đăng xuất</button>
@@ -454,7 +312,7 @@ function OwnerDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {menuItems.map(item => (
+                {menuItems.map((item) => (
                   <tr key={item.id}>
                     <td>{item.name}</td>
                     <td>{item.price.toLocaleString()}đ</td>
@@ -493,7 +351,7 @@ function OwnerDashboard() {
             </form>
 
             <div style={styles.imageGrid}>
-              {images.map(img => (
+              {images.map((img) => (
                 <div key={img.id} style={styles.imageCard}>
                   <img src={img.image_url} alt={img.caption || 'restaurant'} style={styles.image} />
                   <div style={styles.imageMeta}>
@@ -506,94 +364,7 @@ function OwnerDashboard() {
             </div>
           </div>
         )}
-
-        {activeTab === 'orders' && (
-          <div style={styles.card}>
-            <h3>Đơn hàng</h3>
-            <div style={styles.orderSummaryWrap}>
-              <StatCard label="Số đơn tháng này" value={orderSummary?.order_count || 0} />
-              <StatCard label="Doanh thu tháng" value={formatCurrency(orderSummary?.monthly_revenue)} />
-              <StatCard label="Commission tháng" value={formatCurrency(orderSummary?.monthly_commission)} />
-            </div>
-
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th>Mã đơn</th>
-                  <th>Loại</th>
-                  <th>Khách</th>
-                  <th>Món</th>
-                  <th>Tổng tiền</th>
-                  <th>Trạng thái</th>
-                  <th>Thanh toán</th>
-                  <th>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.length === 0 && (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '16px' }}>Chưa có đơn hàng nào</td>
-                  </tr>
-                )}
-                {orders.map((order) => (
-                  <tr key={order.id}>
-                    <td>#{order.id}</td>
-                    <td>{order.order_type === 'delivery' ? 'Giao hàng' : 'Đặt trước'}</td>
-                    <td>{order.customer_email}</td>
-                    <td>
-                      {(order.items || []).map((item) => `${item.item_name} x${item.quantity}`).join(', ')}
-                    </td>
-                    <td>{formatCurrency(order.total_amount)}</td>
-                    <td>{getStatusLabel(order)}</td>
-                    <td>{order.payment_status === 'paid_demo' ? 'Online demo' : 'COD chờ thu'}</td>
-                    <td>
-                      <div style={styles.orderActions}>
-                        {getOrderActions(order).map((entry) => (
-                          <button
-                            key={entry.action}
-                            onClick={() => handleOrderActionRequest(order, entry)}
-                            disabled={processingOrderId === order.id}
-                          >
-                            {entry.label}
-                          </button>
-                        ))}
-                        {getOrderActions(order).length === 0 && <span style={styles.noActionText}>-</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </main>
-
-      {pendingOrderAction && (
-        <div style={styles.confirmOverlay}>
-          <div style={styles.confirmModal}>
-            <h3 style={{ marginTop: 0 }}>Xác nhận thao tác</h3>
-            <p style={{ marginBottom: '14px' }}>
-              Đơn #{pendingOrderAction.orderId}: {getActionConfirmMessage()}
-            </p>
-            <div style={styles.confirmActions}>
-              <button
-                type="button"
-                style={styles.secondaryActionBtn}
-                onClick={() => setPendingOrderAction(null)}
-              >
-                Quay lại
-              </button>
-              <button
-                type="button"
-                style={styles.primaryActionBtn}
-                onClick={handleConfirmPendingAction}
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -742,59 +513,6 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
-  },
-  orderSummaryWrap: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '12px',
-    marginBottom: '14px'
-  },
-  orderActions: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap'
-  },
-  noActionText: {
-    color: '#64748b'
-  },
-  confirmOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(15, 23, 42, 0.45)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000,
-    padding: '16px'
-  },
-  confirmModal: {
-    width: '100%',
-    maxWidth: '460px',
-    background: 'white',
-    borderRadius: '12px',
-    border: '1px solid #dbe4ef',
-    padding: '18px'
-  },
-  confirmActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px'
-  },
-  secondaryActionBtn: {
-    background: '#e2e8f0',
-    color: '#0f172a',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '9px 14px',
-    cursor: 'pointer'
-  },
-  primaryActionBtn: {
-    background: '#2563eb',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '9px 14px',
-    cursor: 'pointer'
   }
 }
 
