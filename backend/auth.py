@@ -12,7 +12,7 @@ from email.message import EmailMessage
 from functools import wraps
 from flask import request, jsonify, session
 from werkzeug.security import check_password_hash, generate_password_hash
-from sqlalchemy import text
+from sqlalchemy import text, func
 from models import Restaurant, AdminUser
 from db import db
 
@@ -100,13 +100,38 @@ def owner_login():
     if not username or not password:
         return jsonify({"error": "Username và mật khẩu không được để trống"}), 400
 
-    restaurant = Restaurant.query.filter_by(owner_username=username, is_active=True).first()
+    # Use case-insensitive + trim lookup to tolerate legacy/deploy data inconsistencies.
+    restaurant = Restaurant.query.filter(
+        func.lower(func.trim(Restaurant.owner_username)) == username
+    ).first()
 
-    if not restaurant or not restaurant.owner_password_hash:
+    if not restaurant:
         return jsonify({"error": "Tài khoản không hợp lệ"}), 401
 
-    if not check_password_hash(restaurant.owner_password_hash, password):
+    if not restaurant.is_active:
+        return jsonify({"error": "Tài khoản quán đang bị ẩn/vô hiệu hóa"}), 403
+
+    login_ok = False
+    needs_hash_upgrade = False
+
+    if restaurant.owner_password_hash:
+        try:
+            login_ok = check_password_hash(restaurant.owner_password_hash, password)
+        except Exception:
+            # Hash format may be invalid on old deploy data.
+            login_ok = False
+
+    if not login_ok and restaurant.owner_password_plain:
+        login_ok = secrets.compare_digest(str(restaurant.owner_password_plain), str(password))
+        if login_ok:
+            needs_hash_upgrade = True
+
+    if not login_ok:
         return jsonify({"error": "Tài khoản không hợp lệ"}), 401
+
+    if needs_hash_upgrade or not restaurant.owner_password_hash:
+        restaurant.owner_password_hash = generate_password_hash(password)
+        db.session.commit()
 
     session["owner_logged_in"] = True
     session["owner_restaurant_id"] = restaurant.id
