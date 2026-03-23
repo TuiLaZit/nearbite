@@ -4,6 +4,7 @@ from db import db
 from sqlalchemy import inspect, text
 import os
 import re
+import time
 import threading
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
@@ -140,9 +141,62 @@ db.init_app(app)
 _prewarm_started = False
 _prewarm_lock = threading.Lock()
 _cache_cleanup_lock = threading.Lock()
-_request_counter = 0
-_cleanup_every_requests = int((os.getenv("CACHE_CLEANUP_EVERY_REQUESTS") or "50").strip() or "50")
-_cleanup_every_requests = max(10, min(500, _cleanup_every_requests))
+_cache_cleanup_started = False
+_cache_cleanup_started_lock = threading.Lock()
+_cleanup_interval_seconds = int((os.getenv("CACHE_CLEANUP_INTERVAL_SECONDS") or "600").strip() or "600")
+_cleanup_interval_seconds = max(60, min(3600, _cleanup_interval_seconds))
+_last_cleanup_monotonic = 0.0
+_cleanup_translation_limit = int((os.getenv("CACHE_CLEANUP_TRANSLATION_LIMIT") or "1000").strip() or "1000")
+_cleanup_translation_limit = max(100, min(10000, _cleanup_translation_limit))
+_cleanup_tts_limit = int((os.getenv("CACHE_CLEANUP_TTS_LIMIT") or "200").strip() or "200")
+_cleanup_tts_limit = max(50, min(2000, _cleanup_tts_limit))
+_cleanup_tts_batches = int((os.getenv("CACHE_CLEANUP_TTS_BATCHES") or "10").strip() or "10")
+_cleanup_tts_batches = max(1, min(100, _cleanup_tts_batches))
+_cleanup_translation_batches = int((os.getenv("CACHE_CLEANUP_TRANSLATION_BATCHES") or "5").strip() or "5")
+_cleanup_translation_batches = max(1, min(100, _cleanup_translation_batches))
+
+
+def _run_cache_cleanup(reason="manual"):
+    if not _cache_cleanup_lock.acquire(blocking=False):
+        return None
+
+    try:
+        translation_deleted = cleanup_expired_translation_cache(
+            limit=_cleanup_translation_limit,
+            max_batches=_cleanup_translation_batches,
+        )
+        tts_deleted = cleanup_expired_tts_cache(
+            limit=_cleanup_tts_limit,
+            max_batches=_cleanup_tts_batches,
+        )
+        stats = {
+            "reason": reason,
+            "translation_deleted": int(translation_deleted or 0),
+            "tts_deleted": int(tts_deleted or 0),
+        }
+        if stats["translation_deleted"] > 0 or stats["tts_deleted"] > 0:
+            print(f"[cache-cleanup] {stats}")
+        return stats
+    finally:
+        _cache_cleanup_lock.release()
+
+
+def _start_periodic_cache_cleanup_worker():
+    global _cache_cleanup_started
+    with _cache_cleanup_started_lock:
+        if _cache_cleanup_started:
+            return
+        _cache_cleanup_started = True
+
+    def _run_forever():
+        while True:
+            try:
+                time.sleep(_cleanup_interval_seconds)
+                _run_cache_cleanup(reason="periodic")
+            except Exception as exc:
+                print(f"[cache-cleanup] periodic worker error: {exc}")
+
+    threading.Thread(target=_run_forever, daemon=True).start()
 
 
 def _extract_translation_texts_for_prewarm():
@@ -221,22 +275,16 @@ def _start_translation_prewarm_worker():
 
 
 def _start_cache_cleanup_worker_if_needed():
-    global _request_counter
-    _request_counter += 1
-    if _request_counter % _cleanup_every_requests != 0:
+    global _last_cleanup_monotonic
+    now = time.monotonic()
+    if now - _last_cleanup_monotonic < _cleanup_interval_seconds:
         return
+    _last_cleanup_monotonic = now
 
-    if not _cache_cleanup_lock.acquire(blocking=False):
-        return
+    def _run_cleanup_async():
+        _run_cache_cleanup(reason="request-throttled")
 
-    def _run_cleanup():
-        try:
-            cleanup_expired_translation_cache()
-            cleanup_expired_tts_cache()
-        finally:
-            _cache_cleanup_lock.release()
-
-    threading.Thread(target=_run_cleanup, daemon=True).start()
+    threading.Thread(target=_run_cleanup_async, daemon=True).start()
 
 
 @app.before_request
@@ -244,6 +292,7 @@ def _ensure_prewarm_started_once():
     if request.method == "OPTIONS":
         return None
     _start_translation_prewarm_worker()
+    _start_periodic_cache_cleanup_worker()
     _start_cache_cleanup_worker_if_needed()
     return None
 

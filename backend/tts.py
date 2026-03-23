@@ -217,34 +217,45 @@ def invalidate_tts_cache(restaurant_id=None):
         return
 
 
-def cleanup_expired_tts_cache(limit=200):
+def cleanup_expired_tts_cache(limit=200, max_batches=10):
     if not supabase_client:
-        return
+        return 0
+
+    total_deleted = 0
+    batch_limit = max(1, int(limit))
+    batch_count = max(1, int(max_batches))
 
     try:
-        rows = (
-            supabase_client
-            .table(TTS_TABLE)
-            .select("id,storage_path")
-            .lt("expires_at", _utc_now_iso())
-            .limit(max(1, int(limit)))
-            .execute()
-            .data
-            or []
-        )
-        if not rows:
-            return
+        for _ in range(batch_count):
+            rows = (
+                supabase_client
+                .table(TTS_TABLE)
+                .select("id,storage_path")
+                .lt("expires_at", _utc_now_iso())
+                .limit(batch_limit)
+                .execute()
+                .data
+                or []
+            )
+            if not rows:
+                break
 
-        paths = [row.get("storage_path") for row in rows if row.get("storage_path")]
-        if paths:
-            ensure_bucket_exists(TTS_BUCKET)
-            supabase_client.storage.from_(TTS_BUCKET).remove(paths)
+            paths = list({row.get("storage_path") for row in rows if row.get("storage_path")})
+            if paths:
+                ensure_bucket_exists(TTS_BUCKET)
+                supabase_client.storage.from_(TTS_BUCKET).remove(paths)
 
-        row_ids = [row.get("id") for row in rows if row.get("id") is not None]
-        if row_ids:
-            supabase_client.table(TTS_TABLE).delete().in_("id", row_ids).execute()
+            row_ids = [row.get("id") for row in rows if row.get("id") is not None]
+            if row_ids:
+                supabase_client.table(TTS_TABLE).delete().in_("id", row_ids).execute()
+                total_deleted += len(row_ids)
+
+            if len(rows) < batch_limit:
+                break
     except Exception:
-        return
+        return total_deleted
+
+    return total_deleted
 
 
 def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):

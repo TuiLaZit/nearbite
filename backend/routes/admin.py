@@ -4,8 +4,8 @@ from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
 from supabase_client import upload_image, delete_image, supabase_client
-from translate import invalidate_translation_cache
-from tts import invalidate_tts_cache
+from translate import invalidate_translation_cache, cleanup_expired_translation_cache
+from tts import invalidate_tts_cache, cleanup_expired_tts_cache
 import uuid
 import re
 import secrets
@@ -435,6 +435,48 @@ def register_admin_routes(app):
             "scope": "global" if restaurant_id is None else f"restaurant:{restaurant_id}",
             "translation": include_translation,
             "tts": include_tts
+        })
+
+    @app.route("/admin/cache/cleanup", methods=["POST"])
+    @admin_required
+    def cleanup_expired_cache_entries():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        data = request.get_json() or {}
+
+        translation_limit = int(data.get("translation_limit", 1000) or 1000)
+        translation_batches = int(data.get("translation_batches", 5) or 5)
+        tts_limit = int(data.get("tts_limit", 200) or 200)
+        tts_batches = int(data.get("tts_batches", 10) or 10)
+
+        translation_limit = max(100, min(10000, translation_limit))
+        translation_batches = max(1, min(100, translation_batches))
+        tts_limit = max(50, min(2000, tts_limit))
+        tts_batches = max(1, min(100, tts_batches))
+
+        translation_deleted = cleanup_expired_translation_cache(
+            limit=translation_limit,
+            max_batches=translation_batches,
+        )
+        tts_deleted = cleanup_expired_tts_cache(
+            limit=tts_limit,
+            max_batches=tts_batches,
+        )
+
+        return jsonify({
+            "status": "success",
+            "deleted": {
+                "translation": int(translation_deleted or 0),
+                "tts": int(tts_deleted or 0),
+            },
+            "config": {
+                "translation_limit": translation_limit,
+                "translation_batches": translation_batches,
+                "tts_limit": tts_limit,
+                "tts_batches": tts_batches,
+            }
         })
 
     # ======================
