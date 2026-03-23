@@ -252,9 +252,10 @@ def register_user_routes(app):
 
         # Queue theo restaurant để hạn chế đồng thời khi nhiều người cùng nghe audio.
         try:
-            audio_url = add_to_queue(
+            audio_url, queue_meta = add_to_queue(
                 nearest.id,
                 lambda: text_to_speech(narration_final, language, restaurant_id=nearest.id),
+                include_meta=True,
             )
         except QueueFullError:
             return jsonify({
@@ -285,6 +286,8 @@ def register_user_routes(app):
             "language": language,
             "narration": narration_final,
             "audio_url": audio_url,
+            "queue_wait_ms": queue_meta.get("queue_wait_ms", 0),
+            "queue_position": queue_meta.get("queue_position", 1),
             "distance_km": round(min_dist, 3),
             "poi_radius_km": poi_radius,
             "nearest_place": restaurant_data,
@@ -334,8 +337,17 @@ def register_user_routes(app):
                 return order_record
 
         try:
-            order_result = add_to_queue(restaurant_id, _create_order_job)
-            return jsonify({"status": "success", "data": order_result}), 201
+            order_result, queue_meta = add_to_queue(
+                restaurant_id,
+                _create_order_job,
+                include_meta=True,
+            )
+            return jsonify({
+                "status": "success",
+                "data": order_result,
+                "queue_wait_ms": queue_meta.get("queue_wait_ms", 0),
+                "queue_position": queue_meta.get("queue_position", 1),
+            }), 201
         except QueueFullError:
             return jsonify({
                 "status": "error",
@@ -580,7 +592,13 @@ def register_user_routes(app):
                         db.session.rollback()
                         raise
 
-            result = add_to_queue(restaurant_id, _track_audio_job)
+            result, queue_meta = add_to_queue(
+                restaurant_id,
+                _track_audio_job,
+                include_meta=True,
+            )
+            result["queue_wait_ms"] = queue_meta.get("queue_wait_ms", 0)
+            result["queue_position"] = queue_meta.get("queue_position", 1)
             return jsonify(result)
         except QueueFullError:
             return jsonify({

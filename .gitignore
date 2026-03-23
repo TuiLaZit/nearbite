@@ -20,3 +20,8 @@ backend/migrations/supabase/
 
 # Local helper scripts
 run-local.ps1
+
+backend/scripts/k6-queue-demo.js
+backend/scripts/k6-queue-summary.json
+backend/scripts/k6-queue-presentation.js
+backend/scripts/k6-quick-demo.js
