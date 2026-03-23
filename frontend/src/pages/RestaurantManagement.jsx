@@ -15,7 +15,11 @@ function RestaurantManagement({
   const [selectedTags, setSelectedTags] = useState([])
   const [sortBy, setSortBy] = useState('name')
   const [showModal, setShowModal] = useState(false)
+  const [showTagModal, setShowTagModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [tagEditingRestaurant, setTagEditingRestaurant] = useState(null)
+  const [editingTagIds, setEditingTagIds] = useState([])
+  const [savingTags, setSavingTags] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(false)
   const [pagination, setPagination] = useState({
@@ -325,6 +329,66 @@ function RestaurantManagement({
     }
   }
 
+  const openTagEditor = (restaurant) => {
+    setTagEditingRestaurant(restaurant)
+    setEditingTagIds((restaurant.tags || []).map((tag) => tag.id))
+    setShowTagModal(true)
+  }
+
+  const closeTagEditor = () => {
+    setShowTagModal(false)
+    setTagEditingRestaurant(null)
+    setEditingTagIds([])
+  }
+
+  const toggleRestaurantTag = (tagId) => {
+    setEditingTagIds((prev) => {
+      if (prev.includes(tagId)) {
+        return prev.filter((id) => id !== tagId)
+      }
+      return [...prev, tagId]
+    })
+  }
+
+  const saveRestaurantTags = async () => {
+    if (!tagEditingRestaurant) return
+
+    const originalTagIds = (tagEditingRestaurant.tags || []).map((tag) => tag.id)
+    const toAdd = editingTagIds.filter((id) => !originalTagIds.includes(id))
+    const toRemove = originalTagIds.filter((id) => !editingTagIds.includes(id))
+
+    setSavingTags(true)
+    try {
+      const requestWithValidation = async (url, method) => {
+        const response = await fetch(url, {
+          method,
+          credentials: 'include'
+        })
+        if (!response.ok) {
+          throw new Error(`Request failed: ${method} ${url}`)
+        }
+      }
+
+      await Promise.all([
+        ...toAdd.map((tagId) =>
+          requestWithValidation(`${BASE_URL}/admin/restaurants/${tagEditingRestaurant.id}/tags/${tagId}`, 'POST')
+        ),
+        ...toRemove.map((tagId) =>
+          requestWithValidation(`${BASE_URL}/admin/restaurants/${tagEditingRestaurant.id}/tags/${tagId}`, 'DELETE')
+        )
+      ])
+
+      alert('✅ Đã cập nhật tags cho quán')
+      closeTagEditor()
+      loadRestaurants()
+    } catch (err) {
+      console.error('Error saving restaurant tags:', err)
+      alert('❌ Không thể cập nhật tags cho quán')
+    } finally {
+      setSavingTags(false)
+    }
+  }
+
   // Show loading state while checking auth
   if (!isAuthenticated) {
     return (
@@ -507,6 +571,13 @@ function RestaurantManagement({
                         ) : (
                           <>
                             <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
+                            <button
+                              style={styles.btnTagAssign}
+                              onClick={() => openTagEditor(r)}
+                              title="Gán tags cho quán"
+                            >
+                              🏷️ Gán tags
+                            </button>
                             {!isOwnerView && (
                               <button
                                 style={r.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
@@ -661,6 +732,46 @@ function RestaurantManagement({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showTagModal && tagEditingRestaurant && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h2 style={styles.modalTitle}>🏷️ Gán tags cho quán</h2>
+            <p style={styles.tagModalSubtitle}><strong>{tagEditingRestaurant.name}</strong></p>
+
+            <div style={styles.tagPickerWrap}>
+              {tags.length === 0 && <div>Chưa có tag nào. Vui lòng tạo tag trước.</div>}
+              {tags.map((tag) => {
+                const isSelected = editingTagIds.includes(tag.id)
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleRestaurantTag(tag.id)}
+                    style={{
+                      ...styles.tagPickerChip,
+                      ...(isSelected ? styles.tagPickerChipActive : {}),
+                      borderColor: tag.color || '#64748b',
+                      backgroundColor: isSelected ? (tag.color || '#2563eb') : '#fff'
+                    }}
+                  >
+                    {tag.icon || '🏷️'} {tag.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={styles.modalActions}>
+              <button type="button" style={styles.btnCancel} onClick={closeTagEditor} disabled={savingTags}>
+                ❌ Hủy
+              </button>
+              <button type="button" style={styles.btnSave} onClick={saveRestaurantTags} disabled={savingTags}>
+                {savingTags ? 'Đang lưu...' : '💾 Lưu tags'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -856,6 +967,16 @@ const styles = {
     fontSize: '13px',
     fontWeight: '600'
   },
+  btnTagAssign: {
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '600'
+  },
   btnCreateAccount: {
     padding: '6px 12px',
     border: 'none',
@@ -984,6 +1105,28 @@ const styles = {
     maxHeight: '90vh',
     overflowY: 'auto',
     boxShadow: '0 26px 48px rgba(9, 18, 38, 0.28)',
+  tagModalSubtitle: {
+    margin: '0 0 12px',
+    color: '#334155'
+  },
+  tagPickerWrap: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    marginBottom: '16px'
+  },
+  tagPickerChip: {
+    padding: '8px 12px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '999px',
+    background: '#fff',
+    color: '#1e293b',
+    cursor: 'pointer',
+    fontWeight: '600'
+  },
+  tagPickerChipActive: {
+    color: '#fff'
+  },
     border: '1px solid rgba(198, 214, 234, 0.75)'
   },
   modalTitle: {

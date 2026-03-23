@@ -14,6 +14,9 @@ function OwnerDashboard() {
   const [imageForm, setImageForm] = useState({ caption: '', is_primary: false })
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [allTags, setAllTags] = useState([])
+  const [selectedTagIds, setSelectedTagIds] = useState([])
+  const [savingTags, setSavingTags] = useState(false)
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -54,10 +57,24 @@ function OwnerDashboard() {
     setRestaurant(ownerRestaurant)
     setMenuItems(ownerRestaurant.menu || [])
     setImages(ownerRestaurant.images || [])
+    setSelectedTagIds((ownerRestaurant.tags || []).map((tag) => tag.id))
+  }
+
+  const loadAllTags = async () => {
+    const response = await fetch(`${BASE_URL}/admin/tags`, {
+      credentials: 'include'
+    })
+
+    if (!response.ok) {
+      throw new Error('Không thể tải danh sách tags')
+    }
+
+    const data = await response.json()
+    setAllTags(Array.isArray(data) ? data : [])
   }
 
   useEffect(() => {
-    loadOwnerRestaurant()
+    Promise.all([loadOwnerRestaurant(), loadAllTags()])
       .catch((error) => {
         alert(error.message)
       })
@@ -224,6 +241,52 @@ function OwnerDashboard() {
     await loadOwnerRestaurant()
   }
 
+  const toggleTag = (tagId) => {
+    setSelectedTagIds((prev) => {
+      if (prev.includes(tagId)) {
+        return prev.filter((id) => id !== tagId)
+      }
+      return [...prev, tagId]
+    })
+  }
+
+  const handleSaveTags = async () => {
+    if (!restaurant) return
+
+    const originalTagIds = (restaurant.tags || []).map((tag) => tag.id)
+    const toAdd = selectedTagIds.filter((id) => !originalTagIds.includes(id))
+    const toRemove = originalTagIds.filter((id) => !selectedTagIds.includes(id))
+
+    setSavingTags(true)
+    try {
+      const requestWithValidation = async (url, method) => {
+        const response = await fetch(url, {
+          method,
+          credentials: 'include'
+        })
+        if (!response.ok) {
+          throw new Error(`Request failed: ${method} ${url}`)
+        }
+      }
+
+      await Promise.all([
+        ...toAdd.map((tagId) =>
+          requestWithValidation(`${BASE_URL}/admin/restaurants/${restaurant.id}/tags/${tagId}`, 'POST')
+        ),
+        ...toRemove.map((tagId) =>
+          requestWithValidation(`${BASE_URL}/admin/restaurants/${restaurant.id}/tags/${tagId}`, 'DELETE')
+        )
+      ])
+
+      alert('Đã cập nhật tags cho quán')
+      await loadOwnerRestaurant()
+    } catch (error) {
+      alert(error.message || 'Không thể lưu tags')
+    } finally {
+      setSavingTags(false)
+    }
+  }
+
   if (loading) {
     return <div style={styles.loading}>Đang tải dashboard chủ quán...</div>
   }
@@ -244,6 +307,9 @@ function OwnerDashboard() {
         </button>
         <button style={{ ...styles.navBtn, ...(activeTab === 'images' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('images')}>
           🖼️ Quản lý Hình ảnh
+        </button>
+        <button style={{ ...styles.navBtn, ...(activeTab === 'tags' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('tags')}>
+          🏷️ Quản lý Tags
         </button>
 
         <button style={styles.logoutBtn} onClick={handleLogout}>🚪 Đăng xuất</button>
@@ -361,6 +427,40 @@ function OwnerDashboard() {
                   <button onClick={() => handleDeleteImage(img.id)}>🗑️ Xóa ảnh</button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'tags' && (
+          <div style={styles.card}>
+            <h3>Gán tags cho quán</h3>
+            <p style={styles.tagHint}>Chủ quán có thể tự chọn tags phù hợp; admin vẫn có thể chỉnh lại nếu cần.</p>
+
+            <div style={styles.tagGrid}>
+              {allTags.map((tag) => {
+                const selected = selectedTagIds.includes(tag.id)
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTag(tag.id)}
+                    style={{
+                      ...styles.tagChip,
+                      ...(selected ? styles.tagChipActive : {}),
+                      borderColor: tag.color || '#64748b',
+                      backgroundColor: selected ? (tag.color || '#2563eb') : '#fff'
+                    }}
+                  >
+                    {tag.icon || '🏷️'} {tag.name}
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ marginTop: '14px' }}>
+              <button type="button" onClick={handleSaveTags} disabled={savingTags}>
+                {savingTags ? 'Đang lưu...' : '💾 Lưu tags'}
+              </button>
             </div>
           </div>
         )}
@@ -507,6 +607,28 @@ const styles = {
     color: '#1e40af',
     padding: '2px 8px',
     borderRadius: '999px'
+  },
+  tagHint: {
+    color: '#475569',
+    fontSize: '14px',
+    marginTop: 0
+  },
+  tagGrid: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px'
+  },
+  tagChip: {
+    padding: '8px 12px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '999px',
+    background: '#fff',
+    color: '#1e293b',
+    cursor: 'pointer',
+    fontWeight: '600'
+  },
+  tagChipActive: {
+    color: '#fff'
   },
   loading: {
     minHeight: '100vh',
