@@ -174,7 +174,7 @@ def _upload_audio_bytes_to_storage(audio_bytes, mapped_lang, text_hash, restaura
             audio_bytes,
             {
                 "content-type": "audio/mpeg",
-                "upsert": True,
+                "upsert": "true",
                 "cache-control": str(ttl_seconds),
             }
         )

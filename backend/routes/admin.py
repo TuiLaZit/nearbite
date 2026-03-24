@@ -437,7 +437,7 @@ def register_admin_routes(app):
                 probe_content,
                 {
                     "content-type": "text/plain",
-                    "upsert": True,
+                    "upsert": "true",
                     "cache-control": "60",
                 }
             )
