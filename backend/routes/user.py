@@ -260,10 +260,6 @@ def register_user_routes(app):
                 if fallback_en:
                     return fallback_en, "en"
 
-            fallback_vi = text_to_speech(narration_vi, "vi", restaurant_id=nearest.id)
-            if fallback_vi:
-                return fallback_vi, "vi"
-
             return None, None
 
         # Queue theo restaurant để hạn chế đồng thời khi nhiều người cùng nghe audio.

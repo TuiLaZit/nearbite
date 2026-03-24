@@ -15,6 +15,11 @@ TTS_BUCKET = (os.getenv("TTS_BUCKET") or "tts-audio").strip() or "tts-audio"
 TTS_TABLE = (os.getenv("TTS_CACHE_TABLE") or "tts_cache_entry").strip() or "tts_cache_entry"
 TTS_CACHE_TTL_SECONDS = int((os.getenv("TTS_CACHE_TTL_SECONDS") or "3600").strip() or "3600")
 TTS_CACHE_TTL_SECONDS = max(60, min(86400, TTS_CACHE_TTL_SECONDS))
+TTS_CACHE_NAMESPACE = (
+    (os.getenv("CACHE_NAMESPACE") or "").strip()
+    or (os.getenv("RENDER_GIT_COMMIT") or "").strip()
+    or "default"
+)
 _IN_MEMORY_TTS_CACHE = {}
 _GTTS_LANGUAGE_MAP = tts_langs()
 
@@ -79,7 +84,7 @@ def _expires_at_iso(ttl_seconds):
 
 def _persistent_key(text, mapped_lang, restaurant_id=None):
     scope = str(restaurant_id) if restaurant_id is not None else "global"
-    source = f"{scope}::{mapped_lang}::{text}"
+    source = f"{TTS_CACHE_NAMESPACE}::{scope}::{mapped_lang}::{text}"
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
