@@ -93,6 +93,24 @@ const parseCoordinate = (value) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const TILE_SOURCES = [
+  {
+    name: 'CARTO Voyager',
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+  },
+  {
+    name: 'OpenStreetMap',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+  },
+  {
+    name: 'OpenTopoMap',
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+  }
+]
+
 function AdminDashboard({ role = 'admin' }) {
   const isOwner = role === 'owner'
   const authBase = isOwner ? '/owner' : '/admin'
@@ -111,6 +129,9 @@ function AdminDashboard({ role = 'admin' }) {
     online_devices: 0,
     online_users: 0
   })
+  const [tileProviderIndex, setTileProviderIndex] = useState(0)
+  const [tileLoaded, setTileLoaded] = useState(false)
+  const tileErrorCountRef = useRef(0)
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -270,6 +291,30 @@ function AdminDashboard({ role = 'admin' }) {
     }
   }, [activeTab, isOwner])
 
+  useEffect(() => {
+    if (activeTab !== 'dashboard') return
+    setTileProviderIndex(0)
+    setTileLoaded(false)
+    tileErrorCountRef.current = 0
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'dashboard' || tileLoaded) return undefined
+
+    if (tileProviderIndex >= TILE_SOURCES.length - 1) return undefined
+
+    const timer = window.setTimeout(() => {
+      if (!tileLoaded) {
+        setTileProviderIndex((prev) => Math.min(prev + 1, TILE_SOURCES.length - 1))
+        tileErrorCountRef.current = 0
+      }
+    }, 4500)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [activeTab, tileLoaded, tileProviderIndex])
+
 
 
   const handleLogout = () => {
@@ -400,6 +445,79 @@ function AdminDashboard({ role = 'admin' }) {
             {!isOwner && activeTab === 'dashboard' && (
               <div style={styles.dashboardContent}>
                 <div style={styles.dashboardLayout}>
+                  <div style={styles.mapContainer}>
+                    <div style={styles.mapHeaderRow}>
+                      <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
+                      <div style={styles.mapSourceBadge}>
+                        {tileLoaded ? 'Tile OK' : 'Đang tải tile...'} | {TILE_SOURCES[tileProviderIndex].name}
+                      </div>
+                    </div>
+                    {restaurants.length === 0 && (
+                      <div style={styles.noDataMessage}>
+                        ℹ️ Chưa có quán ăn nào trong hệ thống.
+                      </div>
+                    )}
+                    <div style={styles.heatmapContainer}>
+                      <MapContainer
+                        center={[10.760426862777551, 106.68198430250096]}
+                        zoom={15}
+                        style={{ height: '100%', width: '100%' }}
+                        zoomControl={true}
+                        key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
+                      >
+                        <MapAutoResize />
+                        <TileLayer
+                          attribution={TILE_SOURCES[tileProviderIndex].attribution}
+                          url={TILE_SOURCES[tileProviderIndex].url}
+                          eventHandlers={{
+                            tileload: () => {
+                              setTileLoaded(true)
+                            },
+                            tileerror: () => {
+                              tileErrorCountRef.current += 1
+                              if (tileErrorCountRef.current >= 8) {
+                                setTileLoaded(false)
+                                setTileProviderIndex((prev) => {
+                                  if (prev >= TILE_SOURCES.length - 1) return prev
+                                  return prev + 1
+                                })
+                                tileErrorCountRef.current = 0
+                              }
+                            }
+                          }}
+                        />
+
+                        {/* Heatmap layer (plugin-free fallback for reliability) */}
+                        <HeatCircleLayer heatmapData={heatmapData} />
+
+                        {/* Marker các quán */}
+                        {restaurantsWithCoords.map(restaurant => (
+                          <Marker
+                            key={restaurant.id}
+                            position={[restaurant.lat, restaurant.lng]}
+                            icon={restaurantIcon}
+                          >
+                            <Popup maxWidth={300}>
+                              <div style={{ padding: '5px' }}>
+                                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                                {restaurant.address && (
+                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
+                                    📍 {restaurant.address}
+                                  </p>
+                                )}
+                                {restaurant.description && (
+                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
+                                    {restaurant.description}
+                                  </p>
+                                )}
+                              </div>
+                            </Popup>
+                          </Marker>
+                        ))}
+                      </MapContainer>
+                    </div>
+                  </div>
+
                   <div style={styles.topTablesContainer}>
                     <div style={styles.onlineCard}>
                       <h3 style={styles.onlineTitle}>🟢 Online realtime ({onlineStats.window_seconds}s)</h3>
@@ -503,57 +621,6 @@ function AdminDashboard({ role = 'admin' }) {
                     </div>
                   </div>
 
-                  <div style={styles.mapContainer}>
-                    <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
-                    {restaurants.length === 0 && (
-                      <div style={styles.noDataMessage}>
-                        ℹ️ Chưa có quán ăn nào trong hệ thống.
-                      </div>
-                    )}
-                    <div style={styles.heatmapContainer}>
-                      <MapContainer
-                        center={[10.760426862777551, 106.68198430250096]}
-                        zoom={15}
-                        style={{ height: '100%', width: '100%' }}
-                        zoomControl={true}
-                        key={`admin-dashboard-map-${activeTab}`}
-                      >
-                        <MapAutoResize />
-                        <TileLayer
-                          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-                          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                        />
-
-                        {/* Heatmap layer (plugin-free fallback for reliability) */}
-                        <HeatCircleLayer heatmapData={heatmapData} />
-
-                        {/* Marker các quán */}
-                        {restaurantsWithCoords.map(restaurant => (
-                          <Marker
-                            key={restaurant.id}
-                            position={[restaurant.lat, restaurant.lng]}
-                            icon={restaurantIcon}
-                          >
-                            <Popup maxWidth={300}>
-                              <div style={{ padding: '5px' }}>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
-                                {restaurant.address && (
-                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
-                                    📍 {restaurant.address}
-                                  </p>
-                                )}
-                                {restaurant.description && (
-                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
-                                    {restaurant.description}
-                                  </p>
-                                )}
-                              </div>
-                            </Popup>
-                          </Marker>
-                        ))}
-                      </MapContainer>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -663,7 +730,6 @@ const styles = {
     background:
       'linear-gradient(158deg, rgba(255, 255, 255, 0.72) 0%, rgba(247, 251, 255, 0.66) 100%)',
     boxShadow: '0 20px 40px rgba(26, 40, 67, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.58)',
-    backdropFilter: 'blur(8px)',
     overflow: 'hidden'
   },
   dashboardContent: {
@@ -789,13 +855,33 @@ const styles = {
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '560px'
+    minHeight: '560px',
+    background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 252, 255, 0.96) 100%)',
+    borderRadius: '16px',
+    border: '1px solid rgba(188, 208, 233, 0.82)',
+    padding: '14px'
+  },
+  mapHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '8px'
+  },
+  mapSourceBadge: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#2d4668',
+    background: 'rgba(214, 230, 249, 0.78)',
+    border: '1px solid rgba(173, 198, 227, 0.8)',
+    borderRadius: '999px',
+    padding: '6px 10px'
   },
   mapTitle: {
     fontSize: '18px',
     fontWeight: '700',
     color: '#132745',
-    marginBottom: '12px',
+    marginBottom: '0',
     marginTop: '0'
   },
   noDataMessage: {
