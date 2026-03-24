@@ -331,10 +331,25 @@ def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
     # Cleanup nếu cần
     cleanup_old_files()
 
+    audio_bytes = None
     try:
         audio_bytes = _generate_tts_bytes(text, mapped_lang)
+    except Exception:
+        # If target language generation fails entirely, keep strict behavior:
+        # do not auto-downgrade to Vietnamese for non-Vietnamese requests.
+        if mapped_lang != "vi":
+            return None
 
-        if supabase_client:
+        # Vietnamese baseline fallback keeps existing behavior when vi generation fails.
+        try:
+            fallback_buffer = BytesIO()
+            gTTS(text=text, lang="vi", slow=False, tld='com').write_to_fp(fallback_buffer)
+            audio_bytes = fallback_buffer.getvalue()
+        except Exception:
+            return None
+
+    if supabase_client:
+        try:
             ensure_bucket_exists(TTS_BUCKET)
             storage_path = _storage_path_for_hash(file_hash, mapped_lang, restaurant_id=restaurant_id)
             supabase_client.storage.from_(TTS_BUCKET).upload(
@@ -347,37 +362,29 @@ def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
                 }
             )
             public_url = get_public_url_for_path(storage_path, bucket_name=TTS_BUCKET)
-            if not public_url:
-                raise Exception("Unable to resolve public URL for generated TTS audio")
-            persistent_key = _persistent_key(text, mapped_lang, restaurant_id=restaurant_id)
-            _persistent_tts_set(
-                cache_key=persistent_key,
-                restaurant_id=restaurant_id,
-                mapped_lang=mapped_lang,
-                text_hash=file_hash,
-                storage_path=storage_path,
-                public_url=public_url,
-                ttl_seconds=ttl,
-            )
-            _IN_MEMORY_TTS_CACHE[memory_cache_key] = public_url
-            return public_url
+            if public_url:
+                persistent_key = _persistent_key(text, mapped_lang, restaurant_id=restaurant_id)
+                _persistent_tts_set(
+                    cache_key=persistent_key,
+                    restaurant_id=restaurant_id,
+                    mapped_lang=mapped_lang,
+                    text_hash=file_hash,
+                    storage_path=storage_path,
+                    public_url=public_url,
+                    ttl_seconds=ttl,
+                )
+                _IN_MEMORY_TTS_CACHE[memory_cache_key] = public_url
+                return public_url
+        except Exception as exc:
+            # Storage errors should not block TTS playback.
+            print(f"[tts] storage upload failed lang={mapped_lang} restaurant_id={restaurant_id} bucket={TTS_BUCKET} error={exc}")
 
+    # Local fallback is valid for every language when storage is unavailable.
+    try:
         with open(filepath, "wb") as f:
             f.write(audio_bytes)
         local_url = f"/static/tts/{filename}"
         _IN_MEMORY_TTS_CACHE[memory_cache_key] = local_url
         return local_url
     except Exception:
-        # Avoid wrong-language fallback for non-Vietnamese requests.
-        if mapped_lang != "vi":
-            return None
-
-        # Local fallback only for Vietnamese to keep baseline behavior.
-        try:
-            tts = gTTS(text=text, lang="vi", slow=False, tld='com')
-            tts.save(filepath)
-            local_url = f"/static/tts/{filename}"
-            _IN_MEMORY_TTS_CACHE[memory_cache_key] = local_url
-            return local_url
-        except Exception:
-            return None
+        return None
