@@ -89,8 +89,99 @@ def _persistent_key(text, mapped_lang, restaurant_id=None):
 
 
 def _storage_path_for_hash(text_hash, mapped_lang, restaurant_id=None):
-    scope = f"restaurant-{restaurant_id}" if restaurant_id is not None else "global"
-    return f"{scope}/{mapped_lang}/{text_hash}.mp3"
+    scope_id = str(restaurant_id) if restaurant_id is not None else "global"
+    scope = f"restaurant-{scope_id}"
+    filename = f"{scope_id}-{mapped_lang}-{text_hash}.mp3"
+    return f"{scope}/{mapped_lang}/{filename}"
+
+
+def _list_storage_paths_recursive(prefix, bucket_name=TTS_BUCKET, page_size=100, max_pages=50):
+    if not supabase_client or not prefix:
+        return []
+
+    prefix = str(prefix).strip("/")
+    if not prefix:
+        return []
+
+    if "/" in prefix:
+        root, sub_path = prefix.split("/", 1)
+    else:
+        root, sub_path = prefix, ""
+
+    stack = [(root, sub_path)]
+    collected = []
+
+    while stack:
+        folder_root, folder_path = stack.pop()
+        offset = 0
+        pages = 0
+
+        while pages < max_pages:
+            try:
+                entries = supabase_client.storage.from_(bucket_name).list(
+                    folder_root,
+                    {
+                        "limit": page_size,
+                        "offset": offset,
+                    }
+                )
+            except Exception:
+                entries = []
+
+            if not isinstance(entries, list) or not entries:
+                break
+
+            for entry in entries:
+                name = entry.get("name") if isinstance(entry, dict) else None
+                if not name:
+                    continue
+
+                if folder_path:
+                    object_path = f"{folder_root}/{folder_path}/{name}".strip("/")
+                else:
+                    object_path = f"{folder_root}/{name}".strip("/")
+
+                entry_id = entry.get("id") if isinstance(entry, dict) else None
+                if entry_id:
+                    collected.append(object_path)
+                else:
+                    stack.append((object_path, ""))
+
+            if len(entries) < page_size:
+                break
+
+            offset += page_size
+            pages += 1
+
+    return sorted(set(collected))
+
+
+def _upload_audio_bytes_to_storage(audio_bytes, mapped_lang, text_hash, restaurant_id=None, ttl_seconds=3600):
+    if not supabase_client or not audio_bytes:
+        return None
+
+    try:
+        ensure_bucket_exists(TTS_BUCKET)
+        storage_path = _storage_path_for_hash(text_hash, mapped_lang, restaurant_id=restaurant_id)
+        supabase_client.storage.from_(TTS_BUCKET).upload(
+            storage_path,
+            audio_bytes,
+            {
+                "content-type": "audio/mpeg",
+                "upsert": True,
+                "cache-control": str(ttl_seconds),
+            }
+        )
+        public_url = get_public_url_for_path(storage_path, bucket_name=TTS_BUCKET)
+        if not public_url:
+            return None
+        return {
+            "storage_path": storage_path,
+            "public_url": public_url,
+        }
+    except Exception as exc:
+        print(f"[tts] storage upload failed lang={mapped_lang} restaurant_id={restaurant_id} bucket={TTS_BUCKET} error={exc}")
+        return None
 
 
 def _generate_tts_bytes(text, mapped_lang):
@@ -234,13 +325,20 @@ def invalidate_tts_cache(restaurant_id=None):
         return
 
     try:
-        query = supabase_client.table(TTS_TABLE).select("storage_path")
+        query = supabase_client.table(TTS_TABLE).select("id,storage_path")
         if restaurant_id is None:
             query = query.gte("id", 0)
         else:
             query = query.eq("restaurant_id", int(restaurant_id))
         rows = (query.execute().data or [])
         paths = [row.get("storage_path") for row in rows if row.get("storage_path")]
+
+        # Hard cleanup by prefix so old files are removed even if DB rows are missing.
+        if restaurant_id is not None:
+            prefix = f"restaurant-{int(restaurant_id)}"
+            paths.extend(_list_storage_paths_recursive(prefix, bucket_name=TTS_BUCKET))
+
+        paths = list({p for p in paths if p})
         if paths:
             ensure_bucket_exists(TTS_BUCKET)
             supabase_client.storage.from_(TTS_BUCKET).remove(paths)
@@ -322,8 +420,35 @@ def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
             _IN_MEMORY_TTS_CACHE[memory_cache_key] = persistent_url
             return persistent_url
 
-    # Nếu file đã tồn tại, trả về luôn không cần tạo lại
+    # If local file already exists, try backfilling it to Supabase first.
     if os.path.exists(filepath):
+        if supabase_client:
+            try:
+                with open(filepath, "rb") as f:
+                    existing_audio_bytes = f.read()
+                upload_result = _upload_audio_bytes_to_storage(
+                    existing_audio_bytes,
+                    mapped_lang,
+                    file_hash,
+                    restaurant_id=restaurant_id,
+                    ttl_seconds=ttl,
+                )
+                if upload_result:
+                    persistent_key = _persistent_key(text, mapped_lang, restaurant_id=restaurant_id)
+                    _persistent_tts_set(
+                        cache_key=persistent_key,
+                        restaurant_id=restaurant_id,
+                        mapped_lang=mapped_lang,
+                        text_hash=file_hash,
+                        storage_path=upload_result["storage_path"],
+                        public_url=upload_result["public_url"],
+                        ttl_seconds=ttl,
+                    )
+                    _IN_MEMORY_TTS_CACHE[memory_cache_key] = upload_result["public_url"]
+                    return upload_result["public_url"]
+            except Exception:
+                pass
+
         local_url = f"/static/tts/{filename}"
         _IN_MEMORY_TTS_CACHE[memory_cache_key] = local_url
         return local_url
@@ -349,35 +474,29 @@ def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
             return None
 
     if supabase_client:
-        try:
-            ensure_bucket_exists(TTS_BUCKET)
-            storage_path = _storage_path_for_hash(file_hash, mapped_lang, restaurant_id=restaurant_id)
-            supabase_client.storage.from_(TTS_BUCKET).upload(
-                storage_path,
-                audio_bytes,
-                {
-                    "content-type": "audio/mpeg",
-                    "upsert": True,
-                    "cache-control": str(ttl),
-                }
-            )
-            public_url = get_public_url_for_path(storage_path, bucket_name=TTS_BUCKET)
-            if public_url:
+        upload_result = _upload_audio_bytes_to_storage(
+            audio_bytes,
+            mapped_lang,
+            file_hash,
+            restaurant_id=restaurant_id,
+            ttl_seconds=ttl,
+        )
+        if upload_result:
+            try:
                 persistent_key = _persistent_key(text, mapped_lang, restaurant_id=restaurant_id)
                 _persistent_tts_set(
                     cache_key=persistent_key,
                     restaurant_id=restaurant_id,
                     mapped_lang=mapped_lang,
                     text_hash=file_hash,
-                    storage_path=storage_path,
-                    public_url=public_url,
+                    storage_path=upload_result["storage_path"],
+                    public_url=upload_result["public_url"],
                     ttl_seconds=ttl,
                 )
-                _IN_MEMORY_TTS_CACHE[memory_cache_key] = public_url
-                return public_url
-        except Exception as exc:
-            # Storage errors should not block TTS playback.
-            print(f"[tts] storage upload failed lang={mapped_lang} restaurant_id={restaurant_id} bucket={TTS_BUCKET} error={exc}")
+            except Exception:
+                pass
+            _IN_MEMORY_TTS_CACHE[memory_cache_key] = upload_result["public_url"]
+            return upload_result["public_url"]
 
     # Local fallback is valid for every language when storage is unavailable.
     try:
