@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet.heat'
 import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import RestaurantManagement from './RestaurantManagement'
@@ -31,58 +30,46 @@ const restaurantIcon = new L.Icon({
   popupAnchor: [0, -32],
 })
 
-// Component để thêm heatmap layer vào map
-function HeatmapLayer({ heatmapData }) {
-  const map = useMap()
-  const heatLayerRef = useRef(null)
+function HeatCircleLayer({ heatmapData }) {
+  const normalizedPoints = (Array.isArray(heatmapData) ? heatmapData : [])
+    .map((point, idx) => ({
+      id: `${idx}-${point?.lat}-${point?.lng}`,
+      lat: Number(point?.lat),
+      lng: Number(point?.lng),
+      intensity: Number(point?.intensity) || 0
+    }))
+    .filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng))
 
-  useEffect(() => {
-    if (!map || typeof L.heatLayer !== 'function') return
+  if (normalizedPoints.length === 0) {
+    return null
+  }
 
-    // Remove existing heatmap layer
-    if (heatLayerRef.current) {
-      map.removeLayer(heatLayerRef.current)
-    }
+  const maxIntensity = Math.max(...normalizedPoints.map(point => point.intensity), 1)
 
-    // Add new heatmap layer if data exists
-    if (heatmapData && heatmapData.length > 0) {
-      const heatPoints = heatmapData
-        .map(point => ({
-          lat: Number(point.lat),
-          lng: Number(point.lng),
-          intensity: Number(point.intensity) || 0
-        }))
-        .filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng))
-        .map(point => [point.lat, point.lng, point.intensity])
+  return (
+    <>
+      {normalizedPoints.map((point) => {
+        const ratio = Math.max(0.08, Math.min(1, point.intensity / maxIntensity))
+        const radius = 18 + (ratio * 82)
+        const fillOpacity = 0.18 + (ratio * 0.5)
+        const strokeOpacity = 0.25 + (ratio * 0.45)
 
-      if (heatPoints.length === 0) {
-        return undefined
-      }
-
-      const heat = L.heatLayer(heatPoints, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 17,
-        max: Math.max(...heatPoints.map(p => p[2])),
-        gradient: {
-          0.0: 'blue',
-          0.5: 'lime',
-          0.7: 'yellow',
-          1.0: 'red'
-        }
-      }).addTo(map)
-
-      heatLayerRef.current = heat
-    }
-
-    return () => {
-      if (heatLayerRef.current) {
-        map.removeLayer(heatLayerRef.current)
-      }
-    }
-  }, [map, heatmapData])
-
-  return null
+        return (
+          <Circle
+            key={point.id}
+            center={[point.lat, point.lng]}
+            radius={radius}
+            pathOptions={{
+              color: `rgba(234, 67, 53, ${strokeOpacity.toFixed(3)})`,
+              weight: 1,
+              fillColor: `rgba(251, 188, 4, ${fillOpacity.toFixed(3)})`,
+              fillOpacity,
+            }}
+          />
+        )
+      })}
+    </>
+  )
 }
 
 function MapAutoResize() {
@@ -547,8 +534,8 @@ function AdminDashboard({ role = 'admin' }) {
                           }}
                         />
 
-                        {/* Heatmap layer */}
-                        <HeatmapLayer heatmapData={heatmapData} />
+                        {/* Heatmap layer (plugin-free fallback for reliability) */}
+                        <HeatCircleLayer heatmapData={heatmapData} />
 
                         {/* Marker các quán */}
                         {restaurantsWithCoords.map(restaurant => (
