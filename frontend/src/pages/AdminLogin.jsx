@@ -15,6 +15,19 @@ function AdminLogin({
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
+  const buildSessionPersistenceError = () => {
+    const isStandalone = typeof window !== 'undefined' && (
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator?.standalone === true
+    )
+
+    if (isStandalone) {
+      return 'Đăng nhập thành công nhưng session cookie bị chặn trong PWA (frontend/backend khác domain). Hãy bật SESSION_COOKIE_PARTITIONED=true ở backend hoặc dùng cùng domain API qua /api proxy.'
+    }
+
+    return 'Đăng nhập thành công nhưng không giữ được phiên đăng nhập. Kiểm tra cấu hình cookie/CORS của backend.'
+  }
+
   useEffect(() => {
     document.body.classList.add('admin-login-body')
     return () => {
@@ -38,6 +51,15 @@ function AdminLogin({
       if (response.ok) {
         const payload = await response.json().catch(() => ({}))
         setAuthUserIdFromPayload(payload)
+
+        const checkResponse = await fetch(`${BASE_URL}/admin/check`, {
+          credentials: 'include'
+        })
+        if (!checkResponse.ok) {
+          setError(buildSessionPersistenceError())
+          return
+        }
+
         localStorage.setItem('activeRole', role)
         navigate(redirectPath)
       } else {
