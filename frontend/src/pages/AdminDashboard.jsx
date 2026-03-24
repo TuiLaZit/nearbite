@@ -124,6 +124,7 @@ function AdminDashboard({ role = 'admin' }) {
     online_devices: 0,
     online_users: 0
   })
+  const [useFallbackTiles, setUseFallbackTiles] = useState(false)
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -533,9 +534,17 @@ function AdminDashboard({ role = 'admin' }) {
                       >
                         <MapAutoResize />
                         <TileLayer
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          crossOrigin="anonymous"
+                          attribution={useFallbackTiles
+                            ? '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+                          url={useFallbackTiles
+                            ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                            : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
+                          eventHandlers={{
+                            tileerror: () => {
+                              setUseFallbackTiles(true)
+                            }
+                          }}
                         />
 
                         {/* Heatmap layer */}
