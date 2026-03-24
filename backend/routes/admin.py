@@ -3,9 +3,9 @@ from models import Restaurant, MenuItem, Tag, RestaurantImage, AdminUser, restau
 from db import db
 from auth import admin_required
 from validators import validate_restaurant, validate_menu_item, validate_tag, validate_restaurant_image
-from supabase_client import upload_image, delete_image, supabase_client
+from supabase_client import upload_image, delete_image, supabase_client, ensure_bucket_exists, get_public_url_for_path
 from translate import invalidate_translation_cache, cleanup_expired_translation_cache
-from tts import invalidate_tts_cache, cleanup_expired_tts_cache
+from tts import invalidate_tts_cache, cleanup_expired_tts_cache, TTS_BUCKET
 from cache_warmup import schedule_restaurant_rewarm
 import uuid
 import re
@@ -395,6 +395,82 @@ def register_admin_routes(app):
                 "tts_batches": tts_batches,
             }
         })
+
+    @app.route("/admin/cache/tts-health", methods=["GET"])
+    @admin_required
+    def tts_storage_health_check():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        if not supabase_client:
+            return jsonify({
+                "status": "error",
+                "message": "Supabase client is not initialized. Check SUPABASE_URL and SUPABASE_SERVICE_KEY.",
+                "bucket": TTS_BUCKET,
+            }), 500
+
+        probe_path = f"healthcheck/probe-{uuid.uuid4().hex}.txt"
+        probe_content = b"tts-storage-health-check"
+
+        diagnostics = {
+            "bucket": TTS_BUCKET,
+            "probe_path": probe_path,
+            "bucket_ready": False,
+            "upload_ok": False,
+            "public_url_ok": False,
+            "remove_ok": False,
+            "sample_list_count": 0,
+            "sample_list_names": [],
+            "errors": [],
+        }
+
+        try:
+            ensure_bucket_exists(TTS_BUCKET)
+            diagnostics["bucket_ready"] = True
+        except Exception as exc:
+            diagnostics["errors"].append(f"ensure_bucket_exists failed: {exc}")
+
+        try:
+            supabase_client.storage.from_(TTS_BUCKET).upload(
+                probe_path,
+                probe_content,
+                {
+                    "content-type": "text/plain",
+                    "upsert": True,
+                    "cache-control": "60",
+                }
+            )
+            diagnostics["upload_ok"] = True
+        except Exception as exc:
+            diagnostics["errors"].append(f"upload failed: {exc}")
+
+        try:
+            probe_url = get_public_url_for_path(probe_path, bucket_name=TTS_BUCKET)
+            diagnostics["public_url_ok"] = bool(probe_url)
+            diagnostics["probe_public_url"] = probe_url
+        except Exception as exc:
+            diagnostics["errors"].append(f"get_public_url failed: {exc}")
+
+        try:
+            items = supabase_client.storage.from_(TTS_BUCKET).list("", {"limit": 20, "offset": 0})
+            if isinstance(items, list):
+                diagnostics["sample_list_count"] = len(items)
+                diagnostics["sample_list_names"] = [item.get("name") for item in items if isinstance(item, dict)]
+        except Exception as exc:
+            diagnostics["errors"].append(f"list failed: {exc}")
+
+        try:
+            supabase_client.storage.from_(TTS_BUCKET).remove([probe_path])
+            diagnostics["remove_ok"] = True
+        except Exception as exc:
+            diagnostics["errors"].append(f"remove failed: {exc}")
+
+        has_error = len(diagnostics["errors"]) > 0
+        return jsonify({
+            "status": "error" if has_error else "success",
+            "diagnostics": diagnostics,
+        }), 500 if has_error else 200
 
     # ======================
     # MENU CRUD
