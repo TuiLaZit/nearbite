@@ -97,6 +97,10 @@ function LocationTracker() {
   const audioStartTimeRef = useRef(null) // Track thời điểm bắt đầu nghe audio
   const isChangingLanguageRef = useRef(false) // Flag để skip cooldown khi đổi ngôn ngữ
   const isCleaningUpAudioRef = useRef(false) // Flag để skip error khi cleanup audio
+  const locationRequestControllerRef = useRef(null)
+  const locationRequestSeqRef = useRef(0)
+  const selectedRestaurantRequestControllerRef = useRef(null)
+  const selectedRestaurantRequestSeqRef = useRef(0)
 
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -273,6 +277,13 @@ function LocationTracker() {
   // Hàm fetch và cập nhật thuyết minh khi di chuyển
   const fetchAndUpdateLocation = (pos, lang = null) => {
     const currentLang = lang || languageRef.current
+    const requestSeq = ++locationRequestSeqRef.current
+    if (locationRequestControllerRef.current) {
+      locationRequestControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    locationRequestControllerRef.current = controller
+
     const userLat = pos.coords.latitude
     const userLng = pos.coords.longitude
     
@@ -282,12 +293,16 @@ function LocationTracker() {
     // NẾU ĐANG PHÁT AUDIO, TẠM DỪNG GPS UPDATE (không fetch location mới)
     if (isAudioPlaying) {
 
-      return
+      if (locationRequestSeqRef.current === requestSeq) {
+        locationRequestControllerRef.current = null
+      }
+      return Promise.resolve()
     }
 
-    fetch(`${BASE_URL}/location`, {
+    return fetch(`${BASE_URL}/location`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         latitude: userLat,
         longitude: userLng,
@@ -301,6 +316,10 @@ function LocationTracker() {
         return res.json()
       })
       .then(data => {
+        if (requestSeq !== locationRequestSeqRef.current || languageRef.current !== currentLang) {
+          return
+        }
+
         if (!data || !data.nearest_place || typeof data.distance_km !== 'number') {
           console.warn('Invalid /location response payload:', data)
           return
@@ -484,7 +503,17 @@ function LocationTracker() {
           // Nếu distance không thay đổi đáng kể, không làm gì cả - tránh re-render
         }
       })
-      .catch(err => console.error('Error fetching location:', err))
+      .catch(err => {
+        if (err?.name === 'AbortError') {
+          return
+        }
+        console.error('Error fetching location:', err)
+      })
+      .finally(() => {
+        if (locationRequestSeqRef.current === requestSeq) {
+          locationRequestControllerRef.current = null
+        }
+      })
   }
 
   // Dừng audio hoàn toàn
@@ -697,6 +726,17 @@ function LocationTracker() {
     
     // Set flag đang đổi ngôn ngữ để skip cooldown tracking
     isChangingLanguageRef.current = true
+
+    if (locationRequestControllerRef.current) {
+      locationRequestControllerRef.current.abort()
+      locationRequestControllerRef.current = null
+    }
+    if (selectedRestaurantRequestControllerRef.current) {
+      selectedRestaurantRequestControllerRef.current.abort()
+      selectedRestaurantRequestControllerRef.current = null
+    }
+    locationRequestSeqRef.current += 1
+    selectedRestaurantRequestSeqRef.current += 1
     
     // Update ngôn ngữ global và state trang hiện tại
     setLanguage(newLang)
@@ -714,6 +754,7 @@ function LocationTracker() {
     
     // Reset currentNarration hoàn toàn
     setCurrentNarration(null)
+    setCurrentDistance(null)
 
     // Reset menu modal/translation cũ để không hiển thị sai ngôn ngữ trước đó.
     setTranslatedPoiMenu({})
@@ -725,8 +766,10 @@ function LocationTracker() {
     
     if (isTracking && userLocation) {
       // Fetch lại ngay sau khi đổi ngôn ngữ để POI cập nhật tức thì.
-      isChangingLanguageRef.current = false // Reset flag
       fetchAndUpdateLocation({ coords: { latitude: userLocation[0], longitude: userLocation[1] } }, newLang)
+        .finally(() => {
+          isChangingLanguageRef.current = false // Reset flag
+        })
     } else {
       isChangingLanguageRef.current = false // Reset flag
     }
@@ -748,15 +791,23 @@ function LocationTracker() {
         userLocation[0], userLocation[1],
         restaurant.lat, restaurant.lng
       )
-      
-      // Fetch với ngôn ngữ hiện tại
+
+      const requestLang = languageRef.current
+      const requestSeq = ++selectedRestaurantRequestSeqRef.current
+      if (selectedRestaurantRequestControllerRef.current) {
+        selectedRestaurantRequestControllerRef.current.abort()
+      }
+      const controller = new AbortController()
+      selectedRestaurantRequestControllerRef.current = controller
+
       fetch(`${BASE_URL}/location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: languageRef.current,
+          language: requestLang,
           allow_network_translation: true
         })
       })
@@ -765,11 +816,13 @@ function LocationTracker() {
           return res.json()
         })
         .then(data => {
+          if (requestSeq !== selectedRestaurantRequestSeqRef.current || languageRef.current !== requestLang) {
+            return
+          }
           if (!data || typeof data !== 'object') {
             throw new Error('Invalid response payload')
           }
 
-          // Set selectedRestaurant với data mới
           const selectedPlace = data.nearest_place || {}
           const newData = {
             ...restaurant,
@@ -782,8 +835,13 @@ function LocationTracker() {
           setSelectedRestaurant(newData)
         })
         .catch(err => {
+          if (err?.name === 'AbortError') {
+            return
+          }
           console.error('Error:', err)
-          // Vẫn hiển thị thông tin cơ bản nếu fetch thất bại
+          if (requestSeq !== selectedRestaurantRequestSeqRef.current || languageRef.current !== requestLang) {
+            return
+          }
           setSelectedRestaurant({
             ...restaurant,
             distance: distance,
@@ -791,15 +849,29 @@ function LocationTracker() {
             error: true
           })
         })
+        .finally(() => {
+          if (selectedRestaurantRequestSeqRef.current === requestSeq) {
+            selectedRestaurantRequestControllerRef.current = null
+          }
+        })
     } else {
       // Nếu không có userLocation, vẫn hiển thị thông tin cơ bản
+      const requestLang = languageRef.current
+      const requestSeq = ++selectedRestaurantRequestSeqRef.current
+      if (selectedRestaurantRequestControllerRef.current) {
+        selectedRestaurantRequestControllerRef.current.abort()
+      }
+      const controller = new AbortController()
+      selectedRestaurantRequestControllerRef.current = controller
+
       fetch(`${BASE_URL}/location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           latitude: restaurant.lat,
           longitude: restaurant.lng,
-          language: languageRef.current,
+          language: requestLang,
           allow_network_translation: true
         })
       })
@@ -808,6 +880,9 @@ function LocationTracker() {
           return res.json()
         })
         .then(data => {
+          if (requestSeq !== selectedRestaurantRequestSeqRef.current || languageRef.current !== requestLang) {
+            return
+          }
           if (!data || typeof data !== 'object') {
             throw new Error('Invalid response payload')
           }
@@ -822,12 +897,23 @@ function LocationTracker() {
           })
         })
         .catch(err => {
+          if (err?.name === 'AbortError') {
+            return
+          }
           console.error('Error:', err)
+          if (requestSeq !== selectedRestaurantRequestSeqRef.current || languageRef.current !== requestLang) {
+            return
+          }
           setSelectedRestaurant({
             ...restaurant,
             loading: false,
             error: true
           })
+        })
+        .finally(() => {
+          if (selectedRestaurantRequestSeqRef.current === requestSeq) {
+            selectedRestaurantRequestControllerRef.current = null
+          }
         })
     }
   }
@@ -914,6 +1000,8 @@ function LocationTracker() {
     return () => {
       if (watchTimerRef.current) clearInterval(watchTimerRef.current)
       if (poiDebounceTimerRef.current) clearTimeout(poiDebounceTimerRef.current)
+      if (locationRequestControllerRef.current) locationRequestControllerRef.current.abort()
+      if (selectedRestaurantRequestControllerRef.current) selectedRestaurantRequestControllerRef.current.abort()
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current = null
@@ -1025,6 +1113,7 @@ function LocationTracker() {
       {/* Leaflet Map */}
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer
+          key={`map-${language}`}
           center={mapCenter}
           zoom={16}
           style={{ height: '100%', width: '100%' }}

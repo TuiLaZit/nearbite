@@ -4,6 +4,7 @@ import re
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from gtts import gTTS
+from gtts.lang import tts_langs
 from supabase_client import supabase_client, ensure_bucket_exists, get_public_url_for_path
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,6 +16,17 @@ TTS_TABLE = (os.getenv("TTS_CACHE_TABLE") or "tts_cache_entry").strip() or "tts_
 TTS_CACHE_TTL_SECONDS = int((os.getenv("TTS_CACHE_TTL_SECONDS") or "3600").strip() or "3600")
 TTS_CACHE_TTL_SECONDS = max(60, min(86400, TTS_CACHE_TTL_SECONDS))
 _IN_MEMORY_TTS_CACHE = {}
+_GTTS_LANGUAGE_MAP = tts_langs()
+
+
+def _normalize_lang_code(code):
+    return str(code or "").strip().replace("_", "-").lower()
+
+
+_GTTS_LANGUAGE_ALIASES = {
+    _normalize_lang_code(code): code
+    for code in _GTTS_LANGUAGE_MAP.keys()
+}
 
 # Map language codes để tương thích với gTTS
 TTS_LANG_MAP = {
@@ -77,14 +89,35 @@ def _storage_path_for_hash(text_hash, mapped_lang, restaurant_id=None):
 
 
 def _generate_tts_bytes(text, mapped_lang):
-    audio_buffer = BytesIO()
-    try:
-        gTTS(text=text, lang=mapped_lang, slow=False, tld='com').write_to_fp(audio_buffer)
-    except Exception:
-        # Fallback: tạo TTS tiếng Việt
+    normalized_lang = _normalize_lang_code(mapped_lang)
+    candidates = []
+
+    direct_match = _GTTS_LANGUAGE_ALIASES.get(normalized_lang)
+    if direct_match:
+        candidates.append(direct_match)
+
+    if "-" in normalized_lang:
+        base_lang = normalized_lang.split("-", 1)[0]
+        base_match = _GTTS_LANGUAGE_ALIASES.get(base_lang)
+        if base_match:
+            candidates.append(base_match)
+
+    # Keep original mapped language as last attempt in case the alias map misses it.
+    if mapped_lang not in candidates:
+        candidates.append(mapped_lang)
+
+    last_error = None
+    for candidate_lang in candidates:
         audio_buffer = BytesIO()
-        gTTS(text=text, lang="vi", slow=False, tld='com').write_to_fp(audio_buffer)
-    return audio_buffer.getvalue()
+        try:
+            gTTS(text=text, lang=candidate_lang, slow=False, tld='com').write_to_fp(audio_buffer)
+            return audio_buffer.getvalue()
+        except Exception as error:
+            last_error = error
+
+    raise RuntimeError(
+        f"Unable to generate TTS for language '{mapped_lang}'"
+    ) from last_error
 
 
 def _extract_http_url(value):
@@ -329,13 +362,17 @@ def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
         local_url = f"/static/tts/{filename}"
         _IN_MEMORY_TTS_CACHE[memory_cache_key] = local_url
         return local_url
-    except Exception as e:
-        # Fallback local file nếu persistent cache lỗi
+    except Exception:
+        # Avoid wrong-language fallback for non-Vietnamese requests.
+        if mapped_lang != "vi":
+            return None
+
+        # Local fallback only for Vietnamese to keep baseline behavior.
         try:
             tts = gTTS(text=text, lang="vi", slow=False, tld='com')
             tts.save(filepath)
             local_url = f"/static/tts/{filename}"
             _IN_MEMORY_TTS_CACHE[memory_cache_key] = local_url
             return local_url
-        except Exception as fallback_error:
+        except Exception:
             return None
