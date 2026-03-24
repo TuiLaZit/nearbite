@@ -139,4 +139,12 @@ h1, h2, h3 {
 .leaflet-container img.leaflet-tile {
   mix-blend-mode: normal !important;
   opacity: 1 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.leaflet-container img,
+.leaflet-container svg,
+.leaflet-container canvas {
+  max-width: none !important;
 }
