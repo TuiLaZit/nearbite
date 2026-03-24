@@ -50,9 +50,9 @@ function HeatCircleLayer({ heatmapData }) {
     <>
       {normalizedPoints.map((point) => {
         const ratio = Math.max(0.08, Math.min(1, point.intensity / maxIntensity))
-        const radius = 18 + (ratio * 82)
-        const fillOpacity = 0.18 + (ratio * 0.5)
-        const strokeOpacity = 0.25 + (ratio * 0.45)
+        const radius = 3 + (ratio * 8)
+        const fillOpacity = 0.24 + (ratio * 0.42)
+        const strokeOpacity = 0.32 + (ratio * 0.34)
 
         return (
           <Circle
@@ -111,7 +111,6 @@ function AdminDashboard({ role = 'admin' }) {
     online_devices: 0,
     online_users: 0
   })
-  const [useFallbackTiles, setUseFallbackTiles] = useState(false)
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -517,21 +516,12 @@ function AdminDashboard({ role = 'admin' }) {
                         zoom={15}
                         style={{ height: '100%', width: '100%' }}
                         zoomControl={true}
-                        key="admin-dashboard-map"
+                        key={`admin-dashboard-map-${activeTab}`}
                       >
                         <MapAutoResize />
                         <TileLayer
-                          attribution={useFallbackTiles
-                            ? '&copy; <a href="https://carto.com/attributions">CARTO</a>'
-                            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
-                          url={useFallbackTiles
-                            ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-                            : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
-                          eventHandlers={{
-                            tileerror: () => {
-                              setUseFallbackTiles(true)
-                            }
-                          }}
+                          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                         />
 
                         {/* Heatmap layer (plugin-free fallback for reliability) */}
