@@ -113,26 +113,94 @@ const TILE_SOURCES = [
   }
 ]
 
-function buildOsmEmbedUrl(points) {
-  const valid = Array.isArray(points) ? points : []
-  if (valid.length === 0) {
-    return 'https://www.openstreetmap.org/export/embed.html?bbox=106.67,10.75,106.70,10.77&layer=mapnik'
+function OfflineHeatmapFallback({ restaurants, heatmapData }) {
+  const restaurantPoints = (Array.isArray(restaurants) ? restaurants : [])
+    .map((restaurant) => ({
+      id: `restaurant-${restaurant.id}`,
+      label: restaurant.name || `Restaurant ${restaurant.id}`,
+      lat: Number(restaurant.lat),
+      lng: Number(restaurant.lng),
+      type: 'restaurant'
+    }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+
+  const heatPoints = (Array.isArray(heatmapData) ? heatmapData : [])
+    .map((point, idx) => ({
+      id: `heat-${idx}`,
+      lat: Number(point?.lat),
+      lng: Number(point?.lng),
+      intensity: Number(point?.intensity) || 0,
+      type: 'heat'
+    }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+
+  const allPoints = [...restaurantPoints, ...heatPoints]
+
+  if (allPoints.length === 0) {
+    return (
+      <div style={styles.fallbackMapEmpty}>
+        Chua co du lieu vi tri de hien thi tren map du phong.
+      </div>
+    )
   }
 
-  const lats = valid.map((p) => p.lat)
-  const lngs = valid.map((p) => p.lng)
+  const lats = allPoints.map((point) => point.lat)
+  const lngs = allPoints.map((point) => point.lng)
   const minLat = Math.min(...lats)
   const maxLat = Math.max(...lats)
   const minLng = Math.min(...lngs)
   const maxLng = Math.max(...lngs)
-  const padding = 0.008
+  const latPadding = Math.max((maxLat - minLat) * 0.18, 0.0008)
+  const lngPadding = Math.max((maxLng - minLng) * 0.18, 0.0008)
 
-  const left = (minLng - padding).toFixed(6)
-  const bottom = (minLat - padding).toFixed(6)
-  const right = (maxLng + padding).toFixed(6)
-  const top = (maxLat + padding).toFixed(6)
+  const projectPoint = (lat, lng) => {
+    const normalizedX = (lng - (minLng - lngPadding)) / ((maxLng - minLng) + (2 * lngPadding) || 1)
+    const normalizedY = (lat - (minLat - latPadding)) / ((maxLat - minLat) + (2 * latPadding) || 1)
+    return {
+      left: `${Math.max(2, Math.min(98, normalizedX * 100)).toFixed(2)}%`,
+      top: `${Math.max(2, Math.min(98, (1 - normalizedY) * 100)).toFixed(2)}%`
+    }
+  }
 
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik`
+  const maxIntensity = Math.max(...heatPoints.map((point) => point.intensity || 0), 1)
+
+  return (
+    <div style={styles.fallbackMapCanvas}>
+      <div style={styles.fallbackMapGrid} />
+
+      {heatPoints.map((point) => {
+        const pos = projectPoint(point.lat, point.lng)
+        const ratio = Math.max(0.1, Math.min(1, point.intensity / maxIntensity))
+        const size = 18 + (ratio * 44)
+        return (
+          <div
+            key={point.id}
+            style={{
+              ...styles.fallbackHeatDot,
+              ...pos,
+              width: `${size}px`,
+              height: `${size}px`,
+              opacity: 0.2 + (ratio * 0.6),
+            }}
+          />
+        )
+      })}
+
+      {restaurantPoints.map((point) => {
+        const pos = projectPoint(point.lat, point.lng)
+        return (
+          <div key={point.id} style={{ ...styles.fallbackRestaurantPinWrap, ...pos }}>
+            <div style={styles.fallbackRestaurantPin} />
+            <div style={styles.fallbackRestaurantLabel}>{point.label}</div>
+          </div>
+        )
+      })}
+
+      <div style={styles.fallbackMapLegend}>
+        Map du phong dang bat (khong dung tile ben ngoai)
+      </div>
+    </div>
+  )
 }
 
 function AdminDashboard({ role = 'admin' }) {
@@ -156,6 +224,7 @@ function AdminDashboard({ role = 'admin' }) {
   const [tileProviderIndex, setTileProviderIndex] = useState(0)
   const [tileLoaded, setTileLoaded] = useState(false)
   const [mapFallbackMode, setMapFallbackMode] = useState(false)
+  const [forceFallbackMode, setForceFallbackMode] = useState(false)
   const tileErrorCountRef = useRef(0)
 
   const restaurantsWithCoords = restaurants
@@ -321,6 +390,7 @@ function AdminDashboard({ role = 'admin' }) {
     setTileProviderIndex(0)
     setTileLoaded(false)
     setMapFallbackMode(false)
+    setForceFallbackMode(false)
     tileErrorCountRef.current = 0
   }, [activeTab])
 
@@ -359,6 +429,18 @@ function AdminDashboard({ role = 'admin' }) {
       window.clearTimeout(timer)
     }
   }, [activeTab, tileLoaded, tileProviderIndex])
+
+  useEffect(() => {
+    if (activeTab !== 'dashboard' || tileLoaded) return undefined
+
+    const safetyTimer = window.setTimeout(() => {
+      setMapFallbackMode(true)
+    }, 6500)
+
+    return () => {
+      window.clearTimeout(safetyTimer)
+    }
+  }, [activeTab, tileLoaded])
 
 
 
@@ -502,19 +584,25 @@ function AdminDashboard({ role = 'admin' }) {
                         ℹ️ Chưa có quán ăn nào trong hệ thống.
                       </div>
                     )}
-                    {mapFallbackMode && (
+                    {(mapFallbackMode || forceFallbackMode) && (
                       <div style={styles.mapFallbackNotice}>
-                        Tile map trên desktop đang bị chặn/lỗi mạng. Đang chuyển sang bản đồ dự phòng để vẫn theo dõi vị trí.
+                        Tile map tren desktop dang bi chan/loi mang. Da chuyen sang map du phong de van theo doi vi tri.
                       </div>
                     )}
+                    <div style={styles.mapActionsRow}>
+                      <button
+                        type="button"
+                        style={styles.mapForceFallbackButton}
+                        onClick={() => setForceFallbackMode((prev) => !prev)}
+                      >
+                        {forceFallbackMode ? 'Tat map du phong' : 'Bat map du phong'}
+                      </button>
+                    </div>
                     <div style={styles.heatmapContainer}>
-                      {mapFallbackMode ? (
-                        <iframe
-                          title="Admin map fallback"
-                          src={buildOsmEmbedUrl(restaurantsWithCoords)}
-                          style={{ width: '100%', height: '100%', border: '0' }}
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
+                      {(mapFallbackMode || forceFallbackMode) ? (
+                        <OfflineHeatmapFallback
+                          restaurants={restaurantsWithCoords}
+                          heatmapData={heatmapData}
                         />
                       ) : (
                         <MapContainer
@@ -535,6 +623,9 @@ function AdminDashboard({ role = 'admin' }) {
                               },
                               tileerror: () => {
                                 tileErrorCountRef.current += 1
+                                if (tileErrorCountRef.current >= 2) {
+                                  setMapFallbackMode(true)
+                                }
                                 if (tileErrorCountRef.current >= 8) {
                                   setTileLoaded(false)
                                   setTileProviderIndex((prev) => {
@@ -964,7 +1055,24 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600'
   },
+  mapActionsRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '10px'
+  },
+  mapForceFallbackButton: {
+    margin: '0',
+    borderRadius: '999px',
+    border: '1px solid rgba(122, 167, 214, 0.72)',
+    background: 'linear-gradient(135deg, rgba(233, 243, 255, 0.95) 0%, rgba(215, 232, 250, 0.96) 100%)',
+    color: '#1d3f67',
+    fontWeight: '700',
+    fontSize: '12px',
+    padding: '7px 12px',
+    cursor: 'pointer'
+  },
   heatmapContainer: {
+    position: 'relative',
     minHeight: '520px',
     height: '520px',
     flex: 1,
@@ -972,6 +1080,78 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 16px 34px rgba(20, 33, 58, 0.18)',
     border: '1px solid rgba(182, 198, 221, 0.8)'
+  },
+  fallbackMapCanvas: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+    background: 'radial-gradient(900px 340px at 10% 0%, rgba(82, 145, 211, 0.25), transparent 62%), linear-gradient(165deg, #eef5fe 0%, #dae8fa 100%)'
+  },
+  fallbackMapGrid: {
+    position: 'absolute',
+    inset: 0,
+    backgroundImage: 'linear-gradient(rgba(37, 72, 112, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 72, 112, 0.12) 1px, transparent 1px)',
+    backgroundSize: '48px 48px'
+  },
+  fallbackHeatDot: {
+    position: 'absolute',
+    transform: 'translate(-50%, -50%)',
+    borderRadius: '999px',
+    background: 'radial-gradient(circle, rgba(232, 53, 68, 0.9) 0%, rgba(251, 188, 4, 0.46) 46%, rgba(255, 255, 255, 0) 100%)',
+    pointerEvents: 'none'
+  },
+  fallbackRestaurantPinWrap: {
+    position: 'absolute',
+    transform: 'translate(-50%, -100%)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  fallbackRestaurantPin: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    background: '#1f4f87',
+    border: '2px solid #ffffff',
+    boxShadow: '0 0 0 3px rgba(31, 79, 135, 0.25)'
+  },
+  fallbackRestaurantLabel: {
+    maxWidth: '200px',
+    padding: '2px 7px',
+    borderRadius: '999px',
+    background: 'rgba(255, 255, 255, 0.9)',
+    border: '1px solid rgba(146, 173, 204, 0.92)',
+    color: '#163961',
+    fontSize: '11px',
+    fontWeight: '600',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+  },
+  fallbackMapLegend: {
+    position: 'absolute',
+    left: '12px',
+    bottom: '12px',
+    borderRadius: '10px',
+    border: '1px solid rgba(127, 161, 198, 0.72)',
+    background: 'rgba(247, 252, 255, 0.92)',
+    color: '#21456d',
+    fontSize: '12px',
+    fontWeight: '700',
+    padding: '6px 10px'
+  },
+  fallbackMapEmpty: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    color: '#415f84',
+    fontWeight: '600',
+    fontSize: '13px',
+    background: 'linear-gradient(165deg, #edf4fe 0%, #dce8f9 100%)'
   }
 }
 
