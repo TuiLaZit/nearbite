@@ -7,6 +7,8 @@ import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
 
+const HEARTBEAT_LOCATION_KEY = 'heartbeatLastLocation'
+
 // Fix cho Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -286,6 +288,16 @@ function LocationTracker() {
 
     const userLat = pos.coords.latitude
     const userLng = pos.coords.longitude
+
+    try {
+      localStorage.setItem(HEARTBEAT_LOCATION_KEY, JSON.stringify({
+        lat: userLat,
+        lng: userLng,
+        at: Date.now()
+      }))
+    } catch {
+      // Ignore storage failure; realtime tracking can continue without heartbeat location cache.
+    }
     
     // Cập nhật vị trí user luôn, không bị block bởi audio
     setUserLocation([userLat, userLng])

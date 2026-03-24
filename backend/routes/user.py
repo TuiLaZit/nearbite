@@ -1,4 +1,4 @@
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, session
 from models import Restaurant, Tag, LocationVisit, db
 from services import calculate_distance, generate_narration
 from translate import translate_text, translate_texts, LANGUAGE_LABELS
@@ -10,7 +10,9 @@ import copy
 import hashlib
 import json
 import uuid
-from datetime import datetime
+import math
+import os
+from datetime import datetime, timedelta, timezone
 
 
 _RESTAURANT_TRANSLATION_CACHE = {}
@@ -119,6 +121,55 @@ def _translate_restaurant_data(restaurant_data, target_lang, allow_network=True)
 
 
 def register_user_routes(app):
+    heatmap_cooldown_seconds = int((os.getenv("HEATMAP_SPAM_COOLDOWN_SECONDS") or "12").strip() or "12")
+    heatmap_cooldown_seconds = max(3, min(300, heatmap_cooldown_seconds))
+
+    heatmap_min_move_meters = float((os.getenv("HEATMAP_SPAM_MIN_MOVE_METERS") or "20").strip() or "20")
+    heatmap_min_move_meters = max(0.0, min(1000.0, heatmap_min_move_meters))
+
+    def _distance_meters(lat1, lng1, lat2, lng2):
+        r = 6371000.0
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        delta_phi = math.radians(lat2 - lat1)
+        delta_lambda = math.radians(lng2 - lng1)
+        a = (
+            math.sin(delta_phi / 2.0) ** 2
+            + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+        )
+        c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+        return r * c
+
+    def _parse_coordinate(raw_value, min_value, max_value, field_name):
+        if raw_value is None or str(raw_value).strip() == "":
+            return None
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field_name} must be a valid number")
+        if value < min_value or value > max_value:
+            raise ValueError(f"{field_name} is out of range")
+        return value
+
+    def _derive_session_user_uuid():
+        """
+        Tạo UUID ổn định từ session hiện tại để heartbeat có thể gán user_id
+        ngay cả khi client không gửi explicit user_id.
+        """
+        identity = None
+
+        if session.get("admin_logged_in") and session.get("admin_email"):
+            identity = f"admin:{str(session.get('admin_email')).strip().lower()}"
+        elif session.get("owner_logged_in") and session.get("owner_restaurant_id") is not None:
+            identity = f"owner:{int(session.get('owner_restaurant_id'))}"
+        elif session.get("customer_logged_in") and session.get("customer_email"):
+            identity = f"customer:{str(session.get('customer_email')).strip().lower()}"
+
+        if not identity:
+            return None
+
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, identity))
+
     @app.route("/heartbeat", methods=["POST"])
     @app.route("/api/heartbeat", methods=["POST"])
     def heartbeat():
@@ -128,6 +179,7 @@ def register_user_routes(app):
         Payload:
         - device_id: string (required)
         - user_id: uuid|string|null (optional, dùng khi client có session user)
+        - latitude/longitude: number (optional, dùng cho heatmap heartbeat realtime)
         """
         data = request.get_json(silent=True) or {}
 
@@ -149,28 +201,47 @@ def register_user_routes(app):
             except (ValueError, TypeError):
                 return jsonify({"status": "error", "message": "user_id must be a valid UUID"}), 400
 
+        # Nếu client không gửi user_id, suy ra từ session để vẫn đếm được online_users.
+        if not user_id_provided:
+            derived_user_id = _derive_session_user_uuid()
+            if derived_user_id:
+                user_id = derived_user_id
+                user_id_provided = True
+
+        try:
+            heartbeat_lat = _parse_coordinate(data.get("latitude"), -90.0, 90.0, "latitude")
+            heartbeat_lng = _parse_coordinate(data.get("longitude"), -180.0, 180.0, "longitude")
+        except ValueError as coord_error:
+            return jsonify({"status": "error", "message": str(coord_error)}), 400
+
+        if (heartbeat_lat is None) != (heartbeat_lng is None):
+            return jsonify({"status": "error", "message": "latitude and longitude must be provided together"}), 400
+
         try:
             # Bước 1: update heartbeat cho device đã tồn tại.
+            set_clauses = ["last_seen = NOW()"]
+            update_params = {"device_id": device_id}
+
             if user_id_provided:
-                update_sql = text(
-                    """
-                    UPDATE user_activity
-                    SET last_seen = NOW(), user_id = :user_id
-                    WHERE device_id = :device_id
-                    RETURNING id, device_id, user_id, last_seen
-                    """
-                )
-                update_params = {"device_id": device_id, "user_id": user_id}
-            else:
-                update_sql = text(
-                    """
-                    UPDATE user_activity
-                    SET last_seen = NOW()
-                    WHERE device_id = :device_id
-                    RETURNING id, device_id, user_id, last_seen
-                    """
-                )
-                update_params = {"device_id": device_id}
+                set_clauses.append("user_id = :user_id")
+                update_params["user_id"] = user_id
+
+            if heartbeat_lat is not None and heartbeat_lng is not None:
+                set_clauses.extend([
+                    "last_lat = :last_lat",
+                    "last_lng = :last_lng",
+                ])
+                update_params["last_lat"] = heartbeat_lat
+                update_params["last_lng"] = heartbeat_lng
+
+            update_sql = text(
+                f"""
+                UPDATE user_activity
+                SET {', '.join(set_clauses)}
+                WHERE device_id = :device_id
+                RETURNING id, device_id, user_id, last_seen
+                """
+            )
 
             updated_rows = db.session.execute(update_sql, update_params).mappings().all()
 
@@ -182,16 +253,102 @@ def register_user_routes(app):
                 inserted_row = db.session.execute(
                     text(
                         """
-                        INSERT INTO user_activity (device_id, user_id, last_seen)
-                        VALUES (:device_id, :user_id, NOW())
+                        INSERT INTO user_activity (device_id, user_id, last_seen, last_lat, last_lng)
+                        VALUES (:device_id, :user_id, NOW(), :last_lat, :last_lng)
                         RETURNING id, device_id, user_id, last_seen
                         """
                     ),
-                    {"device_id": device_id, "user_id": user_id}
+                    {
+                        "device_id": device_id,
+                        "user_id": user_id,
+                        "last_lat": heartbeat_lat,
+                        "last_lng": heartbeat_lng,
+                    }
                 ).mappings().first()
 
                 row = dict(inserted_row or {})
                 action = "inserted"
+
+            heatmap_counted = False
+            if heartbeat_lat is not None and heartbeat_lng is not None:
+                state_row = db.session.execute(
+                    text(
+                        """
+                        SELECT last_counted_at, last_lat, last_lng
+                        FROM user_activity_heatmap_device_state
+                        WHERE device_id = :device_id
+                        """
+                    ),
+                    {"device_id": device_id}
+                ).mappings().first()
+
+                should_count = True
+                if state_row:
+                    last_counted_at = state_row.get("last_counted_at")
+                    last_lat = state_row.get("last_lat")
+                    last_lng = state_row.get("last_lng")
+
+                    cooldown_passed = True
+                    if last_counted_at is not None:
+                        if last_counted_at.tzinfo is None:
+                            last_counted_at = last_counted_at.replace(tzinfo=timezone.utc)
+                        cooldown_passed = (datetime.now(timezone.utc) - last_counted_at) >= timedelta(seconds=heatmap_cooldown_seconds)
+
+                    moved_enough = False
+                    if last_lat is not None and last_lng is not None:
+                        moved_enough = _distance_meters(
+                            float(last_lat),
+                            float(last_lng),
+                            float(heartbeat_lat),
+                            float(heartbeat_lng),
+                        ) >= heatmap_min_move_meters
+
+                    should_count = cooldown_passed or moved_enough
+
+                if should_count:
+                    lat_bucket = round(float(heartbeat_lat), 4)
+                    lng_bucket = round(float(heartbeat_lng), 4)
+
+                    db.session.execute(
+                        text(
+                            """
+                            INSERT INTO user_activity_heatmap_cell (lat_bucket, lng_bucket, hit_count, last_seen)
+                            VALUES (:lat_bucket, :lng_bucket, 1, NOW())
+                            ON CONFLICT (lat_bucket, lng_bucket)
+                            DO UPDATE
+                            SET hit_count = user_activity_heatmap_cell.hit_count + 1,
+                                last_seen = NOW()
+                            """
+                        ),
+                        {
+                            "lat_bucket": lat_bucket,
+                            "lng_bucket": lng_bucket,
+                        }
+                    )
+                    heatmap_counted = True
+
+                db.session.execute(
+                    text(
+                        """
+                        INSERT INTO user_activity_heatmap_device_state (device_id, user_id, last_counted_at, last_lat, last_lng, updated_at)
+                        VALUES (:device_id, :user_id, :last_counted_at, :last_lat, :last_lng, NOW())
+                        ON CONFLICT (device_id)
+                        DO UPDATE
+                        SET user_id = EXCLUDED.user_id,
+                            last_counted_at = EXCLUDED.last_counted_at,
+                            last_lat = EXCLUDED.last_lat,
+                            last_lng = EXCLUDED.last_lng,
+                            updated_at = NOW()
+                        """
+                    ),
+                    {
+                        "device_id": device_id,
+                        "user_id": user_id,
+                        "last_counted_at": datetime.now(timezone.utc) if heatmap_counted else (state_row or {}).get("last_counted_at"),
+                        "last_lat": heartbeat_lat if heatmap_counted else (state_row or {}).get("last_lat"),
+                        "last_lng": heartbeat_lng if heatmap_counted else (state_row or {}).get("last_lng"),
+                    }
+                )
 
             db.session.commit()
 
@@ -203,6 +360,8 @@ def register_user_routes(app):
                     "device_id": row.get("device_id"),
                     "user_id": str(row.get("user_id")) if row.get("user_id") else None,
                     "last_seen": row.get("last_seen").isoformat() if row.get("last_seen") else None,
+                    "has_location": heartbeat_lat is not None and heartbeat_lng is not None,
+                    "heatmap_counted": heatmap_counted,
                 }
             })
         except Exception as exc:

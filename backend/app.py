@@ -457,6 +457,85 @@ def _ensure_translation_cache_catalog_columns():
         print(f"[cache-schema] Ensure translation catalog columns skipped: {exc}")
 
 
+def _ensure_user_activity_heatmap_schema():
+    """Ensure heartbeat tables/columns needed by realtime heatmap exist."""
+    statements = [
+        """
+        CREATE TABLE IF NOT EXISTS user_activity (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            device_id text NOT NULL,
+            user_id uuid NULL,
+            last_seen timestamptz NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_user_activity_device_id_unique
+            ON user_activity(device_id)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_last_seen
+            ON user_activity(last_seen DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_user_last_seen
+            ON user_activity(user_id, last_seen DESC)
+            WHERE user_id IS NOT NULL
+        """,
+        """
+        ALTER TABLE IF EXISTS user_activity
+        ADD COLUMN IF NOT EXISTS last_lat DOUBLE PRECISION NULL
+        """,
+        """
+        ALTER TABLE IF EXISTS user_activity
+        ADD COLUMN IF NOT EXISTS last_lng DOUBLE PRECISION NULL
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_activity_heatmap_cell (
+            lat_bucket DOUBLE PRECISION NOT NULL,
+            lng_bucket DOUBLE PRECISION NOT NULL,
+            hit_count BIGINT NOT NULL DEFAULT 0,
+            last_seen timestamptz NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (lat_bucket, lng_bucket)
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_heatmap_cell_hits
+            ON user_activity_heatmap_cell(hit_count DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_heatmap_cell_last_seen
+            ON user_activity_heatmap_cell(last_seen DESC)
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_activity_heatmap_device_state (
+            device_id text PRIMARY KEY,
+            user_id uuid NULL,
+            last_counted_at timestamptz NULL,
+            last_lat DOUBLE PRECISION NULL,
+            last_lng DOUBLE PRECISION NULL,
+            updated_at timestamptz NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_heatmap_device_state_updated
+            ON user_activity_heatmap_device_state(updated_at DESC)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_heatmap_device_state_user
+            ON user_activity_heatmap_device_state(user_id)
+            WHERE user_id IS NOT NULL
+        """,
+    ]
+
+    try:
+        for statement in statements:
+            db.session.execute(text(statement))
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[user-activity-schema] Ensure heartbeat heatmap schema skipped: {exc}")
+
+
 def _cleanup_legacy_scoped_translation_cache_rows():
     """
     Remove legacy duplicated rows that were scoped by restaurant for generic texts.
@@ -600,6 +679,7 @@ def _refresh_translation_cache_on_redeploy():
 with app.app_context():
     _ensure_cache_tables()
     _ensure_translation_cache_catalog_columns()
+    _ensure_user_activity_heatmap_schema()
     _refresh_translation_cache_on_redeploy()
     _cleanup_legacy_scoped_translation_cache_rows()
     _ensure_local_schema_compatibility()
