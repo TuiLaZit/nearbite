@@ -144,6 +144,7 @@ _prewarm_lock = threading.Lock()
 _cache_cleanup_lock = threading.Lock()
 _cache_cleanup_started = False
 _cache_cleanup_started_lock = threading.Lock()
+_cache_cleanup_enabled = _is_true_env(os.getenv("CACHE_CLEANUP_ENABLED", "false"))
 _cleanup_interval_seconds = int((os.getenv("CACHE_CLEANUP_INTERVAL_SECONDS") or "600").strip() or "600")
 _cleanup_interval_seconds = max(60, min(3600, _cleanup_interval_seconds))
 _last_cleanup_monotonic = 0.0
@@ -158,6 +159,14 @@ _cleanup_translation_batches = max(1, min(100, _cleanup_translation_batches))
 
 
 def _run_cache_cleanup(reason="manual"):
+    if not _cache_cleanup_enabled:
+        return {
+            "reason": reason,
+            "translation_deleted": 0,
+            "tts_deleted": 0,
+            "disabled": True,
+        }
+
     if not _cache_cleanup_lock.acquire(blocking=False):
         return None
 
@@ -183,6 +192,9 @@ def _run_cache_cleanup(reason="manual"):
 
 
 def _start_periodic_cache_cleanup_worker():
+    if not _cache_cleanup_enabled:
+        return
+
     global _cache_cleanup_started
     with _cache_cleanup_started_lock:
         if _cache_cleanup_started:
@@ -279,6 +291,9 @@ def _start_translation_prewarm_worker():
 
 
 def _start_cache_cleanup_worker_if_needed():
+    if not _cache_cleanup_enabled:
+        return
+
     global _last_cleanup_monotonic
     now = time.monotonic()
     if now - _last_cleanup_monotonic < _cleanup_interval_seconds:
@@ -448,25 +463,56 @@ def _cleanup_legacy_scoped_translation_cache_rows():
     cleanup_limit = int((os.getenv("TRANSLATION_CACHE_CLEANUP_LIMIT") or "5000").strip() or "5000")
     cleanup_limit = max(100, min(50000, cleanup_limit))
 
+    protected_texts_env = (os.getenv("TRANSLATION_CACHE_PROTECTED_TEXTS") or "").strip()
+    protected_texts = {
+        "Đăng nhập",
+        "Đăng xuất",
+        "Bắt Đầu Theo Dõi",
+        "Dừng Theo Dõi",
+        "Nghe",
+        "Nghe thuyết minh",
+        "Chỉ đường",
+        "Xem menu",
+    }
+    if protected_texts_env:
+        protected_texts.update({text.strip() for text in protected_texts_env.split("|") if text.strip()})
+
     try:
-        result = db.session.execute(
+        candidate_rows = db.session.execute(
             text(
                 """
-                DELETE FROM translation_cache_entry
-                WHERE id IN (
-                    SELECT id
-                    FROM translation_cache_entry
-                    WHERE restaurant_id IS NOT NULL
-                      AND COALESCE(note, '') NOT IN ('restaurant_narration', 'restaurant_proximity_hint')
-                    ORDER BY updated_at ASC NULLS FIRST, id ASC
-                    LIMIT :cleanup_limit
-                )
-                RETURNING id
+                SELECT id, source_text
+                FROM translation_cache_entry
+                WHERE restaurant_id IS NOT NULL
+                  AND COALESCE(note, '') NOT IN ('restaurant_narration', 'restaurant_proximity_hint')
+                ORDER BY updated_at ASC NULLS FIRST, id ASC
+                LIMIT :cleanup_limit
                 """
             ),
             {"cleanup_limit": cleanup_limit}
-        )
-        deleted_count = len(result.fetchall() or [])
+        ).mappings().all()
+
+        delete_ids = []
+        for row in candidate_rows:
+            source_text = str((row or {}).get("source_text") or "").strip()
+            if source_text in protected_texts:
+                continue
+            delete_ids.append(int(row.get("id")))
+
+        deleted_count = 0
+        if delete_ids:
+            deleted = db.session.execute(
+                text(
+                    """
+                    DELETE FROM translation_cache_entry
+                    WHERE id = ANY(:delete_ids)
+                    RETURNING id
+                    """
+                ),
+                {"delete_ids": delete_ids}
+            ).fetchall() or []
+            deleted_count = len(deleted)
+
         db.session.commit()
         if deleted_count > 0:
             print(f"[cache-cleanup] Removed {deleted_count} legacy scoped translation cache rows")
@@ -488,7 +534,7 @@ def _refresh_translation_cache_on_redeploy():
     If deploy marker changes, clear translation cache so prewarm/build can rewrite
     fresh values and avoid stale rows from previous deploy versions.
     """
-    enabled = _is_true_env(os.getenv("TRANSLATION_REFRESH_ON_REDEPLOY", "true"))
+    enabled = _is_true_env(os.getenv("TRANSLATION_REFRESH_ON_REDEPLOY", "false"))
     if not enabled:
         return
 

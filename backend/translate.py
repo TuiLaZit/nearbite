@@ -152,7 +152,6 @@ def _persistent_cache_get(target_lang, text, cache_scope_id=None, cache_note=Non
             .table(_PERSISTENT_CACHE_TABLE)
             .select("translated_text,expires_at,source_checksum")
             .eq("cache_key", cache_key)
-            .gt("expires_at", _utc_now_iso())
             .limit(1)
             .execute()
         )
@@ -173,7 +172,6 @@ def _persistent_cache_get(target_lang, text, cache_scope_id=None, cache_note=Non
                     .table(_PERSISTENT_CACHE_TABLE)
                     .select("translated_text,expires_at,source_checksum")
                     .eq("cache_key", legacy_key)
-                    .gt("expires_at", _utc_now_iso())
                     .limit(1)
                     .execute()
                 )
@@ -293,32 +291,9 @@ def invalidate_translation_cache(cache_scope_id=None):
 
 
 def cleanup_expired_translation_cache(limit=1000, max_batches=5):
-    if not supabase_client:
-        return 0
-
-    total_deleted = 0
-    batch_limit = max(1, int(limit))
-    batch_count = max(1, int(max_batches))
-
-    try:
-        for _ in range(batch_count):
-            response = (
-                supabase_client
-                .table(_PERSISTENT_CACHE_TABLE)
-                .delete()
-                .lt("expires_at", _utc_now_iso())
-                .limit(batch_limit)
-                .execute()
-            )
-
-            deleted_rows = len((response.data or [])) if response else 0
-            total_deleted += deleted_rows
-            if deleted_rows < batch_limit:
-                break
-    except Exception:
-        return total_deleted
-
-    return total_deleted
+    # Time-based cleanup intentionally disabled.
+    # Cache rows are replaced via stable catalog keys + explicit invalidation on content changes.
+    return 0
 
 
 def _is_valid_translated_value(target_lang, original_text, translated_text):
