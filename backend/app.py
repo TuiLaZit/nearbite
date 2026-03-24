@@ -131,7 +131,13 @@ def handle_preflight():
 app.config.update(
     SESSION_COOKIE_SAMESITE="None" if is_production else "Lax",
     SESSION_COOKIE_SECURE=True if is_production else False,
-    SESSION_COOKIE_HTTPONLY=True
+    SESSION_COOKIE_HTTPONLY=True,
+    # Improve auth reliability for installed PWA when frontend/backend are on different origins.
+    # Browsers can block classic third-party cookies; Partitioned cookies (CHIPS) help preserve
+    # session cookies in cross-site requests while keeping isolation per top-level site.
+    SESSION_COOKIE_PARTITIONED=(
+        is_production and _is_true_env(os.getenv("SESSION_COOKIE_PARTITIONED", "true"))
+    ),
 )
 
 app.config["SQLALCHEMY_DATABASE_URI"] = _normalize_database_url(os.getenv("DATABASE_URL"))

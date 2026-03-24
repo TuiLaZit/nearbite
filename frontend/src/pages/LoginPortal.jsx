@@ -28,6 +28,19 @@ function LoginPortal() {
   const [languages, setLanguages] = useState([])
   const { t } = useTranslation(language)
 
+  const buildSessionPersistenceError = () => {
+    const isStandalone = typeof window !== 'undefined' && (
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator?.standalone === true
+    )
+
+    if (isStandalone) {
+      return 'Đăng nhập thành công nhưng session cookie bị chặn trong PWA (frontend/backend khác domain). Hãy bật SESSION_COOKIE_PARTITIONED=true ở backend hoặc dùng cùng domain API qua /api proxy.'
+    }
+
+    return 'Đăng nhập thành công nhưng không giữ được phiên đăng nhập. Kiểm tra cấu hình cookie/CORS của backend.'
+  }
+
   useEffect(() => {
     fetch(`${BASE_URL}/languages`)
       .then((res) => res.json())
@@ -92,6 +105,13 @@ function LoginPortal() {
       }
 
       setAuthUserIdFromPayload(data)
+      const checkResponse = await fetch(`${BASE_URL}/customer/check`, {
+        credentials: 'include'
+      })
+      if (!checkResponse.ok) {
+        throw new Error(buildSessionPersistenceError())
+      }
+
       navigate('/', { replace: true })
     } catch (error) {
       alert(error.message)
@@ -118,6 +138,13 @@ function LoginPortal() {
       }
 
       setAuthUserIdFromPayload(data)
+      const checkResponse = await fetch(`${BASE_URL}/owner/check`, {
+        credentials: 'include'
+      })
+      if (!checkResponse.ok) {
+        throw new Error(buildSessionPersistenceError())
+      }
+
       localStorage.setItem('activeRole', 'owner')
       navigate('/owner', { replace: true })
     } catch (error) {
