@@ -111,6 +111,28 @@ const TILE_SOURCES = [
   }
 ]
 
+function buildOsmEmbedUrl(points) {
+  const valid = Array.isArray(points) ? points : []
+  if (valid.length === 0) {
+    return 'https://www.openstreetmap.org/export/embed.html?bbox=106.67,10.75,106.70,10.77&layer=mapnik'
+  }
+
+  const lats = valid.map((p) => p.lat)
+  const lngs = valid.map((p) => p.lng)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const padding = 0.008
+
+  const left = (minLng - padding).toFixed(6)
+  const bottom = (minLat - padding).toFixed(6)
+  const right = (maxLng + padding).toFixed(6)
+  const top = (maxLat + padding).toFixed(6)
+
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik`
+}
+
 function AdminDashboard({ role = 'admin' }) {
   const isOwner = role === 'owner'
   const authBase = isOwner ? '/owner' : '/admin'
@@ -131,6 +153,7 @@ function AdminDashboard({ role = 'admin' }) {
   })
   const [tileProviderIndex, setTileProviderIndex] = useState(0)
   const [tileLoaded, setTileLoaded] = useState(false)
+  const [mapFallbackMode, setMapFallbackMode] = useState(false)
   const tileErrorCountRef = useRef(0)
 
   const restaurantsWithCoords = restaurants
@@ -295,6 +318,7 @@ function AdminDashboard({ role = 'admin' }) {
     if (activeTab !== 'dashboard') return
     setTileProviderIndex(0)
     setTileLoaded(false)
+    setMapFallbackMode(false)
     tileErrorCountRef.current = 0
   }, [activeTab])
 
@@ -307,6 +331,25 @@ function AdminDashboard({ role = 'admin' }) {
       if (!tileLoaded) {
         setTileProviderIndex((prev) => Math.min(prev + 1, TILE_SOURCES.length - 1))
         tileErrorCountRef.current = 0
+      }
+    }, 4500)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [activeTab, tileLoaded, tileProviderIndex])
+
+  useEffect(() => {
+    if (activeTab !== 'dashboard') return undefined
+    if (tileLoaded) {
+      setMapFallbackMode(false)
+      return undefined
+    }
+    if (tileProviderIndex < TILE_SOURCES.length - 1) return undefined
+
+    const timer = window.setTimeout(() => {
+      if (!tileLoaded) {
+        setMapFallbackMode(true)
       }
     }, 4500)
 
@@ -457,64 +500,80 @@ function AdminDashboard({ role = 'admin' }) {
                         ℹ️ Chưa có quán ăn nào trong hệ thống.
                       </div>
                     )}
+                    {mapFallbackMode && (
+                      <div style={styles.mapFallbackNotice}>
+                        Tile map trên desktop đang bị chặn/lỗi mạng. Đang chuyển sang bản đồ dự phòng để vẫn theo dõi vị trí.
+                      </div>
+                    )}
                     <div style={styles.heatmapContainer}>
-                      <MapContainer
-                        center={[10.760426862777551, 106.68198430250096]}
-                        zoom={15}
-                        style={{ height: '100%', width: '100%' }}
-                        zoomControl={true}
-                        key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
-                      >
-                        <MapAutoResize />
-                        <TileLayer
-                          attribution={TILE_SOURCES[tileProviderIndex].attribution}
-                          url={TILE_SOURCES[tileProviderIndex].url}
-                          eventHandlers={{
-                            tileload: () => {
-                              setTileLoaded(true)
-                            },
-                            tileerror: () => {
-                              tileErrorCountRef.current += 1
-                              if (tileErrorCountRef.current >= 8) {
-                                setTileLoaded(false)
-                                setTileProviderIndex((prev) => {
-                                  if (prev >= TILE_SOURCES.length - 1) return prev
-                                  return prev + 1
-                                })
-                                tileErrorCountRef.current = 0
-                              }
-                            }
-                          }}
+                      {mapFallbackMode ? (
+                        <iframe
+                          title="Admin map fallback"
+                          src={buildOsmEmbedUrl(restaurantsWithCoords)}
+                          style={{ width: '100%', height: '100%', border: '0' }}
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
                         />
+                      ) : (
+                        <MapContainer
+                          center={[10.760426862777551, 106.68198430250096]}
+                          zoom={15}
+                          style={{ height: '100%', width: '100%' }}
+                          zoomControl={true}
+                          key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
+                        >
+                          <MapAutoResize />
+                          <TileLayer
+                            attribution={TILE_SOURCES[tileProviderIndex].attribution}
+                            url={TILE_SOURCES[tileProviderIndex].url}
+                            eventHandlers={{
+                              tileload: () => {
+                                setTileLoaded(true)
+                                setMapFallbackMode(false)
+                              },
+                              tileerror: () => {
+                                tileErrorCountRef.current += 1
+                                if (tileErrorCountRef.current >= 8) {
+                                  setTileLoaded(false)
+                                  setTileProviderIndex((prev) => {
+                                    if (prev >= TILE_SOURCES.length - 1) return prev
+                                    return prev + 1
+                                  })
+                                  tileErrorCountRef.current = 0
+                                }
+                              }
+                            }}
+                          />
 
-                        {/* Heatmap layer (plugin-free fallback for reliability) */}
-                        <HeatCircleLayer heatmapData={heatmapData} />
+                          {/* Heatmap layer (plugin-free fallback for reliability) */}
+                          <HeatCircleLayer heatmapData={heatmapData} />
 
-                        {/* Marker các quán */}
-                        {restaurantsWithCoords.map(restaurant => (
-                          <Marker
-                            key={restaurant.id}
-                            position={[restaurant.lat, restaurant.lng]}
-                            icon={restaurantIcon}
-                          >
-                            <Popup maxWidth={300}>
-                              <div style={{ padding: '5px' }}>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
-                                {restaurant.address && (
-                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
-                                    📍 {restaurant.address}
-                                  </p>
-                                )}
-                                {restaurant.description && (
-                                  <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
-                                    {restaurant.description}
-                                  </p>
-                                )}
-                              </div>
-                            </Popup>
-                          </Marker>
-                        ))}
-                      </MapContainer>
+                          {/* Marker các quán */}
+                          {restaurantsWithCoords.map(restaurant => (
+                            <Marker
+                              key={restaurant.id}
+                              position={[restaurant.lat, restaurant.lng]}
+                              icon={restaurantIcon}
+                            >
+                              <Popup maxWidth={300}>
+                                <div style={{ padding: '5px' }}>
+                                  <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                                  {restaurant.address && (
+                                    <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
+                                      📍 {restaurant.address}
+                                    </p>
+                                  )}
+                                  {restaurant.description && (
+                                    <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
+                                      {restaurant.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </Popup>
+                            </Marker>
+                          ))}
+                        </MapContainer>
+                      )}
                     </div>
                   </div>
 
@@ -892,6 +951,16 @@ const styles = {
     color: '#475569',
     textAlign: 'center',
     fontSize: '13px'
+  },
+  mapFallbackNotice: {
+    marginBottom: '10px',
+    borderRadius: '10px',
+    border: '1px solid rgba(235, 164, 84, 0.62)',
+    background: 'rgba(255, 241, 219, 0.9)',
+    color: '#6b4313',
+    padding: '8px 10px',
+    fontSize: '12px',
+    fontWeight: '600'
   },
   heatmapContainer: {
     minHeight: '520px',
