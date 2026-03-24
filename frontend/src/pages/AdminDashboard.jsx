@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import 'leaflet.heat'
 import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import RestaurantManagement from './RestaurantManagement'
@@ -36,7 +37,7 @@ function HeatmapLayer({ heatmapData }) {
   const heatLayerRef = useRef(null)
 
   useEffect(() => {
-    if (!map || !window.L || !window.L.heatLayer) return
+    if (!map || typeof L.heatLayer !== 'function') return
 
     // Remove existing heatmap layer
     if (heatLayerRef.current) {
@@ -58,7 +59,7 @@ function HeatmapLayer({ heatmapData }) {
         return undefined
       }
 
-      const heat = window.L.heatLayer(heatPoints, {
+      const heat = L.heatLayer(heatPoints, {
         radius: 25,
         blur: 15,
         maxZoom: 17,
@@ -528,11 +529,13 @@ function AdminDashboard({ role = 'admin' }) {
                         zoom={15}
                         style={{ height: '100%', width: '100%' }}
                         zoomControl={true}
+                        key="admin-dashboard-map"
                       >
                         <MapAutoResize />
                         <TileLayer
-                          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-                          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          crossOrigin="anonymous"
                         />
 
                         {/* Heatmap layer */}
