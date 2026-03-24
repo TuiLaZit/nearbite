@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory, request, Response
 from flask_cors import CORS
 from db import db
 from sqlalchemy import inspect, text
@@ -6,6 +6,8 @@ import os
 import re
 import time
 import threading
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
 from translate import prewarm_translation_cache, cleanup_expired_translation_cache
@@ -162,6 +164,13 @@ _cleanup_tts_batches = int((os.getenv("CACHE_CLEANUP_TTS_BATCHES") or "10").stri
 _cleanup_tts_batches = max(1, min(100, _cleanup_tts_batches))
 _cleanup_translation_batches = int((os.getenv("CACHE_CLEANUP_TRANSLATION_BATCHES") or "5").strip() or "5")
 _cleanup_translation_batches = max(1, min(100, _cleanup_translation_batches))
+
+
+MAP_TILE_PROVIDERS = {
+    "carto-voyager": "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+    "osm": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "opentopo": "https://tile.opentopomap.org/{z}/{x}/{y}.png",
+}
 
 
 def _run_cache_cleanup(reason="manual"):
@@ -688,6 +697,41 @@ with app.app_context():
 @app.route("/healthz")
 def healthz():
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/map-tiles/<provider>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
+@app.route("/api/map-tiles/<provider>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
+def proxy_map_tiles(provider, z, x, y):
+    provider_template = MAP_TILE_PROVIDERS.get(provider)
+    if not provider_template:
+        return jsonify({"error": "Unknown map tile provider"}), 404
+
+    if z < 0 or z > 22 or x < 0 or y < 0:
+        return jsonify({"error": "Invalid tile coordinates"}), 400
+
+    upstream_url = provider_template.format(z=z, x=x, y=y)
+    upstream_request = Request(
+        upstream_url,
+        headers={
+            "User-Agent": "NearBiteMapProxy/1.0",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+    )
+
+    try:
+        with urlopen(upstream_request, timeout=8) as upstream_response:
+            body = upstream_response.read()
+            content_type = upstream_response.headers.get("Content-Type", "image/png")
+            response = Response(body, status=200, content_type=content_type)
+            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+            return response
+    except HTTPError as exc:
+        return Response(status=int(exc.code or 502))
+    except (URLError, TimeoutError):
+        return Response(status=504)
+    except Exception:
+        return Response(status=502)
 
 
 @app.route("/")

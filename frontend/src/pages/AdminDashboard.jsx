@@ -93,21 +93,23 @@ const parseCoordinate = (value) => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+const buildTileProxyUrl = (provider) => `${BASE_URL}/map-tiles/${provider}/{z}/{x}/{y}.png`
+
 const TILE_SOURCES = [
   {
     name: 'CARTO Voyager',
     attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+    url: buildTileProxyUrl('carto-voyager')
   },
   {
     name: 'OpenStreetMap',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    url: buildTileProxyUrl('osm')
   },
   {
     name: 'OpenTopoMap',
     attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'
+    url: buildTileProxyUrl('opentopo')
   }
 ]
 
