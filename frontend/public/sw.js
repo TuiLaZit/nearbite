@@ -1,4 +1,4 @@
-const CACHE_NAME = 'food-street-v10';
+const CACHE_NAME = 'food-street-v11';
 const urlsToCache = [
   '/',
   '/index.html',

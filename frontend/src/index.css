@@ -130,3 +130,13 @@ h1, h2, h3 {
     transform: rotate(360deg);
   }
 }
+
+/* Desktop-safe Leaflet overrides: avoid white tiles caused by blend-mode on some GPU stacks */
+.leaflet-container {
+  background: #e8eef5 !important;
+}
+
+.leaflet-container img.leaflet-tile {
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
