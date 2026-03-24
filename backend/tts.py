@@ -3,9 +3,15 @@ import hashlib
 import re
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
+from urllib.request import Request, urlopen
 from gtts import gTTS
 from gtts.lang import tts_langs
-from supabase_client import supabase_client, ensure_bucket_exists, get_public_url_for_path
+from supabase_client import (
+    supabase_client,
+    ensure_bucket_exists,
+    get_public_url_for_path,
+    get_signed_url_for_path,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TTS_DIR = os.path.join(BASE_DIR, "static", "tts")
@@ -173,15 +179,47 @@ def _upload_audio_bytes_to_storage(audio_bytes, mapped_lang, text_hash, restaura
             }
         )
         public_url = get_public_url_for_path(storage_path, bucket_name=TTS_BUCKET)
-        if not public_url:
+        resolved_url = _resolve_playable_storage_url(storage_path, public_url, ttl_seconds=ttl_seconds)
+        if not resolved_url:
             return None
         return {
             "storage_path": storage_path,
-            "public_url": public_url,
+            "public_url": resolved_url,
         }
     except Exception as exc:
         print(f"[tts] storage upload failed lang={mapped_lang} restaurant_id={restaurant_id} bucket={TTS_BUCKET} error={exc}")
         return None
+
+
+def _is_audio_content_type(content_type):
+    if not content_type:
+        return False
+    value = str(content_type).lower()
+    return "audio/" in value or "application/octet-stream" in value
+
+
+def _is_audio_url_playable(url):
+    if not url or not isinstance(url, str):
+        return False
+
+    try:
+        request = Request(url, method="GET")
+        with urlopen(request, timeout=6) as response:
+            content_type = response.headers.get("Content-Type", "")
+            return _is_audio_content_type(content_type)
+    except Exception:
+        return False
+
+
+def _resolve_playable_storage_url(storage_path, candidate_public_url, ttl_seconds=3600):
+    if candidate_public_url and _is_audio_url_playable(candidate_public_url):
+        return candidate_public_url
+
+    signed_url = get_signed_url_for_path(storage_path, bucket_name=TTS_BUCKET, expires_in=ttl_seconds)
+    if signed_url and _is_audio_url_playable(signed_url):
+        return signed_url
+
+    return None
 
 
 def _generate_tts_bytes(text, mapped_lang):

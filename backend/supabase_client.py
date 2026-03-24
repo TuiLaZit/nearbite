@@ -79,6 +79,34 @@ def get_public_url_for_path(path, bucket_name="restaurant-images"):
     return None
 
 
+def get_signed_url_for_path(path, bucket_name="restaurant-images", expires_in=3600):
+    if not supabase_client or not path:
+        return None
+
+    try:
+        value = supabase_client.storage.from_(bucket_name).create_signed_url(path, int(expires_in))
+
+        if isinstance(value, str):
+            return value
+
+        if isinstance(value, dict):
+            signed = value.get("signedURL") or value.get("signedUrl") or value.get("signed_url")
+            if not signed:
+                return None
+
+            if signed.startswith("http://") or signed.startswith("https://"):
+                return signed
+
+            base = (SUPABASE_URL or "").rstrip("/")
+            if not base:
+                return None
+            return f"{base}{signed if signed.startswith('/') else '/' + signed}"
+    except Exception:
+        return None
+
+    return None
+
+
 def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
     """
     Upload image to Supabase Storage
