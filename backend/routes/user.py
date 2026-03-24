@@ -250,11 +250,27 @@ def register_user_routes(app):
         narration_vi = generate_narration(nearest, min_dist)
         narration_final = translate_text(narration_vi, language, cache_scope_id=nearest.id)
 
+        def _build_audio_url():
+            primary = text_to_speech(narration_final, language, restaurant_id=nearest.id)
+            if primary:
+                return primary, language
+
+            if language != "en":
+                fallback_en = text_to_speech(narration_final, "en", restaurant_id=nearest.id)
+                if fallback_en:
+                    return fallback_en, "en"
+
+            fallback_vi = text_to_speech(narration_vi, "vi", restaurant_id=nearest.id)
+            if fallback_vi:
+                return fallback_vi, "vi"
+
+            return None, None
+
         # Queue theo restaurant để hạn chế đồng thời khi nhiều người cùng nghe audio.
         try:
             audio_url, queue_meta = add_to_queue(
                 nearest.id,
-                lambda: text_to_speech(narration_final, language, restaurant_id=nearest.id),
+                _build_audio_url,
                 include_meta=True,
             )
         except QueueFullError:
@@ -285,7 +301,8 @@ def register_user_routes(app):
             "status": "success",
             "language": language,
             "narration": narration_final,
-            "audio_url": audio_url,
+            "audio_url": audio_url[0] if isinstance(audio_url, tuple) else audio_url,
+            "audio_language": audio_url[1] if isinstance(audio_url, tuple) else language,
             "queue_wait_ms": queue_meta.get("queue_wait_ms", 0),
             "queue_position": queue_meta.get("queue_position", 1),
             "distance_km": round(min_dist, 3),

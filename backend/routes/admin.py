@@ -6,6 +6,7 @@ from validators import validate_restaurant, validate_menu_item, validate_tag, va
 from supabase_client import upload_image, delete_image, supabase_client
 from translate import invalidate_translation_cache, cleanup_expired_translation_cache
 from tts import invalidate_tts_cache, cleanup_expired_tts_cache
+from cache_warmup import schedule_restaurant_rewarm
 import uuid
 import re
 import secrets
@@ -16,7 +17,7 @@ from werkzeug.security import generate_password_hash
 
 def register_admin_routes(app):
 
-    def invalidate_restaurant_content_cache(restaurant_id):
+    def invalidate_restaurant_content_cache(restaurant_id, reason="admin-crud"):
         try:
             invalidate_translation_cache(cache_scope_id=restaurant_id)
         except Exception:
@@ -25,12 +26,31 @@ def register_admin_routes(app):
             invalidate_tts_cache(restaurant_id=restaurant_id)
         except Exception:
             pass
-
-    def invalidate_all_translation_cache():
         try:
-            invalidate_translation_cache(cache_scope_id=None)
+            schedule_restaurant_rewarm(
+                restaurant_id,
+                reason=reason,
+                clear_existing=False,
+                flask_app=app,
+            )
         except Exception:
             pass
+
+    def invalidate_translation_for_restaurants(restaurant_ids, reason="admin-tag-update"):
+        for restaurant_id in sorted({rid for rid in (restaurant_ids or []) if rid is not None}):
+            try:
+                invalidate_translation_cache(cache_scope_id=restaurant_id)
+            except Exception:
+                pass
+            try:
+                schedule_restaurant_rewarm(
+                    restaurant_id,
+                    reason=reason,
+                    clear_existing=False,
+                    flask_app=app,
+                )
+            except Exception:
+                pass
 
     def is_admin_session():
         return bool(session.get("admin_logged_in"))
@@ -498,7 +518,6 @@ def register_admin_routes(app):
         
         db.session.add(tag)
         db.session.commit()
-        invalidate_all_translation_cache()
         
         return jsonify({
             "status": "success",
@@ -511,6 +530,7 @@ def register_admin_routes(app):
         """Update a tag"""
         tag = Tag.query.get_or_404(id)
         data = request.get_json()
+        affected_restaurant_ids = [restaurant.id for restaurant in (tag.restaurants or [])]
         
         # Validate data
         error = validate_tag(data)
@@ -529,7 +549,7 @@ def register_admin_routes(app):
         tag.description = data.get("description", tag.description)
         
         db.session.commit()
-        invalidate_all_translation_cache()
+        invalidate_translation_for_restaurants(affected_restaurant_ids, reason="tag-updated")
         
         return jsonify({
             "status": "success",
@@ -541,9 +561,10 @@ def register_admin_routes(app):
     def delete_tag(id):
         """Delete a tag"""
         tag = Tag.query.get_or_404(id)
+        affected_restaurant_ids = [restaurant.id for restaurant in (tag.restaurants or [])]
         db.session.delete(tag)
         db.session.commit()
-        invalidate_all_translation_cache()
+        invalidate_translation_for_restaurants(affected_restaurant_ids, reason="tag-deleted")
         
         return jsonify({
             "status": "deleted",
