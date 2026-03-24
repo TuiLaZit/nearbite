@@ -8,8 +8,9 @@ import time
 import threading
 from routes.user import register_user_routes
 from routes.admin import register_admin_routes
-from translate import prewarm_translation_cache, LANGUAGE_LABELS, cleanup_expired_translation_cache
+from translate import prewarm_translation_cache, cleanup_expired_translation_cache
 from tts import cleanup_expired_tts_cache
+from cache_warmup import prewarm_all_restaurants_content, resolve_target_languages
 from auth import (
     admin_login,
     admin_check,
@@ -243,30 +244,33 @@ def _start_translation_prewarm_worker():
     if not is_production and enabled_env not in {"1", "true", "yes", "on"}:
         return
 
-    langs_env = (os.getenv("PREWARM_LANGS") or "").strip()
-    if langs_env:
-        target_langs = [lang.strip() for lang in langs_env.split(",") if lang.strip()]
-    else:
-        target_langs = [code for code in LANGUAGE_LABELS.keys() if code != "vi"]
-
-    # Keep only supported and unique language codes, preserving order.
-    seen_langs = set()
-    filtered_langs = []
-    for code in target_langs:
-        if code == "vi" or code not in LANGUAGE_LABELS or code in seen_langs:
-            continue
-        seen_langs.add(code)
-        filtered_langs.append(code)
-
-    target_langs = filtered_langs
+    target_langs = resolve_target_languages()
     texts = _extract_translation_texts_for_prewarm()
-    if not texts or not target_langs:
+    if not target_langs:
         return
+
+    prewarm_restaurant_env = (os.getenv("PREWARM_RESTAURANTS") or "").strip().lower()
+    if prewarm_restaurant_env in {"0", "false", "no", "off"}:
+        prewarm_restaurants = False
+    elif prewarm_restaurant_env in {"1", "true", "yes", "on"}:
+        prewarm_restaurants = True
+    else:
+        prewarm_restaurants = True
 
     def _run_prewarm():
         try:
-            prewarm_translation_cache(texts, target_langs)
-            print(f"[prewarm] Completed for {len(target_langs)} languages, {len(texts)} texts")
+            if texts:
+                prewarm_translation_cache(texts, target_langs)
+                print(f"[prewarm] UI translations ready for {len(target_langs)} languages, {len(texts)} texts")
+
+            if prewarm_restaurants:
+                with app.app_context():
+                    stats = prewarm_all_restaurants_content(
+                        target_langs=target_langs,
+                        clear_existing=False,
+                        only_active=True,
+                    )
+                print(f"[prewarm] Restaurant content ready: {stats}")
         except Exception as exc:
             print(f"[prewarm] Failed: {exc}")
 
