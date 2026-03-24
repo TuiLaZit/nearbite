@@ -57,11 +57,10 @@ def ensure_bucket_exists(bucket_name="restaurant-images"):
                 bucket_name,
                 options={"public": True}
             )
+        _checked_buckets.add(bucket_name)
     except Exception:
         # Do not block app startup or request handling if storage bootstrap fails.
-        pass
-    finally:
-        _checked_buckets.add(bucket_name)
+        print(f"[supabase] ensure_bucket_exists failed for bucket={bucket_name}")
 
 
 def get_public_url_for_path(path, bucket_name="restaurant-images"):
