@@ -56,10 +56,23 @@ export default async function handler(req, res) {
 
     res.status(upstreamResponse.status)
 
-    const setCookieValues = typeof upstreamResponse.headers.getSetCookie === 'function'
-      ? upstreamResponse.headers.getSetCookie()
-      : []
-    if (Array.isArray(setCookieValues) && setCookieValues.length > 0) {
+    // Forward Set-Cookie in a runtime-compatible way.
+    // - Node 20+/Undici may expose headers.getSetCookie()
+    // - Node 18 may only expose headers.get('set-cookie')
+    const setCookieValues = []
+    if (typeof upstreamResponse.headers.getSetCookie === 'function') {
+      const cookies = upstreamResponse.headers.getSetCookie()
+      if (Array.isArray(cookies)) {
+        setCookieValues.push(...cookies)
+      }
+    } else {
+      const singleCookieHeader = upstreamResponse.headers.get('set-cookie')
+      if (singleCookieHeader) {
+        setCookieValues.push(singleCookieHeader)
+      }
+    }
+
+    if (setCookieValues.length > 0) {
       res.setHeader('set-cookie', setCookieValues)
     }
 
