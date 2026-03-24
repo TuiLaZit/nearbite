@@ -347,6 +347,9 @@ def _ensure_cache_tables():
             cache_key VARCHAR(255) UNIQUE NOT NULL,
             restaurant_id INTEGER NULL,
             target_lang VARCHAR(16) NOT NULL,
+            note TEXT NULL,
+            logical_key TEXT NULL,
+            source_checksum VARCHAR(64) NULL,
             source_text TEXT NOT NULL,
             translated_text TEXT NOT NULL,
             expires_at TIMESTAMPTZ NOT NULL,
@@ -365,6 +368,18 @@ def _ensure_cache_tables():
         """
         CREATE INDEX IF NOT EXISTS idx_translation_cache_expires
             ON translation_cache_entry(expires_at)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_translation_cache_scope_lang_note
+            ON translation_cache_entry(restaurant_id, target_lang, note)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_translation_cache_global_lang_note
+            ON translation_cache_entry(target_lang, note)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_translation_cache_logical
+            ON translation_cache_entry(restaurant_id, target_lang, note, logical_key)
         """,
         """
         CREATE TABLE IF NOT EXISTS tts_cache_entry (
@@ -403,8 +418,138 @@ def _ensure_cache_tables():
         print(f"[cache-schema] Ensure cache tables skipped: {exc}")
 
 
+def _ensure_translation_cache_catalog_columns():
+    """Ensure catalog columns exist for older schemas."""
+    try:
+        db.session.execute(
+            text("ALTER TABLE IF EXISTS translation_cache_entry ADD COLUMN IF NOT EXISTS note TEXT")
+        )
+        db.session.execute(
+            text("ALTER TABLE IF EXISTS translation_cache_entry ADD COLUMN IF NOT EXISTS logical_key TEXT")
+        )
+        db.session.execute(
+            text("ALTER TABLE IF EXISTS translation_cache_entry ADD COLUMN IF NOT EXISTS source_checksum VARCHAR(64)")
+        )
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[cache-schema] Ensure translation catalog columns skipped: {exc}")
+
+
+def _cleanup_legacy_scoped_translation_cache_rows():
+    """
+    Remove legacy duplicated rows that were scoped by restaurant for generic texts.
+    Keep restaurant-specific caches for narration/proximity note categories.
+    """
+    cleanup_enabled = _is_true_env(os.getenv("TRANSLATION_CACHE_CLEANUP_LEGACY_SCOPED", "true"))
+    if not cleanup_enabled:
+        return
+
+    cleanup_limit = int((os.getenv("TRANSLATION_CACHE_CLEANUP_LIMIT") or "5000").strip() or "5000")
+    cleanup_limit = max(100, min(50000, cleanup_limit))
+
+    try:
+        result = db.session.execute(
+            text(
+                """
+                DELETE FROM translation_cache_entry
+                WHERE id IN (
+                    SELECT id
+                    FROM translation_cache_entry
+                    WHERE restaurant_id IS NOT NULL
+                      AND COALESCE(note, '') NOT IN ('restaurant_narration', 'restaurant_proximity_hint')
+                    ORDER BY updated_at ASC NULLS FIRST, id ASC
+                    LIMIT :cleanup_limit
+                )
+                RETURNING id
+                """
+            ),
+            {"cleanup_limit": cleanup_limit}
+        )
+        deleted_count = len(result.fetchall() or [])
+        db.session.commit()
+        if deleted_count > 0:
+            print(f"[cache-cleanup] Removed {deleted_count} legacy scoped translation cache rows")
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[cache-cleanup] Legacy scoped translation cleanup skipped: {exc}")
+
+
+def _resolve_deploy_marker():
+    return (
+        (os.getenv("CACHE_DEPLOY_MARKER") or "").strip()
+        or (os.getenv("RENDER_GIT_COMMIT") or "").strip()
+        or (os.getenv("RAILWAY_GIT_COMMIT_SHA") or "").strip()
+    )
+
+
+def _refresh_translation_cache_on_redeploy():
+    """
+    If deploy marker changes, clear translation cache so prewarm/build can rewrite
+    fresh values and avoid stale rows from previous deploy versions.
+    """
+    enabled = _is_true_env(os.getenv("TRANSLATION_REFRESH_ON_REDEPLOY", "true"))
+    if not enabled:
+        return
+
+    deploy_marker = _resolve_deploy_marker()
+    if not deploy_marker:
+        return
+
+    try:
+        db.session.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS app_runtime_meta (
+                    meta_key TEXT PRIMARY KEY,
+                    meta_value TEXT NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+        )
+
+        row = db.session.execute(
+            text(
+                "SELECT meta_value FROM app_runtime_meta WHERE meta_key = 'translation_cache_deploy_marker' LIMIT 1"
+            )
+        ).mappings().first()
+
+        last_marker = (row or {}).get("meta_value")
+        if last_marker == deploy_marker:
+            db.session.commit()
+            return
+
+        deleted_rows = db.session.execute(
+            text("DELETE FROM translation_cache_entry RETURNING id")
+        ).fetchall() or []
+
+        db.session.execute(
+            text(
+                """
+                INSERT INTO app_runtime_meta (meta_key, meta_value, updated_at)
+                VALUES ('translation_cache_deploy_marker', :deploy_marker, NOW())
+                ON CONFLICT (meta_key)
+                DO UPDATE SET meta_value = EXCLUDED.meta_value, updated_at = NOW()
+                """
+            ),
+            {"deploy_marker": deploy_marker}
+        )
+        db.session.commit()
+        print(
+            "[cache-refresh] Deploy marker changed. "
+            f"Cleared translation cache rows={len(deleted_rows)} marker={deploy_marker[:12]}"
+        )
+    except Exception as exc:
+        db.session.rollback()
+        print(f"[cache-refresh] Redeploy refresh skipped: {exc}")
+
+
 with app.app_context():
     _ensure_cache_tables()
+    _ensure_translation_cache_catalog_columns()
+    _refresh_translation_cache_on_redeploy()
+    _cleanup_legacy_scoped_translation_cache_rows()
     _ensure_local_schema_compatibility()
 
 

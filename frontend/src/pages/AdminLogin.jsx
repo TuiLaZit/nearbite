@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
+import { setAuthUserIdFromPayload } from '../utils/authUser'
 
 function AdminLogin({
   role = 'admin',
@@ -35,6 +36,8 @@ function AdminLogin({
       })
 
       if (response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        setAuthUserIdFromPayload(payload)
         localStorage.setItem('activeRole', role)
         navigate(redirectPath)
       } else {

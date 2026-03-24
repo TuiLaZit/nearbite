@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
+import { setAuthUserIdFromPayload } from '../utils/authUser'
 
 function LoginPortal() {
   const navigate = useNavigate()
@@ -90,6 +91,7 @@ function LoginPortal() {
         throw new Error(data.error || t('invalidOtp'))
       }
 
+      setAuthUserIdFromPayload(data)
       navigate('/', { replace: true })
     } catch (error) {
       alert(error.message)
@@ -115,6 +117,7 @@ function LoginPortal() {
         throw new Error(data.error || 'Dang nhap that bai')
       }
 
+      setAuthUserIdFromPayload(data)
       localStorage.setItem('activeRole', 'owner')
       navigate('/owner', { replace: true })
     } catch (error) {

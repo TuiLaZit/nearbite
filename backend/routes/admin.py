@@ -12,7 +12,7 @@ import re
 import secrets
 import string
 import unicodedata
-from sqlalchemy import func
+from sqlalchemy import func, text
 from werkzeug.security import generate_password_hash
 
 def register_admin_routes(app):
@@ -30,7 +30,7 @@ def register_admin_routes(app):
             schedule_restaurant_rewarm(
                 restaurant_id,
                 reason=reason,
-                clear_existing=False,
+                clear_existing=True,
                 flask_app=app,
             )
         except Exception:
@@ -46,7 +46,7 @@ def register_admin_routes(app):
                 schedule_restaurant_rewarm(
                     restaurant_id,
                     reason=reason,
-                    clear_existing=False,
+                    clear_existing=True,
                     flask_app=app,
                 )
             except Exception:
@@ -471,6 +471,69 @@ def register_admin_routes(app):
             "status": "error" if has_error else "success",
             "diagnostics": diagnostics,
         }), 500 if has_error else 200
+
+    @app.route("/admin/online-users", methods=["GET"])
+    @app.route("/api/admin/online-users", methods=["GET"])
+    @admin_required
+    def get_online_users_stats():
+        """
+        Thống kê online trong 30 giây gần nhất.
+
+        - online_devices: số lượng device có heartbeat mới nhất trong cửa sổ 30s
+        - online_users: số lượng user_id khác null trong cửa sổ 30s
+        - online_user_list: danh sách user online (bonus)
+        """
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        try:
+            counts_row = db.session.execute(
+                text(
+                    """
+                    SELECT
+                        COUNT(*)::int AS online_devices,
+                        COUNT(DISTINCT user_id)::int AS online_users
+                    FROM user_activity
+                    WHERE last_seen > NOW() - INTERVAL '30 seconds'
+                    """
+                )
+            ).mappings().first() or {}
+
+            online_users_rows = db.session.execute(
+                text(
+                    """
+                    SELECT
+                        user_id,
+                        MAX(last_seen) AS last_seen,
+                        COUNT(*)::int AS device_count
+                    FROM user_activity
+                    WHERE user_id IS NOT NULL
+                      AND last_seen > NOW() - INTERVAL '30 seconds'
+                    GROUP BY user_id
+                    ORDER BY MAX(last_seen) DESC
+                    """
+                )
+            ).mappings().all()
+
+            online_user_list = [
+                {
+                    "user_id": str(row.get("user_id")) if row.get("user_id") else None,
+                    "last_seen": row.get("last_seen").isoformat() if row.get("last_seen") else None,
+                    "device_count": int(row.get("device_count") or 0),
+                }
+                for row in online_users_rows
+            ]
+
+            return jsonify({
+                "status": "success",
+                "window_seconds": 30,
+                "online_devices": int(counts_row.get("online_devices") or 0),
+                "online_users": int(counts_row.get("online_users") or 0),
+                "online_user_list": online_user_list,
+            })
+        except Exception as exc:
+            return jsonify({"status": "error", "message": f"online users query failed: {exc}"}), 500
 
     # ======================
     # MENU CRUD
@@ -978,25 +1041,24 @@ def register_admin_routes(app):
                 } for r in results])
                 
             elif metric == 'duration':
-                # Top by average visit duration (in minutes)
+                # Top by average visit duration from restaurant analytics (stored in seconds).
+                # This is more stable than aggregating raw location_visit rows, because
+                # analytics is updated during tracking flow and already normalized per restaurant.
                 results = db.session.query(
                     Restaurant.id,
                     Restaurant.name,
-                    func.avg(LocationVisit.duration_seconds).label('avg_duration_seconds')
-                ).join(
-                    LocationVisit, Restaurant.id == LocationVisit.restaurant_id
+                    Restaurant.avg_visit_duration
                 ).filter(
-                    Restaurant.is_active == True
-                ).group_by(
-                    Restaurant.id, Restaurant.name
+                    Restaurant.is_active == True,
+                    Restaurant.avg_visit_duration > 0
                 ).order_by(
-                    func.avg(LocationVisit.duration_seconds).desc()
+                    Restaurant.avg_visit_duration.desc()
                 ).limit(limit).all()
                 
                 return jsonify([{
                     'id': r.id,
                     'name': r.name,
-                    'avg_visit_duration': round(r.avg_duration_seconds / 60.0, 1) if r.avg_duration_seconds else 0
+                    'avg_visit_duration': round((r.avg_visit_duration or 0) / 60.0, 1)
                 } for r in results])
                 
             elif metric == 'audio':
