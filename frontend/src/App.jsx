@@ -39,7 +39,7 @@ function App() {
             role="admin"
             redirectPath="/admin"
             title="🛡️ Đăng nhập Admin"
-            placeholder="Nhập ADMIN_PASSWORD"
+            placeholder="Nhập PASSWORD"
           />
         }
       />
