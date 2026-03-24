@@ -4,11 +4,12 @@ from services import calculate_distance, generate_narration
 from translate import translate_text, translate_texts, LANGUAGE_LABELS
 from tts import text_to_speech
 from queue_manager import add_to_queue, QueueFullError
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 from threading import Lock
 import copy
 import hashlib
 import json
+import uuid
 from datetime import datetime
 
 
@@ -53,47 +54,64 @@ def _translate_restaurant_data(restaurant_data, target_lang, allow_network=True)
         return cached
 
     translated_payload = copy.deepcopy(restaurant_data)
-    text_refs = {}
-    texts = []
+    text_entries = []
 
-    def track(text, setter):
+    def track(text, setter, logical_suffix):
         if not text or not isinstance(text, str):
             return
-        if text not in text_refs:
-            text_refs[text] = []
-            texts.append(text)
-        text_refs[text].append(setter)
+        text_entries.append({
+            "text": text,
+            "setter": setter,
+            "logical_suffix": logical_suffix,
+        })
 
-    track(translated_payload.get("name"), lambda value: translated_payload.__setitem__("name", value))
-    track(translated_payload.get("description"), lambda value: translated_payload.__setitem__("description", value))
+    track(translated_payload.get("name"), lambda value: translated_payload.__setitem__("name", value), "name")
+    track(
+        translated_payload.get("description"),
+        lambda value: translated_payload.__setitem__("description", value),
+        "description",
+    )
 
-    for tag in translated_payload.get("tags", []) or []:
-        track(tag.get("name"), lambda value, tag=tag: tag.__setitem__("name", value))
-        track(tag.get("description"), lambda value, tag=tag: tag.__setitem__("description", value))
+    for idx, tag in enumerate(translated_payload.get("tags", []) or []):
+        tag_key = f"tag:{tag.get('id') if tag.get('id') is not None else idx}"
+        track(tag.get("name"), lambda value, tag=tag: tag.__setitem__("name", value), f"{tag_key}:name")
+        track(
+            tag.get("description"),
+            lambda value, tag=tag: tag.__setitem__("description", value),
+            f"{tag_key}:description",
+        )
 
-    for item in translated_payload.get("menu", []) or []:
-        track(item.get("name"), lambda value, item=item: item.__setitem__("name", value))
+    for idx, item in enumerate(translated_payload.get("menu", []) or []):
+        item_key = f"menu:{item.get('id') if item.get('id') is not None else idx}"
+        track(item.get("name"), lambda value, item=item: item.__setitem__("name", value), f"{item_key}:name")
 
-    for image in translated_payload.get("images", []) or []:
-        track(image.get("caption"), lambda value, image=image: image.__setitem__("caption", value))
+    for idx, image in enumerate(translated_payload.get("images", []) or []):
+        image_key = f"image:{image.get('id') if image.get('id') is not None else idx}"
+        track(
+            image.get("caption"),
+            lambda value, image=image: image.__setitem__("caption", value),
+            f"{image_key}:caption",
+        )
 
     restaurant_id = restaurant_data.get("id")
 
-    if texts:
-        translated_texts = translate_texts(
+    if text_entries:
+        texts = [entry["text"] for entry in text_entries]
+        logical_keys = [
+            f"restaurant:{restaurant_id}:{entry['logical_suffix']}"
+            for entry in text_entries
+        ]
+        translated_values = translate_texts(
             texts,
             target_lang,
             cache_only=not allow_network,
             cache_scope_id=restaurant_id,
+            cache_note="restaurant_content",
+            cache_logical_keys=logical_keys,
         )
-        translation_map = {}
-        for idx, original in enumerate(texts):
-            translation_map[original] = translated_texts[idx] if idx < len(translated_texts) else original
-
-        for original, setters in text_refs.items():
-            translated_value = translation_map.get(original, original) or original
-            for setter in setters:
-                setter(translated_value)
+        for idx, entry in enumerate(text_entries):
+            translated_value = translated_values[idx] if idx < len(translated_values) else entry["text"]
+            entry["setter"](translated_value or entry["text"])
 
     if allow_network:
         _cache_restaurant_payload(signature, translated_payload)
@@ -101,6 +119,96 @@ def _translate_restaurant_data(restaurant_data, target_lang, allow_network=True)
 
 
 def register_user_routes(app):
+    @app.route("/heartbeat", methods=["POST"])
+    @app.route("/api/heartbeat", methods=["POST"])
+    def heartbeat():
+        """
+        Nhận heartbeat từ client để cập nhật trạng thái online theo device.
+
+        Payload:
+        - device_id: string (required)
+        - user_id: uuid|string|null (optional, dùng khi client có session user)
+        """
+        data = request.get_json(silent=True) or {}
+
+        device_id = (data.get("device_id") or "").strip()
+        if not device_id:
+            return jsonify({"status": "error", "message": "device_id is required"}), 400
+
+        # Giới hạn độ dài để tránh dữ liệu bất thường làm phình index/text column.
+        if len(device_id) > 255:
+            return jsonify({"status": "error", "message": "device_id is too long (max 255 chars)"}), 400
+
+        user_id_provided = "user_id" in data
+        raw_user_id = data.get("user_id")
+        user_id = None
+
+        if raw_user_id is not None and str(raw_user_id).strip() != "":
+            try:
+                user_id = str(uuid.UUID(str(raw_user_id).strip()))
+            except (ValueError, TypeError):
+                return jsonify({"status": "error", "message": "user_id must be a valid UUID"}), 400
+
+        try:
+            # Bước 1: update heartbeat cho device đã tồn tại.
+            if user_id_provided:
+                update_sql = text(
+                    """
+                    UPDATE user_activity
+                    SET last_seen = NOW(), user_id = :user_id
+                    WHERE device_id = :device_id
+                    RETURNING id, device_id, user_id, last_seen
+                    """
+                )
+                update_params = {"device_id": device_id, "user_id": user_id}
+            else:
+                update_sql = text(
+                    """
+                    UPDATE user_activity
+                    SET last_seen = NOW()
+                    WHERE device_id = :device_id
+                    RETURNING id, device_id, user_id, last_seen
+                    """
+                )
+                update_params = {"device_id": device_id}
+
+            updated_rows = db.session.execute(update_sql, update_params).mappings().all()
+
+            # Bước 2: nếu chưa có device thì insert mới.
+            if updated_rows:
+                row = dict(updated_rows[0])
+                action = "updated"
+            else:
+                inserted_row = db.session.execute(
+                    text(
+                        """
+                        INSERT INTO user_activity (device_id, user_id, last_seen)
+                        VALUES (:device_id, :user_id, NOW())
+                        RETURNING id, device_id, user_id, last_seen
+                        """
+                    ),
+                    {"device_id": device_id, "user_id": user_id}
+                ).mappings().first()
+
+                row = dict(inserted_row or {})
+                action = "inserted"
+
+            db.session.commit()
+
+            return jsonify({
+                "status": "success",
+                "action": action,
+                "heartbeat": {
+                    "id": row.get("id"),
+                    "device_id": row.get("device_id"),
+                    "user_id": str(row.get("user_id")) if row.get("user_id") else None,
+                    "last_seen": row.get("last_seen").isoformat() if row.get("last_seen") else None,
+                }
+            })
+        except Exception as exc:
+            db.session.rollback()
+            return jsonify({"status": "error", "message": f"heartbeat failed: {exc}"}), 500
+
     @app.route("/languages", methods=["GET"])
     def get_languages():
         """Lấy danh sách ngôn ngữ hỗ trợ (public endpoint)"""
@@ -248,7 +356,13 @@ def register_user_routes(app):
                 nearest = r
 
         narration_vi = generate_narration(nearest, min_dist)
-        narration_final = translate_text(narration_vi, language, cache_scope_id=nearest.id)
+        narration_final = translate_text(
+            narration_vi,
+            language,
+            cache_scope_id=nearest.id,
+            cache_note="restaurant_narration",
+            cache_logical_key=f"restaurant:{nearest.id}:narration",
+        )
 
         def _build_audio_url():
             primary = text_to_speech(narration_final, language, restaurant_id=nearest.id)
@@ -280,7 +394,13 @@ def register_user_routes(app):
         
         # Message khi chưa đến gần quán
         out_of_range_msg_vi = f'🚶 Bạn hãy tới gần quán "{nearest.name}" để nghe thuyết minh'
-        out_of_range_msg = translate_text(out_of_range_msg_vi, language, cache_scope_id=nearest.id)
+        out_of_range_msg = translate_text(
+            out_of_range_msg_vi,
+            language,
+            cache_scope_id=nearest.id,
+            cache_note="restaurant_proximity_hint",
+            cache_logical_key=f"restaurant:{nearest.id}:proximity_hint",
+        )
 
         # Get restaurant data and reuse cached translation if unchanged.
         restaurant_data = nearest.to_dict(include_details=True)

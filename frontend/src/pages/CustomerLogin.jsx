@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
+import { setAuthUserIdFromPayload } from '../utils/authUser'
 
 function CustomerLogin() {
   const navigate = useNavigate()
@@ -69,6 +70,7 @@ function CustomerLogin() {
         throw new Error(data.error || t('invalidOtp'))
       }
 
+      setAuthUserIdFromPayload(data)
       navigate('/customer', { replace: true })
     } catch (error) {
       alert(error.message)

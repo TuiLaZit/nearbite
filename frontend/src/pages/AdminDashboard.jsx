@@ -7,6 +7,7 @@ import { BASE_URL } from '../config'
 import RestaurantManagement from './RestaurantManagement'
 import TagManagement from './TagManagement'
 import AdminAccountManagement from './AdminAccountManagement'
+import { clearAuthUserId } from '../utils/authUser'
 
 // Fix cho Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl
@@ -89,6 +90,23 @@ function AdminDashboard({ role = 'admin' }) {
     byDuration: [],
     byAudio: []
   })
+  const [onlineStats, setOnlineStats] = useState({
+    window_seconds: 30,
+    online_devices: 0,
+    online_users: 0,
+    online_user_list: []
+  })
+
+  const formatOnlineTimestamp = (isoValue) => {
+    if (!isoValue) return '--'
+    const parsed = new Date(isoValue)
+    if (Number.isNaN(parsed.getTime())) return '--'
+    return parsed.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -124,7 +142,32 @@ function AdminDashboard({ role = 'admin' }) {
 
   // Load heatmap và restaurants khi load component
 
+  const loadOnlineStats = () => {
+    fetch(`${BASE_URL}/admin/online-users`, {
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to load online users')
+        }
+        return res.json()
+      })
+      .then(data => {
+        setOnlineStats({
+          window_seconds: data.window_seconds || 30,
+          online_devices: data.online_devices || 0,
+          online_users: data.online_users || 0,
+          online_user_list: Array.isArray(data.online_user_list) ? data.online_user_list : []
+        })
+      })
+      .catch(err => {
+        console.error('Error loading online users:', err)
+      })
+  }
+
   const loadHeatmapData = () => {
+    loadOnlineStats()
+
     // Load heatmap data
     fetch(`${BASE_URL}/admin/heatmap`, {
       credentials: 'include'
@@ -183,6 +226,20 @@ function AdminDashboard({ role = 'admin' }) {
       .catch(err => console.error('Error loading top audio:', err))
   }
 
+  useEffect(() => {
+    if (isOwner || activeTab !== 'dashboard') {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadOnlineStats()
+    }, 10_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [activeTab, isOwner])
+
 
 
   const handleLogout = () => {
@@ -191,6 +248,7 @@ function AdminDashboard({ role = 'admin' }) {
       credentials: 'include'
     }).then(() => {
       localStorage.removeItem('activeRole')
+      clearAuthUserId()
       navigate(loginPath)
     })
   }
@@ -312,8 +370,55 @@ function AdminDashboard({ role = 'admin' }) {
             {!isOwner && activeTab === 'dashboard' && (
               <div style={styles.dashboardContent}>
                 <div style={styles.dashboardLayout}>
-                  {/* Left side - Top tables */}
                   <div style={styles.topTablesContainer}>
+                    <div style={styles.onlineCard}>
+                      <h3 style={styles.onlineTitle}>🟢 Online realtime ({onlineStats.window_seconds}s)</h3>
+                      <div style={styles.onlineStatsGrid}>
+                        <div style={styles.onlineStatItem}>
+                          <div style={styles.onlineStatValue}>{onlineStats.online_devices}</div>
+                          <div style={styles.onlineStatLabel}>online_devices</div>
+                        </div>
+                        <div style={styles.onlineStatItem}>
+                          <div style={styles.onlineStatValue}>{onlineStats.online_users}</div>
+                          <div style={styles.onlineStatLabel}>online_users</div>
+                        </div>
+                      </div>
+
+                      <div style={styles.onlineUsersSection}>
+                        <div style={styles.onlineUsersHeader}>Top user online gần nhất</div>
+
+                        {onlineStats.online_user_list.length === 0 ? (
+                          <div style={styles.onlineUsersEmpty}>Chưa có user_id online trong cửa sổ hiện tại</div>
+                        ) : (
+                          <table style={styles.onlineUsersTable}>
+                            <thead>
+                              <tr>
+                                <th style={styles.onlineUsersTh}>#</th>
+                                <th style={styles.onlineUsersTh}>User</th>
+                                <th style={styles.onlineUsersTh}>Devices</th>
+                                <th style={styles.onlineUsersTh}>Last seen</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {onlineStats.online_user_list.slice(0, 5).map((user, idx) => {
+                                const userId = user.user_id || ''
+                                const compactUserId = userId.length > 12 ? `${userId.slice(0, 8)}...${userId.slice(-4)}` : userId
+
+                                return (
+                                  <tr key={userId || `${idx}-${user.last_seen || ''}`}>
+                                    <td style={styles.onlineUsersTd}>{idx + 1}</td>
+                                    <td style={styles.onlineUsersTd}>{compactUserId || '--'}</td>
+                                    <td style={styles.onlineUsersTd}>{Number(user.device_count || 0)}</td>
+                                    <td style={styles.onlineUsersTd}>{formatOnlineTimestamp(user.last_seen)}</td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Top 5 by visits */}
                     <div style={styles.topTableCard}>
                       <h3 style={styles.topTableTitle}>🔥 Top 5 Quán được ghé nhiều nhất</h3>
@@ -364,7 +469,7 @@ function AdminDashboard({ role = 'admin' }) {
                               <tr key={r.id} style={styles.topTableTr}>
                                 <td style={styles.topTableTd}>{idx + 1}</td>
                                 <td style={styles.topTableTd}>{r.name}</td>
-                                <td style={styles.topTableTd}><strong>{r.avg_visit_duration ? r.avg_visit_duration.toFixed(1) : '0.0'}</strong></td>
+                                <td style={styles.topTableTd}><strong>{Number(r.avg_visit_duration || 0).toFixed(1)}</strong></td>
                               </tr>
                             ))
                           )}
@@ -393,7 +498,7 @@ function AdminDashboard({ role = 'admin' }) {
                               <tr key={r.id} style={styles.topTableTr}>
                                 <td style={styles.topTableTd}>{idx + 1}</td>
                                 <td style={styles.topTableTd}>{r.name}</td>
-                                <td style={styles.topTableTd}><strong>{r.avg_audio_duration ? r.avg_audio_duration.toFixed(1) : '0.0'}</strong></td>
+                                <td style={styles.topTableTd}><strong>{Number(r.avg_audio_duration || 0).toFixed(1)}</strong></td>
                               </tr>
                             ))
                           )}
@@ -402,7 +507,6 @@ function AdminDashboard({ role = 'admin' }) {
                     </div>
                   </div>
 
-                  {/* Right side - Map */}
                   <div style={styles.mapContainer}>
                     <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
                     {restaurants.length === 0 && (
@@ -584,15 +688,91 @@ const styles = {
   },
   dashboardLayout: {
     display: 'flex',
-    gap: '24px',
-    height: 'calc(100vh - 200px)'
+    flexDirection: 'column',
+    gap: '20px',
+    minHeight: 'calc(100vh - 220px)'
   },
   topTablesContainer: {
-    width: '400px',
-    display: 'flex',
-    flexDirection: 'column',
+    width: '100%',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
     gap: '16px',
-    overflowY: 'auto'
+    alignItems: 'stretch'
+  },
+  onlineCard: {
+    gridColumn: '1 / -1',
+    background: 'linear-gradient(165deg, rgba(8, 43, 65, 0.94) 0%, rgba(12, 66, 95, 0.9) 100%)',
+    borderRadius: '16px',
+    padding: '18px 20px',
+    border: '1px solid rgba(122, 202, 236, 0.42)',
+    boxShadow: '0 16px 30px rgba(4, 24, 44, 0.28)'
+  },
+  onlineTitle: {
+    margin: '0',
+    fontSize: '15px',
+    fontWeight: '700',
+    color: '#ebfbff'
+  },
+  onlineStatsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '12px',
+    marginTop: '10px'
+  },
+  onlineStatItem: {
+    borderRadius: '12px',
+    padding: '12px',
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(171, 226, 251, 0.36)'
+  },
+  onlineStatValue: {
+    fontSize: '32px',
+    lineHeight: 1,
+    fontWeight: '800',
+    color: '#ecfdff'
+  },
+  onlineStatLabel: {
+    marginTop: '6px',
+    fontSize: '12px',
+    letterSpacing: '0.4px',
+    color: 'rgba(219, 246, 255, 0.86)',
+    textTransform: 'uppercase'
+  },
+  onlineUsersSection: {
+    marginTop: '14px',
+    borderRadius: '12px',
+    border: '1px solid rgba(171, 226, 251, 0.35)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    padding: '12px'
+  },
+  onlineUsersHeader: {
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#dbf6ff',
+    marginBottom: '10px'
+  },
+  onlineUsersEmpty: {
+    fontSize: '12px',
+    color: 'rgba(219, 246, 255, 0.8)',
+    textAlign: 'center',
+    padding: '8px 0'
+  },
+  onlineUsersTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '12px'
+  },
+  onlineUsersTh: {
+    textAlign: 'left',
+    color: 'rgba(219, 246, 255, 0.9)',
+    padding: '6px 4px',
+    borderBottom: '1px solid rgba(171, 226, 251, 0.28)',
+    fontWeight: '700'
+  },
+  onlineUsersTd: {
+    color: '#f3fcff',
+    padding: '7px 4px',
+    borderBottom: '1px solid rgba(171, 226, 251, 0.2)'
   },
   topTableCard: {
     background: 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(246, 250, 255, 0.92) 100%)',
@@ -644,9 +824,10 @@ const styles = {
     fontSize: '13px'
   },
   mapContainer: {
-    flex: 1,
+    width: '100%',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    minHeight: '560px'
   },
   mapTitle: {
     fontSize: '18px',

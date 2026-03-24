@@ -7,8 +7,11 @@ import TagManagement from './pages/TagManagement'
 import LoginPortal from './pages/LoginPortal'
 import OwnerDashboard from './pages/OwnerDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
+import useHeartbeat from './hooks/useHeartbeat'
 
 function App() {
+  useHeartbeat()
+
   return (
     <Routes>
       <Route path="/" element={<LocationTracker />} />

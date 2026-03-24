@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
+import { setAuthUserIdFromPayload } from '../utils/authUser'
 
 function OwnerLogin() {
   const navigate = useNavigate()
@@ -25,6 +26,7 @@ function OwnerLogin() {
         throw new Error(data.error || 'Đăng nhập thất bại')
       }
 
+      setAuthUserIdFromPayload(data)
       localStorage.setItem('activeRole', 'owner')
       navigate('/owner', { replace: true })
     } catch (error) {

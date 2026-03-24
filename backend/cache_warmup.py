@@ -37,32 +37,36 @@ def resolve_target_languages(raw_langs=None):
 
 def _collect_restaurant_translatable_texts(restaurant):
     payload = restaurant.to_dict(include_details=True)
-    texts = []
-    seen = set()
+    entries = []
 
-    def add_text(value):
+    def add_entry(value, logical_suffix):
         if not isinstance(value, str):
             return
         text = value.strip()
-        if not text or text in seen:
+        if not text:
             return
-        seen.add(text)
-        texts.append(text)
+        entries.append({
+            "text": text,
+            "logical_key": f"restaurant:{restaurant.id}:{logical_suffix}",
+        })
 
-    add_text(payload.get("name"))
-    add_text(payload.get("description"))
+    add_entry(payload.get("name"), "name")
+    add_entry(payload.get("description"), "description")
 
-    for tag in payload.get("tags", []) or []:
-        add_text(tag.get("name"))
-        add_text(tag.get("description"))
+    for idx, tag in enumerate(payload.get("tags", []) or []):
+        tag_key = f"tag:{tag.get('id') if tag.get('id') is not None else idx}"
+        add_entry(tag.get("name"), f"{tag_key}:name")
+        add_entry(tag.get("description"), f"{tag_key}:description")
 
-    for item in payload.get("menu", []) or []:
-        add_text(item.get("name"))
+    for idx, item in enumerate(payload.get("menu", []) or []):
+        item_key = f"menu:{item.get('id') if item.get('id') is not None else idx}"
+        add_entry(item.get("name"), f"{item_key}:name")
 
-    for image in payload.get("images", []) or []:
-        add_text(image.get("caption"))
+    for idx, image in enumerate(payload.get("images", []) or []):
+        image_key = f"image:{image.get('id') if image.get('id') is not None else idx}"
+        add_entry(image.get("caption"), f"{image_key}:caption")
 
-    return texts
+    return entries
 
 
 def _build_restaurant_narration_text(restaurant):
@@ -70,6 +74,10 @@ def _build_restaurant_narration_text(restaurant):
     user_lng = restaurant.lng
     distance_km = calculate_distance(user_lat, user_lng, restaurant.lat, restaurant.lng)
     return generate_narration(restaurant, distance_km)
+
+
+def _build_out_of_range_message(restaurant):
+    return f'🚶 Bạn hãy tới gần quán "{restaurant.name}" để nghe thuyết minh'
 
 
 def prewarm_restaurant_content(restaurant_id, target_langs=None, clear_existing=False):
@@ -99,16 +107,37 @@ def prewarm_restaurant_content(restaurant_id, target_langs=None, clear_existing=
             "reason": "no-target-languages"
         }
 
-    texts = _collect_restaurant_translatable_texts(restaurant)
+    text_entries = _collect_restaurant_translatable_texts(restaurant)
     narration_vi = _build_restaurant_narration_text(restaurant)
-    if narration_vi:
-        texts.append(narration_vi)
+    out_of_range_message_vi = _build_out_of_range_message(restaurant)
 
     for lang in langs:
-        if texts:
-            translate_texts(texts, lang, cache_scope_id=restaurant.id)
+        if text_entries:
+            translate_texts(
+                [entry["text"] for entry in text_entries],
+                lang,
+                cache_scope_id=restaurant.id,
+                cache_note="restaurant_content",
+                cache_logical_keys=[entry["logical_key"] for entry in text_entries],
+                force_refresh=bool(clear_existing),
+            )
 
-        translated_narration = translate_text(narration_vi, lang, cache_scope_id=restaurant.id)
+        translated_narration = translate_text(
+            narration_vi,
+            lang,
+            cache_scope_id=restaurant.id,
+            cache_note="restaurant_narration",
+            cache_logical_key=f"restaurant:{restaurant.id}:narration",
+            force_refresh=bool(clear_existing),
+        )
+        translate_text(
+            out_of_range_message_vi,
+            lang,
+            cache_scope_id=restaurant.id,
+            cache_note="restaurant_proximity_hint",
+            cache_logical_key=f"restaurant:{restaurant.id}:proximity_hint",
+            force_refresh=bool(clear_existing),
+        )
         audio_url = text_to_speech(translated_narration, lang, restaurant_id=restaurant.id)
 
         # Keep a best-effort fallback voice to avoid missing audio button in popup.
