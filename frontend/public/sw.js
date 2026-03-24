@@ -29,6 +29,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never cache API responses; auth/session endpoints must always hit network.
+  if (reqUrl.pathname.startsWith('/api/')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
