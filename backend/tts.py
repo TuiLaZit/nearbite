@@ -23,8 +23,7 @@ TTS_CACHE_TTL_SECONDS = int((os.getenv("TTS_CACHE_TTL_SECONDS") or "3600").strip
 TTS_CACHE_TTL_SECONDS = max(60, min(86400, TTS_CACHE_TTL_SECONDS))
 TTS_CACHE_NAMESPACE = (
     (os.getenv("CACHE_NAMESPACE") or "").strip()
-    or (os.getenv("RENDER_GIT_COMMIT") or "").strip()
-    or "default"
+    or "stable-v1"
 )
 _IN_MEMORY_TTS_CACHE = {}
 _GTTS_LANGUAGE_MAP = tts_langs()
@@ -292,7 +291,6 @@ def _persistent_tts_get(cache_key):
             .table(TTS_TABLE)
             .select("id,public_url,storage_path,expires_at")
             .eq("cache_key", cache_key)
-            .gt("expires_at", _utc_now_iso())
             .limit(1)
             .execute()
         )
@@ -392,44 +390,9 @@ def invalidate_tts_cache(restaurant_id=None):
 
 
 def cleanup_expired_tts_cache(limit=200, max_batches=10):
-    if not supabase_client:
-        return 0
-
-    total_deleted = 0
-    batch_limit = max(1, int(limit))
-    batch_count = max(1, int(max_batches))
-
-    try:
-        for _ in range(batch_count):
-            rows = (
-                supabase_client
-                .table(TTS_TABLE)
-                .select("id,storage_path")
-                .lt("expires_at", _utc_now_iso())
-                .limit(batch_limit)
-                .execute()
-                .data
-                or []
-            )
-            if not rows:
-                break
-
-            paths = list({row.get("storage_path") for row in rows if row.get("storage_path")})
-            if paths:
-                ensure_bucket_exists(TTS_BUCKET)
-                supabase_client.storage.from_(TTS_BUCKET).remove(paths)
-
-            row_ids = [row.get("id") for row in rows if row.get("id") is not None]
-            if row_ids:
-                supabase_client.table(TTS_TABLE).delete().in_("id", row_ids).execute()
-                total_deleted += len(row_ids)
-
-            if len(rows) < batch_limit:
-                break
-    except Exception:
-        return total_deleted
-
-    return total_deleted
+    # Time-based cleanup intentionally disabled.
+    # TTS rows/files are replaced by stable key overwrite and restaurant-level invalidation.
+    return 0
 
 
 def text_to_speech(text, lang, restaurant_id=None, ttl_seconds=None):
