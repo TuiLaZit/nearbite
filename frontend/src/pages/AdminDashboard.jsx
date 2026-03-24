@@ -226,6 +226,8 @@ function AdminDashboard({ role = 'admin' }) {
   const [mapFallbackMode, setMapFallbackMode] = useState(false)
   const [forceFallbackMode, setForceFallbackMode] = useState(false)
   const tileErrorCountRef = useRef(0)
+  const tileLoadCountRef = useRef(0)
+  const [tileDiagnostics, setTileDiagnostics] = useState({ loaded: 0, errors: 0 })
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -392,6 +394,8 @@ function AdminDashboard({ role = 'admin' }) {
     setMapFallbackMode(false)
     setForceFallbackMode(false)
     tileErrorCountRef.current = 0
+    tileLoadCountRef.current = 0
+    setTileDiagnostics({ loaded: 0, errors: 0 })
   }, [activeTab])
 
   useEffect(() => {
@@ -415,31 +419,8 @@ function AdminDashboard({ role = 'admin' }) {
     if (activeTab !== 'dashboard') return undefined
     if (tileLoaded) {
       setMapFallbackMode(false)
-      return undefined
     }
-    if (tileProviderIndex < TILE_SOURCES.length - 1) return undefined
-
-    const timer = window.setTimeout(() => {
-      if (!tileLoaded) {
-        setMapFallbackMode(true)
-      }
-    }, 4500)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [activeTab, tileLoaded, tileProviderIndex])
-
-  useEffect(() => {
-    if (activeTab !== 'dashboard' || tileLoaded) return undefined
-
-    const safetyTimer = window.setTimeout(() => {
-      setMapFallbackMode(true)
-    }, 6500)
-
-    return () => {
-      window.clearTimeout(safetyTimer)
-    }
+    return undefined
   }, [activeTab, tileLoaded])
 
 
@@ -576,7 +557,7 @@ function AdminDashboard({ role = 'admin' }) {
                     <div style={styles.mapHeaderRow}>
                       <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
                       <div style={styles.mapSourceBadge}>
-                        {tileLoaded ? 'Tile OK' : 'Đang tải tile...'} | {TILE_SOURCES[tileProviderIndex].name}
+                        {tileLoaded ? 'Tile OK' : 'Dang tai tile...'} | {TILE_SOURCES[tileProviderIndex].name} | ok {tileDiagnostics.loaded} / err {tileDiagnostics.errors}
                       </div>
                     </div>
                     {restaurants.length === 0 && (
@@ -584,7 +565,7 @@ function AdminDashboard({ role = 'admin' }) {
                         ℹ️ Chưa có quán ăn nào trong hệ thống.
                       </div>
                     )}
-                    {(mapFallbackMode || forceFallbackMode) && (
+                    {forceFallbackMode && (
                       <div style={styles.mapFallbackNotice}>
                         Tile map tren desktop dang bi chan/loi mang. Da chuyen sang map du phong de van theo doi vi tri.
                       </div>
@@ -599,7 +580,7 @@ function AdminDashboard({ role = 'admin' }) {
                       </button>
                     </div>
                     <div style={styles.heatmapContainer}>
-                      {(mapFallbackMode || forceFallbackMode) ? (
+                      {forceFallbackMode ? (
                         <OfflineHeatmapFallback
                           restaurants={restaurantsWithCoords}
                           heatmapData={heatmapData}
@@ -618,15 +599,23 @@ function AdminDashboard({ role = 'admin' }) {
                             url={TILE_SOURCES[tileProviderIndex].url}
                             eventHandlers={{
                               tileload: () => {
+                                tileLoadCountRef.current += 1
+                                setTileDiagnostics({
+                                  loaded: tileLoadCountRef.current,
+                                  errors: tileErrorCountRef.current
+                                })
                                 setTileLoaded(true)
                                 setMapFallbackMode(false)
                               },
                               tileerror: () => {
                                 tileErrorCountRef.current += 1
-                                if (tileErrorCountRef.current >= 2) {
-                                  setMapFallbackMode(true)
-                                }
-                                if (tileErrorCountRef.current >= 8) {
+                                setTileDiagnostics({
+                                  loaded: tileLoadCountRef.current,
+                                  errors: tileErrorCountRef.current
+                                })
+
+                                // Only rotate provider after multiple failures and no successful tile yet.
+                                if (tileLoadCountRef.current === 0 && tileErrorCountRef.current >= 8) {
                                   setTileLoaded(false)
                                   setTileProviderIndex((prev) => {
                                     if (prev >= TILE_SOURCES.length - 1) return prev
