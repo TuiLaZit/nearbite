@@ -967,32 +967,51 @@ def register_admin_routes(app):
         if admin_only_error:
             return admin_only_error
 
-        """Get heatmap data for admin dashboard with duration-based intensity"""
+        """Get aggregated heartbeat heatmap cells (higher hit_count => stronger intensity)."""
         try:
-            # Get all location visits
-            visits = LocationVisit.query.all()
-            
-            # Aggregate data by location (rounded to 4 decimal places for clustering)
-            # Use duration to calculate intensity
-            heatmap_data = {}
-            for visit in visits:
-                # Round to create clusters
-                lat_key = round(visit.lat, 4)
-                lng_key = round(visit.lng, 4)
-                key = (lat_key, lng_key)
-                
-                if key not in heatmap_data:
-                    heatmap_data[key] = {
-                        "lat": lat_key,
-                        "lng": lng_key,
-                        "intensity": 0
-                    }
-                # Add duration to intensity (normalized by dividing by 60 to get minutes)
-                # Cap at 60 minutes max per visit for reasonable scaling
-                duration_weight = min(visit.duration_seconds / 60.0, 60.0)
-                heatmap_data[key]["intensity"] += duration_weight
-            
-            return jsonify(list(heatmap_data.values()))
+            limit_raw = request.args.get("limit", "2000")
+            min_hits_raw = request.args.get("min_hits", "1")
+            try:
+                limit = int(limit_raw)
+            except Exception:
+                limit = 2000
+            try:
+                min_hits = int(min_hits_raw)
+            except Exception:
+                min_hits = 1
+
+            limit = max(100, min(5000, limit))
+            min_hits = max(1, min(1000, min_hits))
+
+            rows = db.session.execute(
+                text(
+                    """
+                    SELECT
+                        lat_bucket AS lat,
+                        lng_bucket AS lng,
+                        hit_count::double precision AS intensity,
+                        last_seen
+                    FROM user_activity_heatmap_cell
+                    WHERE hit_count >= :min_hits
+                    ORDER BY hit_count DESC, last_seen DESC
+                    LIMIT :limit
+                    """
+                ),
+                {
+                    "limit": limit,
+                    "min_hits": min_hits,
+                }
+            ).mappings().all()
+
+            return jsonify([
+                {
+                    "lat": float(row.get("lat")),
+                    "lng": float(row.get("lng")),
+                    "intensity": float(row.get("intensity") or 0.0),
+                }
+                for row in rows
+                if row.get("lat") is not None and row.get("lng") is not None
+            ])
         except Exception as e:
             print(f"Error in get_heatmap_data: {str(e)}")
             # Return empty array if table doesn't exist yet

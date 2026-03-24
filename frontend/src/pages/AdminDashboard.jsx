@@ -45,17 +45,24 @@ function HeatmapLayer({ heatmapData }) {
 
     // Add new heatmap layer if data exists
     if (heatmapData && heatmapData.length > 0) {
-      const heatPoints = heatmapData.map(point => [
-        point.lat,
-        point.lng,
-        point.intensity
-      ])
+      const heatPoints = heatmapData
+        .map(point => ({
+          lat: Number(point.lat),
+          lng: Number(point.lng),
+          intensity: Number(point.intensity) || 0
+        }))
+        .filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+        .map(point => [point.lat, point.lng, point.intensity])
+
+      if (heatPoints.length === 0) {
+        return undefined
+      }
 
       const heat = window.L.heatLayer(heatPoints, {
         radius: 25,
         blur: 15,
         maxZoom: 17,
-        max: Math.max(...heatmapData.map(p => p.intensity)),
+        max: Math.max(...heatPoints.map(p => p[2])),
         gradient: {
           0.0: 'blue',
           0.5: 'lime',
@@ -77,6 +84,27 @@ function HeatmapLayer({ heatmapData }) {
   return null
 }
 
+function MapAutoResize() {
+  const map = useMap()
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      map.invalidateSize()
+    }, 120)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [map])
+
+  return null
+}
+
+const parseCoordinate = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function AdminDashboard({ role = 'admin' }) {
   const isOwner = role === 'owner'
   const authBase = isOwner ? '/owner' : '/admin'
@@ -93,20 +121,16 @@ function AdminDashboard({ role = 'admin' }) {
   const [onlineStats, setOnlineStats] = useState({
     window_seconds: 30,
     online_devices: 0,
-    online_users: 0,
-    online_user_list: []
+    online_users: 0
   })
 
-  const formatOnlineTimestamp = (isoValue) => {
-    if (!isoValue) return '--'
-    const parsed = new Date(isoValue)
-    if (Number.isNaN(parsed.getTime())) return '--'
-    return parsed.toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  }
+  const restaurantsWithCoords = restaurants
+    .map(restaurant => ({
+      ...restaurant,
+      lat: parseCoordinate(restaurant.lat),
+      lng: parseCoordinate(restaurant.lng)
+    }))
+    .filter(restaurant => restaurant.lat !== null && restaurant.lng !== null)
 
   useEffect(() => {
     let isMounted = true
@@ -156,8 +180,7 @@ function AdminDashboard({ role = 'admin' }) {
         setOnlineStats({
           window_seconds: data.window_seconds || 30,
           online_devices: data.online_devices || 0,
-          online_users: data.online_users || 0,
-          online_user_list: Array.isArray(data.online_user_list) ? data.online_user_list : []
+          online_users: data.online_users || 0
         })
       })
       .catch(err => {
@@ -226,6 +249,24 @@ function AdminDashboard({ role = 'admin' }) {
       .catch(err => console.error('Error loading top audio:', err))
   }
 
+  const loadHeatmapOnly = () => {
+    fetch(`${BASE_URL}/admin/heatmap`, {
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to load heatmap')
+        }
+        return res.json()
+      })
+      .then(data => {
+        setHeatmapData(data || [])
+      })
+      .catch(err => {
+        console.error('Error loading heatmap:', err)
+      })
+  }
+
   useEffect(() => {
     if (isOwner || activeTab !== 'dashboard') {
       return undefined
@@ -233,6 +274,7 @@ function AdminDashboard({ role = 'admin' }) {
 
     const intervalId = window.setInterval(() => {
       loadOnlineStats()
+      loadHeatmapOnly()
     }, 10_000)
 
     return () => {
@@ -383,40 +425,6 @@ function AdminDashboard({ role = 'admin' }) {
                           <div style={styles.onlineStatLabel}>online_users</div>
                         </div>
                       </div>
-
-                      <div style={styles.onlineUsersSection}>
-                        <div style={styles.onlineUsersHeader}>Top user online gần nhất</div>
-
-                        {onlineStats.online_user_list.length === 0 ? (
-                          <div style={styles.onlineUsersEmpty}>Chưa có user_id online trong cửa sổ hiện tại</div>
-                        ) : (
-                          <table style={styles.onlineUsersTable}>
-                            <thead>
-                              <tr>
-                                <th style={styles.onlineUsersTh}>#</th>
-                                <th style={styles.onlineUsersTh}>User</th>
-                                <th style={styles.onlineUsersTh}>Devices</th>
-                                <th style={styles.onlineUsersTh}>Last seen</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {onlineStats.online_user_list.slice(0, 5).map((user, idx) => {
-                                const userId = user.user_id || ''
-                                const compactUserId = userId.length > 12 ? `${userId.slice(0, 8)}...${userId.slice(-4)}` : userId
-
-                                return (
-                                  <tr key={userId || `${idx}-${user.last_seen || ''}`}>
-                                    <td style={styles.onlineUsersTd}>{idx + 1}</td>
-                                    <td style={styles.onlineUsersTd}>{compactUserId || '--'}</td>
-                                    <td style={styles.onlineUsersTd}>{Number(user.device_count || 0)}</td>
-                                    <td style={styles.onlineUsersTd}>{formatOnlineTimestamp(user.last_seen)}</td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
                     </div>
 
                     {/* Top 5 by visits */}
@@ -521,6 +529,7 @@ function AdminDashboard({ role = 'admin' }) {
                         style={{ height: '100%', width: '100%' }}
                         zoomControl={true}
                       >
+                        <MapAutoResize />
                         <TileLayer
                           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
                           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -530,7 +539,7 @@ function AdminDashboard({ role = 'admin' }) {
                         <HeatmapLayer heatmapData={heatmapData} />
 
                         {/* Marker các quán */}
-                        {restaurants.map(restaurant => (
+                        {restaurantsWithCoords.map(restaurant => (
                           <Marker
                             key={restaurant.id}
                             position={[restaurant.lat, restaurant.lng]}
@@ -738,42 +747,6 @@ const styles = {
     color: 'rgba(219, 246, 255, 0.86)',
     textTransform: 'uppercase'
   },
-  onlineUsersSection: {
-    marginTop: '14px',
-    borderRadius: '12px',
-    border: '1px solid rgba(171, 226, 251, 0.35)',
-    background: 'rgba(255, 255, 255, 0.05)',
-    padding: '12px'
-  },
-  onlineUsersHeader: {
-    fontSize: '13px',
-    fontWeight: '700',
-    color: '#dbf6ff',
-    marginBottom: '10px'
-  },
-  onlineUsersEmpty: {
-    fontSize: '12px',
-    color: 'rgba(219, 246, 255, 0.8)',
-    textAlign: 'center',
-    padding: '8px 0'
-  },
-  onlineUsersTable: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '12px'
-  },
-  onlineUsersTh: {
-    textAlign: 'left',
-    color: 'rgba(219, 246, 255, 0.9)',
-    padding: '6px 4px',
-    borderBottom: '1px solid rgba(171, 226, 251, 0.28)',
-    fontWeight: '700'
-  },
-  onlineUsersTd: {
-    color: '#f3fcff',
-    padding: '7px 4px',
-    borderBottom: '1px solid rgba(171, 226, 251, 0.2)'
-  },
   topTableCard: {
     background: 'linear-gradient(165deg, rgba(255,255,255,0.95) 0%, rgba(246, 250, 255, 0.92) 100%)',
     borderRadius: '16px',
@@ -846,6 +819,8 @@ const styles = {
     fontSize: '13px'
   },
   heatmapContainer: {
+    minHeight: '520px',
+    height: '520px',
     flex: 1,
     borderRadius: '16px',
     overflow: 'hidden',

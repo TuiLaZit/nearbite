@@ -3,6 +3,7 @@ import { BASE_URL } from '../config'
 
 const DEVICE_KEY = 'heartbeatDeviceId'
 const USER_KEY = 'authUserId'
+const LOCATION_KEY = 'heartbeatLastLocation'
 const HEARTBEAT_INTERVAL_MS = 30_000
 
 function generateDeviceId() {
@@ -36,12 +37,36 @@ function getCurrentUserId() {
   }
 }
 
+function getCurrentLocation() {
+  try {
+    const raw = localStorage.getItem(LOCATION_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+    const lat = Number(parsed?.lat)
+    const lng = Number(parsed?.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null
+    }
+
+    return { lat, lng }
+  } catch {
+    return null
+  }
+}
+
 async function sendHeartbeat(deviceId) {
   const payload = { device_id: deviceId }
   const userId = getCurrentUserId()
+  const location = getCurrentLocation()
 
   if (userId) {
     payload.user_id = userId
+  }
+
+  if (location) {
+    payload.latitude = location.lat
+    payload.longitude = location.lng
   }
 
   try {
