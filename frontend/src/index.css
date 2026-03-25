@@ -148,3 +148,25 @@ h1, h2, h3 {
 .leaflet-container canvas {
   max-width: none !important;
 }
+
+.leaflet-container .leaflet-pane,
+.leaflet-container .leaflet-tile-pane,
+.leaflet-container .leaflet-overlay-pane,
+.leaflet-container .leaflet-shadow-pane,
+.leaflet-container .leaflet-marker-pane,
+.leaflet-container .leaflet-tooltip-pane,
+.leaflet-container .leaflet-popup-pane {
+  visibility: visible !important;
+}
+
+.leaflet-container .leaflet-tile-pane {
+  z-index: 200 !important;
+}
+
+.leaflet-container .leaflet-overlay-pane {
+  z-index: 400 !important;
+}
+
+.leaflet-container .leaflet-control-container {
+  z-index: 800 !important;
+}

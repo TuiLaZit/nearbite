@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
 import RestaurantManagement from './RestaurantManagement'
 import TagManagement from './TagManagement'
@@ -115,89 +114,51 @@ const TILE_SOURCES = [
 
 function OfflineHeatmapFallback({ restaurants, heatmapData }) {
   const restaurantPoints = (Array.isArray(restaurants) ? restaurants : [])
-    .map((restaurant) => ({
-      id: `restaurant-${restaurant.id}`,
-      label: restaurant.name || `Restaurant ${restaurant.id}`,
-      lat: Number(restaurant.lat),
-      lng: Number(restaurant.lng),
-      type: 'restaurant'
-    }))
+    .map((restaurant) => ({ lat: Number(restaurant.lat), lng: Number(restaurant.lng) }))
     .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
 
   const heatPoints = (Array.isArray(heatmapData) ? heatmapData : [])
-    .map((point, idx) => ({
-      id: `heat-${idx}`,
-      lat: Number(point?.lat),
-      lng: Number(point?.lng),
-      intensity: Number(point?.intensity) || 0,
-      type: 'heat'
-    }))
+    .map((point) => ({ lat: Number(point?.lat), lng: Number(point?.lng) }))
     .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
 
-  const allPoints = [...restaurantPoints, ...heatPoints]
+  const mapPoints = [...restaurantPoints, ...heatPoints]
 
-  if (allPoints.length === 0) {
-    return (
-      <div style={styles.fallbackMapEmpty}>
-        Chua co du lieu vi tri de hien thi tren map du phong.
-      </div>
-    )
-  }
-
-  const lats = allPoints.map((point) => point.lat)
-  const lngs = allPoints.map((point) => point.lng)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs)
-  const maxLng = Math.max(...lngs)
-  const latPadding = Math.max((maxLat - minLat) * 0.18, 0.0008)
-  const lngPadding = Math.max((maxLng - minLng) * 0.18, 0.0008)
-
-  const projectPoint = (lat, lng) => {
-    const normalizedX = (lng - (minLng - lngPadding)) / ((maxLng - minLng) + (2 * lngPadding) || 1)
-    const normalizedY = (lat - (minLat - latPadding)) / ((maxLat - minLat) + (2 * latPadding) || 1)
-    return {
-      left: `${Math.max(2, Math.min(98, normalizedX * 100)).toFixed(2)}%`,
-      top: `${Math.max(2, Math.min(98, (1 - normalizedY) * 100)).toFixed(2)}%`
+  const buildOsmEmbedUrl = (points) => {
+    const valid = Array.isArray(points) ? points : []
+    if (valid.length === 0) {
+      return 'https://www.openstreetmap.org/export/embed.html?bbox=106.67,10.75,106.70,10.77&layer=mapnik'
     }
+
+    const lats = valid.map((p) => p.lat)
+    const lngs = valid.map((p) => p.lng)
+    const minLat = Math.min(...lats)
+    const maxLat = Math.max(...lats)
+    const minLng = Math.min(...lngs)
+    const maxLng = Math.max(...lngs)
+    const padding = 0.008
+
+    const left = (minLng - padding).toFixed(6)
+    const bottom = (minLat - padding).toFixed(6)
+    const right = (maxLng + padding).toFixed(6)
+    const top = (maxLat + padding).toFixed(6)
+
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik`
   }
 
-  const maxIntensity = Math.max(...heatPoints.map((point) => point.intensity || 0), 1)
+  const embedUrl = buildOsmEmbedUrl(mapPoints)
 
   return (
     <div style={styles.fallbackMapCanvas}>
-      <div style={styles.fallbackMapGrid} />
-
-      {heatPoints.map((point) => {
-        const pos = projectPoint(point.lat, point.lng)
-        const ratio = Math.max(0.1, Math.min(1, point.intensity / maxIntensity))
-        const size = 18 + (ratio * 44)
-        return (
-          <div
-            key={point.id}
-            style={{
-              ...styles.fallbackHeatDot,
-              ...pos,
-              width: `${size}px`,
-              height: `${size}px`,
-              opacity: 0.2 + (ratio * 0.6),
-            }}
-          />
-        )
-      })}
-
-      {restaurantPoints.map((point) => {
-        const pos = projectPoint(point.lat, point.lng)
-        return (
-          <div key={point.id} style={{ ...styles.fallbackRestaurantPinWrap, ...pos }}>
-            <div style={styles.fallbackRestaurantPin} />
-            <div style={styles.fallbackRestaurantLabel}>{point.label}</div>
-          </div>
-        )
-      })}
+      <iframe
+        title="Admin map fallback"
+        src={embedUrl}
+        style={styles.fallbackMapIframe}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+      />
 
       <div style={styles.fallbackMapLegend}>
-        Map du phong dang bat (khong dung tile ben ngoai)
+        Map du phong dang bat (OpenStreetMap embed)
       </div>
     </div>
   )
@@ -1074,49 +1035,13 @@ const styles = {
     position: 'relative',
     width: '100%',
     height: '100%',
-    background: 'radial-gradient(900px 340px at 10% 0%, rgba(82, 145, 211, 0.25), transparent 62%), linear-gradient(165deg, #eef5fe 0%, #dae8fa 100%)'
+    background: 'linear-gradient(165deg, #edf4fe 0%, #dce8f9 100%)'
   },
-  fallbackMapGrid: {
-    position: 'absolute',
-    inset: 0,
-    backgroundImage: 'linear-gradient(rgba(37, 72, 112, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(37, 72, 112, 0.12) 1px, transparent 1px)',
-    backgroundSize: '48px 48px'
-  },
-  fallbackHeatDot: {
-    position: 'absolute',
-    transform: 'translate(-50%, -50%)',
-    borderRadius: '999px',
-    background: 'radial-gradient(circle, rgba(232, 53, 68, 0.9) 0%, rgba(251, 188, 4, 0.46) 46%, rgba(255, 255, 255, 0) 100%)',
-    pointerEvents: 'none'
-  },
-  fallbackRestaurantPinWrap: {
-    position: 'absolute',
-    transform: 'translate(-50%, -100%)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px'
-  },
-  fallbackRestaurantPin: {
-    width: '12px',
-    height: '12px',
-    borderRadius: '50%',
-    background: '#1f4f87',
-    border: '2px solid #ffffff',
-    boxShadow: '0 0 0 3px rgba(31, 79, 135, 0.25)'
-  },
-  fallbackRestaurantLabel: {
-    maxWidth: '200px',
-    padding: '2px 7px',
-    borderRadius: '999px',
-    background: 'rgba(255, 255, 255, 0.9)',
-    border: '1px solid rgba(146, 173, 204, 0.92)',
-    color: '#163961',
-    fontSize: '11px',
-    fontWeight: '600',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis'
+  fallbackMapIframe: {
+    width: '100%',
+    height: '100%',
+    border: 0,
+    display: 'block'
   },
   fallbackMapLegend: {
     position: 'absolute',
@@ -1129,18 +1054,6 @@ const styles = {
     fontSize: '12px',
     fontWeight: '700',
     padding: '6px 10px'
-  },
-  fallbackMapEmpty: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlign: 'center',
-    color: '#415f84',
-    fontWeight: '600',
-    fontSize: '13px',
-    background: 'linear-gradient(165deg, #edf4fe 0%, #dce8f9 100%)'
   }
 }
 
