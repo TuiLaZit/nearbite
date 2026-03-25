@@ -199,7 +199,9 @@ def register_user_routes(app):
             try:
                 user_id = str(uuid.UUID(str(raw_user_id).strip()))
             except (ValueError, TypeError):
-                return jsonify({"status": "error", "message": "user_id must be a valid UUID"}), 400
+                # Keep heartbeat resilient: ignore malformed client user_id and fallback to session identity.
+                user_id_provided = False
+                user_id = None
 
         # Nếu client không gửi user_id, suy ra từ session để vẫn đếm được online_users.
         if not user_id_provided:

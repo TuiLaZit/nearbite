@@ -5,6 +5,7 @@ const DEVICE_KEY = 'heartbeatDeviceId'
 const USER_KEY = 'authUserId'
 const LOCATION_KEY = 'heartbeatLastLocation'
 const HEARTBEAT_INTERVAL_MS = 30_000
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function generateDeviceId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -28,10 +29,12 @@ function getOrCreateDeviceId() {
 }
 
 function getCurrentUserId() {
-  // Optional: frontend can store Supabase/Auth user id at this key after login.
+  // Send user_id only when it is a valid UUID; otherwise backend will derive from session.
   try {
     const value = localStorage.getItem(USER_KEY)
-    return value && value.trim() ? value.trim() : null
+    const normalized = value && value.trim() ? value.trim() : ''
+    if (!normalized) return null
+    return UUID_PATTERN.test(normalized) ? normalized : null
   } catch {
     return null
   }
