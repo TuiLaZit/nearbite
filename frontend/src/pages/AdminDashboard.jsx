@@ -139,6 +139,8 @@ const TILE_SOURCES = [
   }
 ]
 
+const DASHBOARD_POLL_INTERVAL_MS = 4000
+
 function AdminDashboard({ role = 'admin' }) {
   const isOwner = role === 'owner'
   const authBase = isOwner ? '/owner' : '/admin'
@@ -309,10 +311,14 @@ function AdminDashboard({ role = 'admin' }) {
       return undefined
     }
 
+    // Refresh immediately on tab entry, then keep polling.
+    loadOnlineStats()
+    loadHeatmapOnly()
+
     const intervalId = window.setInterval(() => {
       loadOnlineStats()
       loadHeatmapOnly()
-    }, 10_000)
+    }, DASHBOARD_POLL_INTERVAL_MS)
 
     return () => {
       window.clearInterval(intervalId)
