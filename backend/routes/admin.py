@@ -493,7 +493,7 @@ def register_admin_routes(app):
                     """
                     SELECT
                         COUNT(*)::int AS online_devices,
-                        COUNT(DISTINCT user_id)::int AS online_users
+                        COUNT(DISTINCT COALESCE(user_id::text, user_identity))::int AS online_users
                     FROM user_activity
                     WHERE last_seen > NOW() - INTERVAL '30 seconds'
                     """
@@ -504,13 +504,13 @@ def register_admin_routes(app):
                 text(
                     """
                     SELECT
-                        user_id,
+                        COALESCE(user_id::text, user_identity) AS online_identity,
                         MAX(last_seen) AS last_seen,
                         COUNT(*)::int AS device_count
                     FROM user_activity
-                    WHERE user_id IS NOT NULL
+                    WHERE COALESCE(user_id::text, user_identity) IS NOT NULL
                       AND last_seen > NOW() - INTERVAL '30 seconds'
-                    GROUP BY user_id
+                    GROUP BY COALESCE(user_id::text, user_identity)
                     ORDER BY MAX(last_seen) DESC
                     """
                 )
@@ -518,7 +518,7 @@ def register_admin_routes(app):
 
             online_user_list = [
                 {
-                    "user_id": str(row.get("user_id")) if row.get("user_id") else None,
+                    "user_id": row.get("online_identity"),
                     "last_seen": row.get("last_seen").isoformat() if row.get("last_seen") else None,
                     "device_count": int(row.get("device_count") or 0),
                 }
