@@ -499,6 +499,15 @@ def _ensure_user_activity_heatmap_schema():
         ADD COLUMN IF NOT EXISTS last_lng DOUBLE PRECISION NULL
         """,
         """
+        ALTER TABLE IF EXISTS user_activity
+        ADD COLUMN IF NOT EXISTS user_identity TEXT NULL
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_activity_identity_last_seen
+            ON user_activity(user_identity, last_seen DESC)
+            WHERE user_identity IS NOT NULL
+        """,
+        """
         CREATE TABLE IF NOT EXISTS user_activity_heatmap_cell (
             lat_bucket DOUBLE PRECISION NOT NULL,
             lng_bucket DOUBLE PRECISION NOT NULL,
