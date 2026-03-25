@@ -4,7 +4,7 @@ import { BASE_URL } from '../config'
 const DEVICE_KEY = 'heartbeatDeviceId'
 const USER_KEY = 'authUserId'
 const LOCATION_KEY = 'heartbeatLastLocation'
-const HEARTBEAT_INTERVAL_MS = 30_000
+const HEARTBEAT_INTERVAL_MS = 10_000
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function generateDeviceId() {
