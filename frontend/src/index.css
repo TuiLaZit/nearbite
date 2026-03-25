@@ -134,6 +134,13 @@ h1, h2, h3 {
 /* Desktop-safe Leaflet overrides: avoid white tiles caused by blend-mode on some GPU stacks */
 .leaflet-container {
   background: #e8eef5 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.leaflet-container::before,
+.leaflet-container::after {
+  display: none !important;
 }
 
 .leaflet-container img.leaflet-tile {

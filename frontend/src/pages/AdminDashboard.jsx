@@ -73,14 +73,40 @@ function HeatCircleLayer({ heatmapData }) {
 
 function MapAutoResize() {
   const map = useMap()
+  const rafRef = useRef(null)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      map.invalidateSize()
-    }, 120)
+    const invalidate = () => {
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current)
+      }
+
+      rafRef.current = window.requestAnimationFrame(() => {
+        map.invalidateSize({ pan: false, animate: false })
+      })
+    }
+
+    const timer = window.setTimeout(invalidate, 120)
+    const intervalId = window.setInterval(invalidate, 1500)
+    const observer = new ResizeObserver(() => {
+      invalidate()
+    })
+
+    const container = map.getContainer()
+    if (container) {
+      observer.observe(container)
+      if (container.parentElement) {
+        observer.observe(container.parentElement)
+      }
+    }
 
     return () => {
       window.clearTimeout(timer)
+      window.clearInterval(intervalId)
+      observer.disconnect()
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current)
+      }
     }
   }, [map])
 
@@ -93,6 +119,7 @@ const parseCoordinate = (value) => {
 }
 
 const buildTileProxyUrl = (provider) => `${BASE_URL}/map-tiles/${provider}/{z}/{x}/{y}.png`
+const MAP_HEIGHT_PX = 520
 
 const TILE_SOURCES = [
   {
@@ -152,7 +179,7 @@ function OfflineHeatmapFallback({ restaurants, heatmapData }) {
       <iframe
         title="Admin map fallback"
         src={embedUrl}
-        style={styles.fallbackMapIframe}
+        style={{ ...styles.fallbackMapIframe, height: `${MAP_HEIGHT_PX}px` }}
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
       />
@@ -541,82 +568,84 @@ function AdminDashboard({ role = 'admin' }) {
                       </button>
                     </div>
                     <div style={styles.heatmapContainer}>
-                      {forceFallbackMode ? (
-                        <OfflineHeatmapFallback
-                          restaurants={restaurantsWithCoords}
-                          heatmapData={heatmapData}
-                        />
-                      ) : (
-                        <MapContainer
-                          center={[10.760426862777551, 106.68198430250096]}
-                          zoom={15}
-                          style={{ height: '100%', width: '100%' }}
-                          zoomControl={true}
-                          key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
-                        >
-                          <MapAutoResize />
-                          <TileLayer
-                            attribution={TILE_SOURCES[tileProviderIndex].attribution}
-                            url={TILE_SOURCES[tileProviderIndex].url}
-                            eventHandlers={{
-                              tileload: () => {
-                                tileLoadCountRef.current += 1
-                                setTileDiagnostics({
-                                  loaded: tileLoadCountRef.current,
-                                  errors: tileErrorCountRef.current
-                                })
-                                setTileLoaded(true)
-                                setMapFallbackMode(false)
-                              },
-                              tileerror: () => {
-                                tileErrorCountRef.current += 1
-                                setTileDiagnostics({
-                                  loaded: tileLoadCountRef.current,
-                                  errors: tileErrorCountRef.current
-                                })
-
-                                // Only rotate provider after multiple failures and no successful tile yet.
-                                if (tileLoadCountRef.current === 0 && tileErrorCountRef.current >= 8) {
-                                  setTileLoaded(false)
-                                  setTileProviderIndex((prev) => {
-                                    if (prev >= TILE_SOURCES.length - 1) return prev
-                                    return prev + 1
-                                  })
-                                  tileErrorCountRef.current = 0
-                                }
-                              }
-                            }}
+                      <div style={styles.mapSurfaceLayer}>
+                        {forceFallbackMode ? (
+                          <OfflineHeatmapFallback
+                            restaurants={restaurantsWithCoords}
+                            heatmapData={heatmapData}
                           />
+                        ) : (
+                          <MapContainer
+                            center={[10.760426862777551, 106.68198430250096]}
+                            zoom={15}
+                            style={{ height: `${MAP_HEIGHT_PX}px`, width: '100%' }}
+                            zoomControl={true}
+                            key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
+                          >
+                            <MapAutoResize />
+                            <TileLayer
+                              attribution={TILE_SOURCES[tileProviderIndex].attribution}
+                              url={TILE_SOURCES[tileProviderIndex].url}
+                              eventHandlers={{
+                                tileload: () => {
+                                  tileLoadCountRef.current += 1
+                                  setTileDiagnostics({
+                                    loaded: tileLoadCountRef.current,
+                                    errors: tileErrorCountRef.current
+                                  })
+                                  setTileLoaded(true)
+                                  setMapFallbackMode(false)
+                                },
+                                tileerror: () => {
+                                  tileErrorCountRef.current += 1
+                                  setTileDiagnostics({
+                                    loaded: tileLoadCountRef.current,
+                                    errors: tileErrorCountRef.current
+                                  })
 
-                          {/* Heatmap layer (plugin-free fallback for reliability) */}
-                          <HeatCircleLayer heatmapData={heatmapData} />
+                                  // Only rotate provider after multiple failures and no successful tile yet.
+                                  if (tileLoadCountRef.current === 0 && tileErrorCountRef.current >= 8) {
+                                    setTileLoaded(false)
+                                    setTileProviderIndex((prev) => {
+                                      if (prev >= TILE_SOURCES.length - 1) return prev
+                                      return prev + 1
+                                    })
+                                    tileErrorCountRef.current = 0
+                                  }
+                                }
+                              }}
+                            />
 
-                          {/* Marker các quán */}
-                          {restaurantsWithCoords.map(restaurant => (
-                            <Marker
-                              key={restaurant.id}
-                              position={[restaurant.lat, restaurant.lng]}
-                              icon={restaurantIcon}
-                            >
-                              <Popup maxWidth={300}>
-                                <div style={{ padding: '5px' }}>
-                                  <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
-                                  {restaurant.address && (
-                                    <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
-                                      📍 {restaurant.address}
-                                    </p>
-                                  )}
-                                  {restaurant.description && (
-                                    <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
-                                      {restaurant.description}
-                                    </p>
-                                  )}
-                                </div>
-                              </Popup>
-                            </Marker>
-                          ))}
-                        </MapContainer>
-                      )}
+                            {/* Heatmap layer (plugin-free fallback for reliability) */}
+                            <HeatCircleLayer heatmapData={heatmapData} />
+
+                            {/* Marker các quán */}
+                            {restaurantsWithCoords.map(restaurant => (
+                              <Marker
+                                key={restaurant.id}
+                                position={[restaurant.lat, restaurant.lng]}
+                                icon={restaurantIcon}
+                              >
+                                <Popup maxWidth={300}>
+                                  <div style={{ padding: '5px' }}>
+                                    <h3 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{restaurant.name}</h3>
+                                    {restaurant.address && (
+                                      <p style={{ margin: '5px 0', fontSize: '13px', color: '#666' }}>
+                                        📍 {restaurant.address}
+                                      </p>
+                                    )}
+                                    {restaurant.description && (
+                                      <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>
+                                        {restaurant.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            ))}
+                          </MapContainer>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1023,13 +1052,20 @@ const styles = {
   },
   heatmapContainer: {
     position: 'relative',
-    minHeight: '520px',
-    height: '520px',
+    minHeight: `${MAP_HEIGHT_PX}px`,
+    height: `${MAP_HEIGHT_PX}px`,
     flex: 1,
     borderRadius: '16px',
     overflow: 'hidden',
     boxShadow: '0 16px 34px rgba(20, 33, 58, 0.18)',
-    border: '1px solid rgba(182, 198, 221, 0.8)'
+    border: '1px solid rgba(182, 198, 221, 0.8)',
+    background: '#dfe8f3'
+  },
+  mapSurfaceLayer: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 1,
+    overflow: 'hidden'
   },
   fallbackMapCanvas: {
     position: 'relative',
