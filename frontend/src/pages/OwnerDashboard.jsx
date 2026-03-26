@@ -19,6 +19,8 @@ function OwnerDashboard() {
   const [savingTags, setSavingTags] = useState(false)
   const [isTopBarHidden, setIsTopBarHidden] = useState(false)
   const lastScrollYRef = useRef(0)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
+  const isMobile = viewportWidth <= 768
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -115,6 +117,15 @@ function OwnerDashboard() {
     return () => {
       window.removeEventListener('scroll', handleScroll)
     }
+  }, [])
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const handleLogout = () => {
@@ -473,40 +484,22 @@ function OwnerDashboard() {
         }
 
         @media (max-width: 768px) {
-          .owner-dashboard-topbar {
-            padding: 8px 10px;
-            display: grid;
-            grid-template-columns: 1fr auto;
-            align-items: center;
-            row-gap: 8px;
-            column-gap: 8px;
-          }
-
-          .owner-topbar-nav {
-            grid-column: 1 / -1;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px;
-            width: 100%;
-          }
-
           .owner-topbar-nav-btn {
-            height: 34px;
+            height: 38px;
             padding: 0 8px;
-            font-size: 12px;
-            border-radius: 999px;
-            width: 100%;
+            font-size: 12.5px;
+            border-radius: 10px;
+            width: auto;
             text-align: center;
+            white-space: normal;
+            line-height: 1.15;
           }
 
           .owner-topbar-logout-btn {
-            height: 34px;
-            padding: 0 10px;
-            font-size: 12px;
+            height: 36px;
+            padding: 0 12px;
+            font-size: 13px;
             border-radius: 10px;
-            width: auto;
-            white-space: nowrap;
-            justify-self: end;
           }
 
           .owner-dashboard-content {
@@ -544,35 +537,72 @@ function OwnerDashboard() {
         }
 
         @media (max-width: 520px) {
-          .owner-topbar-nav {
-            grid-template-columns: 1fr;
-          }
-
           .owner-stats-grid {
             grid-template-columns: 1fr !important;
           }
         }
       `}</style>
 
-      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
-        <div style={styles.topBarTitle}>🏪 Chủ quán Dashboard</div>
+      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}), ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
+        {isMobile ? (
+          <>
+            <div style={styles.topBarHeadMobile}>
+              <div style={{ ...styles.topBarBrand, ...styles.topBarBrandMobile }}>
+                <div style={styles.brandDot} />
+                <div>
+                  <div style={styles.topBarTitle}>Owner Command</div>
+                  <div style={{ ...styles.topBarSub, ...styles.topBarSubMobile }}>Restaurant Operations</div>
+                </div>
+              </div>
 
-        <div className="owner-topbar-nav" style={styles.topBarNav}>
-          <button className={`owner-topbar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('overview')}>
-            📊 Tổng quan
-          </button>
-          <button className={`owner-topbar-nav-btn ${activeTab === 'menu' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('menu')}>
-            🍽️ Quản lý Menu
-          </button>
-          <button className={`owner-topbar-nav-btn ${activeTab === 'images' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('images')}>
-            🖼️ Quản lý Hình ảnh
-          </button>
-          <button className={`owner-topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('tags')}>
-            🏷️ Quản lý Tags
-          </button>
-        </div>
+              <button className="owner-topbar-logout-btn" style={{ ...styles.topBarLogout, ...styles.topBarLogoutCompactMobile }} onClick={handleLogout}>
+                Đăng xuất
+              </button>
+            </div>
 
-        <button className="owner-topbar-logout-btn" onClick={handleLogout}>🚪 Đăng xuất</button>
+            <nav className="owner-topbar-nav" style={{ ...styles.topBarNav, ...styles.topBarNavMobile }}>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`} style={{ ...styles.topBarButton, ...styles.topBarButtonMobile }} onClick={() => setActiveTab('overview')}>
+                📊 Tổng quan
+              </button>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'menu' ? 'active' : ''}`} style={{ ...styles.topBarButton, ...styles.topBarButtonMobile }} onClick={() => setActiveTab('menu')}>
+                🍽️ Quản lý Menu
+              </button>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'images' ? 'active' : ''}`} style={{ ...styles.topBarButton, ...styles.topBarButtonMobile }} onClick={() => setActiveTab('images')}>
+                🖼️ Quản lý Hình ảnh
+              </button>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`} style={{ ...styles.topBarButton, ...styles.topBarButtonMobile }} onClick={() => setActiveTab('tags')}>
+                🏷️ Quản lý Tags
+              </button>
+            </nav>
+          </>
+        ) : (
+          <>
+            <div style={styles.topBarBrand}>
+              <div style={styles.brandDot} />
+              <div>
+                <div style={styles.topBarTitle}>Owner Command</div>
+                <div style={styles.topBarSub}>Restaurant Operations</div>
+              </div>
+            </div>
+
+            <nav className="owner-topbar-nav" style={styles.topBarNav}>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('overview')}>
+                📊 Tổng quan
+              </button>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'menu' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('menu')}>
+                🍽️ Quản lý Menu
+              </button>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'images' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('images')}>
+                🖼️ Quản lý Hình ảnh
+              </button>
+              <button className={`owner-topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('tags')}>
+                🏷️ Quản lý Tags
+              </button>
+            </nav>
+
+            <button className="owner-topbar-logout-btn" style={styles.topBarLogout} onClick={handleLogout}>Đăng xuất</button>
+          </>
+        )}
       </header>
 
       <main className="owner-dashboard-content" style={styles.main}>
@@ -784,11 +814,56 @@ const styles = {
     transform: 'translateY(calc(-100% - 8px))',
     boxShadow: 'none'
   },
+  topBarMobile: {
+    height: 'auto',
+    padding: '14px 16px 14px',
+    alignItems: 'stretch',
+    gap: '12px',
+    flexDirection: 'column',
+    borderBottomLeftRadius: '24px',
+    borderBottomRightRadius: '24px',
+    boxShadow: '0 8px 24px rgba(12, 23, 43, 0.4)'
+  },
+  topBarHeadMobile: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px'
+  },
+  topBarBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    minWidth: '250px'
+  },
+  topBarBrandMobile: {
+    minWidth: 0,
+    gap: '10px',
+    flex: 1
+  },
+  brandDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #79d8ff 0%, #77f2ce 100%)',
+    boxShadow: '0 0 16px rgba(121, 216, 255, 0.8)'
+  },
   topBarTitle: {
     color: '#eff7ff',
     fontWeight: '700',
     fontSize: '20px',
     letterSpacing: '0.2px'
+  },
+  topBarSub: {
+    color: 'rgba(208, 223, 243, 0.85)',
+    fontSize: '12px',
+    letterSpacing: '0.4px',
+    textTransform: 'uppercase',
+    marginTop: '2px'
+  },
+  topBarSubMobile: {
+    fontSize: '10px',
+    letterSpacing: '0.25px'
   },
   topBarNav: {
     display: 'flex',
@@ -796,8 +871,34 @@ const styles = {
     gap: '8px',
     flexWrap: 'wrap'
   },
+  topBarNavMobile: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    justifyContent: 'center',
+    width: '100%',
+    paddingBottom: '2px'
+  },
   topBarButton: {
     cursor: 'pointer'
+  },
+  topBarButtonMobile: {
+    width: 'auto',
+    minWidth: '80px'
+  },
+  topBarLogout: {
+    border: '1px solid rgba(132, 160, 195, 0.42)',
+    background: 'linear-gradient(135deg, rgba(18, 59, 117, 0.84) 0%, rgba(18, 98, 122, 0.84) 100%)',
+    color: '#f0f6ff',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '700'
+  },
+  topBarLogoutCompactMobile: {
+    width: 'auto',
+    minWidth: '102px',
+    fontSize: '13px',
+    padding: '0 12px'
   },
   main: {
     padding: '24px',
