@@ -1351,6 +1351,19 @@ function LocationTracker() {
           gap: 10px;
         }
 
+        .tracker-root .tracker-map-section {
+          flex: 1;
+          position: relative;
+          padding: 10px 10px 0;
+        }
+
+        .tracker-root .tracker-map {
+          height: 100%;
+          width: 100%;
+          border-radius: 14px;
+          box-shadow: 0 18px 36px rgba(17, 35, 61, 0.2);
+        }
+
         @media (max-width: 900px) {
           .tracker-root .tracker-header {
             grid-template-columns: 1fr 1fr;
@@ -1367,6 +1380,25 @@ function LocationTracker() {
             justify-self: end;
             padding: 9px 12px !important;
             font-size: 12px !important;
+          }
+
+          .tracker-root .tracker-map-section {
+            flex: none;
+            height: 52vh;
+            min-height: 300px;
+            max-height: 520px;
+            padding: 8px 8px 0;
+          }
+
+          .tracker-root .tracker-map {
+            border-radius: 12px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .tracker-root .tracker-map-section {
+            height: 48vh;
+            min-height: 260px;
           }
         }
       `}</style>
@@ -1478,7 +1510,7 @@ function LocationTracker() {
       </div>
 
       {/* Leaflet Map */}
-      <div style={{ flex: 1, position: 'relative', padding: '10px 10px 0' }}>
+      <div className="tracker-map-section">
         {showWeakDeviceNote && (
           <div
             style={{
@@ -1552,7 +1584,7 @@ function LocationTracker() {
           key={`map-${language}`}
           center={mapCenter}
           zoom={16}
-          style={{ height: '100%', width: '100%', borderRadius: '14px', boxShadow: '0 18px 36px rgba(17, 35, 61, 0.2)' }}
+          className="tracker-map"
           zoomControl={true}
         >
           <TileLayer
