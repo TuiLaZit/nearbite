@@ -429,22 +429,40 @@ function OwnerDashboard() {
 
         @media (max-width: 768px) {
           .owner-dashboard-topbar {
-            padding: 12px;
-            align-items: stretch;
-            gap: 10px;
+            padding: 8px 10px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            row-gap: 8px;
+            column-gap: 8px;
           }
 
           .owner-topbar-nav {
-            width: 100%;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            grid-column: 1 / -1;
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+            scrollbar-width: thin;
           }
 
-          .owner-topbar-nav-btn,
+          .owner-topbar-nav-btn {
+            height: 34px;
+            padding: 0 10px;
+            font-size: 12px;
+            border-radius: 10px;
+            flex: 0 0 auto;
+          }
+
           .owner-topbar-logout-btn {
-            width: 100%;
-            justify-content: center;
+            height: 34px;
+            padding: 0 10px;
+            font-size: 12px;
+            border-radius: 10px;
+            width: auto;
+            white-space: nowrap;
+            justify-self: end;
           }
 
           .owner-dashboard-content {
@@ -454,6 +472,10 @@ function OwnerDashboard() {
           .owner-dashboard-title {
             font-size: 28px !important;
             margin-bottom: 14px !important;
+          }
+
+          .owner-dashboard-topbar > div:first-child {
+            font-size: 16px;
           }
 
           .owner-stats-grid {
@@ -468,10 +490,6 @@ function OwnerDashboard() {
         }
 
         @media (max-width: 520px) {
-          .owner-topbar-nav {
-            grid-template-columns: 1fr;
-          }
-
           .owner-stats-grid {
             grid-template-columns: 1fr !important;
           }
