@@ -36,6 +36,7 @@ function RestaurantManagement({
     poi_radius_km: '0.015',
     description: ''
   })
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
 
   useEffect(() => {
     // Check authentication first
@@ -74,6 +75,12 @@ function RestaurantManagement({
       setPagination(prev => ({ ...prev, page: 1 }))
     }
   }, [searchTerm, selectedTags, sortBy, isAuthenticated])
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const loadTags = () => {
     fetch(`${BASE_URL}/admin/tags`, {
@@ -401,6 +408,9 @@ function RestaurantManagement({
     )
   }
 
+  const isMobile = viewportWidth <= 768
+  const tableMinWidth = isHidden ? 640 : (isOwnerView ? 860 : 1180)
+
   return (
     <div style={styles.container}>
       <div style={styles.heroPanel}>
@@ -495,24 +505,24 @@ function RestaurantManagement({
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
-              <table style={styles.table}>
+            <div style={{ ...styles.tableScrollWrap, ...(isMobile ? styles.tableScrollWrapMobile : {}) }}>
+              <table style={{ ...styles.table, ...(isMobile ? { minWidth: `${tableMinWidth}px` } : {}) }}>
               <thead>
                 <tr>
                   <th style={styles.th}>Tên quán</th>
-                  {!isHidden && !isOwnerView && <th style={styles.th}>Tài khoản quán</th>}
+                  {!isHidden && !isOwnerView && <th style={styles.th}>{isMobile ? 'Tài khoản' : 'Tài khoản quán'}</th>}
                   {!isHidden && !isOwnerView && <th style={styles.th}>Password</th>}
-                  {!isHidden && <th style={styles.th}>Lượt ghé</th>}
-                  {!isHidden && <th style={styles.th}>TG ghé TB (phút)</th>}
-                  {!isHidden && <th style={styles.th}>TG nghe TB (giây)</th>}
-                  {!isHidden && <th style={styles.th}>TG ăn (phút)</th>}
+                  {!isHidden && <th style={styles.th}>{isMobile ? 'Ghé' : 'Lượt ghé'}</th>}
+                  {!isHidden && <th style={styles.th}>{isMobile ? 'TG ghé' : 'TG ghé TB (phút)'}</th>}
+                  {!isHidden && <th style={styles.th}>{isMobile ? 'TG nghe' : 'TG nghe TB (giây)'}</th>}
+                  {!isHidden && <th style={styles.th}>{isMobile ? 'TG ăn' : 'TG ăn (phút)'}</th>}
                   <th style={styles.th}>Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {restaurants.map(r => (
                   <tr key={r.id} style={styles.tr}>
-                    <td style={styles.td}>
+                    <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
                       <div style={styles.restaurantName}>{r.name}</div>
                       <div style={styles.restaurantTags}>
                         {r.tags?.map(tag => (
@@ -526,7 +536,7 @@ function RestaurantManagement({
                       </div>
                     </td>
                     {!isHidden && !isOwnerView && (
-                      <td style={styles.td}>
+                      <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
                         {r.has_account ? (
                           <div>
                             <div style={styles.accountUsername}>{r.owner_username}</div>
@@ -538,7 +548,7 @@ function RestaurantManagement({
                       </td>
                     )}
                     {!isHidden && !isOwnerView && (
-                      <td style={styles.td}>
+                      <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
                         {r.has_account ? (
                           <span style={styles.passwordText}>{r.owner_password_plain || 'Chưa có'}</span>
                         ) : (
@@ -546,12 +556,12 @@ function RestaurantManagement({
                         )}
                       </td>
                     )}
-                    {!isHidden && <td style={styles.td}>{r.visit_count || 0}</td>}
-                    {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
-                    {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
-                    {!isHidden && <td style={styles.td}>{r.avg_eat_time}</td>}
-                    <td style={styles.td}>
-                      <div style={styles.actionButtons}>
+                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.visit_count || 0}</td>}
+                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.avg_visit_duration || 0}</td>}
+                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.avg_audio_duration || 0}</td>}
+                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.avg_eat_time}</td>}
+                    <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
+                      <div style={{ ...styles.actionButtons, ...(isMobile ? styles.actionButtonsMobile : {}) }}>
                         {isHidden ? (
                           <>
                             <button 
@@ -559,14 +569,14 @@ function RestaurantManagement({
                               onClick={() => handleRestore(r.id, r.name)}
                               title="Khôi phục quán"
                             >
-                              ♻️ Khôi phục
+                              {isMobile ? '♻️ Khôi phục' : '♻️ Khôi phục'}
                             </button>
                             <button 
                               style={styles.btnDeletePermanent} 
                               onClick={() => handleDelete(r.id, r.name)}
                               title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
                             >
-                              ⚠️ Xóa vĩnh viễn
+                              {isMobile ? '⚠️ Xóa vv' : '⚠️ Xóa vĩnh viễn'}
                             </button>
                           </>
                         ) : (
@@ -577,7 +587,7 @@ function RestaurantManagement({
                               onClick={() => openTagEditor(r)}
                               title="Gán tags cho quán"
                             >
-                              🏷️ Gán tags
+                              {isMobile ? '🏷️ Tags' : '🏷️ Gán tags'}
                             </button>
                             {!isOwnerView && (
                               <button
@@ -585,7 +595,7 @@ function RestaurantManagement({
                                 onClick={() => handleCreateOrResetAccount(r)}
                                 title={r.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
                               >
-                                {r.has_account ? '🔐 Quên mật khẩu' : '👤 Tạo tài khoản'}
+                                {r.has_account ? (isMobile ? '🔐 Reset' : '🔐 Quên mật khẩu') : (isMobile ? '👤 Tạo TK' : '👤 Tạo tài khoản')}
                               </button>
                             )}
                             {!isOwnerView && (
@@ -594,7 +604,7 @@ function RestaurantManagement({
                                 onClick={() => handleDelete(r.id, r.name)}
                                 title="Ẩn quán"
                               >
-                                👻 Ẩn
+                                {isMobile ? '👻 Ẩn' : '👻 Ẩn'}
                               </button>
                             )}
                           </>
@@ -902,6 +912,16 @@ const styles = {
     border: '1px solid #c5d9f3',
     boxShadow: '0 10px 22px rgba(20, 50, 92, 0.12)'
   },
+  tableScrollWrap: {
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    margin: '0 -10px',
+    padding: '0 10px'
+  },
+  tableScrollWrapMobile: {
+    margin: '0 -6px',
+    padding: '0 6px'
+  },
   th: {
     padding: '16px',
     textAlign: 'left',
@@ -921,6 +941,11 @@ const styles = {
     fontSize: '14px',
     color: '#20324e',
     backgroundColor: 'rgba(255, 255, 255, 0.86)'
+  },
+  tdMobile: {
+    padding: '12px 10px',
+    fontSize: '13px',
+    whiteSpace: 'nowrap'
   },
   restaurantName: {
     fontWeight: '600',
@@ -960,6 +985,9 @@ const styles = {
     display: 'flex',
     gap: '8px',
     flexWrap: 'wrap'
+  },
+  actionButtonsMobile: {
+    minWidth: '260px'
   },
   btnEdit: {
     padding: '6px 12px',
