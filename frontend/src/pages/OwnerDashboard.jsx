@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
@@ -17,6 +17,8 @@ function OwnerDashboard() {
   const [allTags, setAllTags] = useState([])
   const [selectedTagIds, setSelectedTagIds] = useState([])
   const [savingTags, setSavingTags] = useState(false)
+  const [isTopBarHidden, setIsTopBarHidden] = useState(false)
+  const lastScrollYRef = useRef(0)
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -81,6 +83,38 @@ function OwnerDashboard() {
       .finally(() => {
         setLoading(false)
       })
+  }, [])
+
+  useEffect(() => {
+    let ticking = false
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY || window.pageYOffset
+
+      if (ticking) return
+      ticking = true
+
+      window.requestAnimationFrame(() => {
+        const diff = currentScrollY - lastScrollYRef.current
+
+        if (currentScrollY <= 8) {
+          setIsTopBarHidden(false)
+        } else if (diff > 6) {
+          setIsTopBarHidden(true)
+        } else if (diff < -6) {
+          setIsTopBarHidden(false)
+        }
+
+        lastScrollYRef.current = currentScrollY
+        ticking = false
+      })
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
   const handleLogout = () => {
@@ -496,7 +530,7 @@ function OwnerDashboard() {
         }
       `}</style>
 
-      <header className="owner-dashboard-topbar" style={styles.topBar}>
+      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
         <div style={styles.topBarTitle}>🏪 Chủ quán Dashboard</div>
 
         <div className="owner-topbar-nav" style={styles.topBarNav}>
@@ -701,7 +735,13 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '12px',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    transition: 'transform 0.26s ease, box-shadow 0.26s ease',
+    willChange: 'transform'
+  },
+  topBarHidden: {
+    transform: 'translateY(calc(-100% - 8px))',
+    boxShadow: 'none'
   },
   topBarTitle: {
     color: '#eff7ff',
