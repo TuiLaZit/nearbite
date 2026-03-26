@@ -298,6 +298,88 @@ function OwnerDashboard() {
   return (
     <div style={styles.page}>
       <style>{`
+        .owner-dashboard-content {
+          font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+          color: #132745;
+        }
+
+        .owner-dashboard-content h3 {
+          margin-top: 0;
+          margin-bottom: 14px;
+          font-size: 24px;
+          font-weight: 750;
+          color: #10243f;
+          letter-spacing: -0.01em;
+        }
+
+        .owner-dashboard-content input,
+        .owner-dashboard-content textarea {
+          width: 100%;
+          border: 1px solid #cad9ec;
+          border-radius: 12px;
+          padding: 11px 13px;
+          font-size: 15px;
+          color: #153251;
+          background: rgba(255, 255, 255, 0.96);
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          box-sizing: border-box;
+        }
+
+        .owner-dashboard-content input:focus,
+        .owner-dashboard-content textarea:focus {
+          outline: none;
+          border-color: #4a91eb;
+          box-shadow: 0 0 0 4px rgba(74, 145, 235, 0.16);
+        }
+
+        .owner-dashboard-content button {
+          border-radius: 12px;
+          border: 1px solid rgba(123, 161, 201, 0.45);
+          background: linear-gradient(140deg, #0f5d5c 0%, #164d66 100%);
+          color: #f5fbff;
+          font-weight: 700;
+          font-size: 14px;
+          height: 42px;
+          padding: 0 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 10px 18px rgba(12, 48, 76, 0.2);
+        }
+
+        .owner-dashboard-content button:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.06);
+          box-shadow: 0 12px 22px rgba(12, 48, 76, 0.26);
+        }
+
+        .owner-dashboard-content button:disabled {
+          opacity: 0.75;
+          cursor: not-allowed;
+          transform: none;
+          filter: grayscale(0.1);
+        }
+
+        .owner-dashboard-content table thead th {
+          text-align: left;
+          padding: 10px 12px;
+          border-bottom: 2px solid #d5e5f8;
+          color: #3a5372;
+          font-weight: 700;
+          font-size: 13px;
+          background: linear-gradient(180deg, #fbfdff 0%, #eef5ff 100%);
+        }
+
+        .owner-dashboard-content table tbody td {
+          padding: 11px 12px;
+          border-bottom: 1px solid #e8f0fb;
+          color: #223653;
+          background: rgba(255, 255, 255, 0.88);
+        }
+
+        .owner-dashboard-content table tbody tr:hover td {
+          background: rgba(234, 244, 255, 0.78);
+        }
+
         .owner-topbar-nav-btn {
           margin: 0;
           border: 1px solid rgba(120, 148, 181, 0.34);
@@ -366,7 +448,7 @@ function OwnerDashboard() {
         <button className="owner-topbar-logout-btn" onClick={handleLogout}>🚪 Đăng xuất</button>
       </header>
 
-      <main style={styles.main}>
+      <main className="owner-dashboard-content" style={styles.main}>
         <h1 style={styles.title}>{restaurant.name}</h1>
 
         {activeTab === 'overview' && (
@@ -568,59 +650,75 @@ const styles = {
     cursor: 'pointer'
   },
   main: {
-    padding: '24px'
+    padding: '24px',
+    background: 'radial-gradient(860px 340px at 10% -12%, rgba(62, 118, 201, 0.16), transparent 70%), radial-gradient(760px 280px at 90% 0%, rgba(50, 146, 162, 0.12), transparent 72%), linear-gradient(160deg, #ebf2fb 0%, #e4edf8 100%)'
   },
   title: {
     marginTop: 0,
-    marginBottom: '16px'
+    marginBottom: '18px',
+    fontSize: '36px',
+    fontWeight: '750',
+    color: '#11203a',
+    letterSpacing: '-0.02em'
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '12px',
-    marginBottom: '16px'
+    gap: '14px',
+    marginBottom: '18px'
   },
   statCard: {
-    background: 'white',
-    borderRadius: '10px',
-    padding: '14px',
-    border: '1px solid #dbe4ef'
+    background: 'linear-gradient(165deg, rgba(255,255,255,0.96) 0%, rgba(246, 250, 255, 0.94) 100%)',
+    borderRadius: '14px',
+    padding: '14px 16px',
+    border: '1px solid rgba(188, 208, 233, 0.92)',
+    boxShadow: '0 12px 24px rgba(22, 35, 61, 0.1), inset 0 0 0 1px rgba(207, 222, 241, 0.38)'
   },
   statLabel: {
-    color: '#475569',
-    fontSize: '13px'
+    color: '#4a6281',
+    fontSize: '13px',
+    fontWeight: '600'
   },
   statValue: {
-    fontSize: '24px',
-    fontWeight: '700',
+    fontSize: '40px',
+    lineHeight: 1,
+    fontWeight: '800',
+    color: '#132745',
     marginTop: '4px'
   },
   card: {
-    background: 'white',
-    borderRadius: '12px',
-    border: '1px solid #dbe4ef',
-    padding: '16px'
+    background: 'linear-gradient(165deg, rgba(255,255,255,0.96) 0%, rgba(246, 250, 255, 0.93) 100%)',
+    borderRadius: '16px',
+    border: '1px solid rgba(188, 208, 233, 0.82)',
+    boxShadow: '0 18px 32px rgba(22, 35, 61, 0.12), inset 0 0 0 1px rgba(207, 222, 241, 0.4)',
+    padding: '20px'
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '10px',
-    marginBottom: '10px'
+    gap: '12px',
+    marginBottom: '12px'
   },
   inlineForm: {
     display: 'grid',
-    gridTemplateColumns: '2fr 1fr auto auto',
-    gap: '10px',
-    marginBottom: '12px'
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
+    marginBottom: '14px'
   },
   table: {
     width: '100%',
-    borderCollapse: 'collapse'
+    borderCollapse: 'separate',
+    borderSpacing: 0,
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: '1px solid #c6daf4',
+    boxShadow: '0 8px 20px rgba(20, 50, 92, 0.1)',
+    fontSize: '14px'
   },
   imageForm: {
     display: 'grid',
-    gridTemplateColumns: '1.3fr 1fr 1fr auto',
-    gap: '10px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
     alignItems: 'center',
     marginBottom: '14px'
   },
@@ -635,10 +733,11 @@ const styles = {
     gap: '12px'
   },
   imageCard: {
-    border: '1px solid #e2e8f0',
-    borderRadius: '10px',
+    border: '1px solid #d2e1f3',
+    borderRadius: '12px',
     overflow: 'hidden',
-    background: '#f8fafc'
+    background: 'linear-gradient(180deg, #fafdff 0%, #f2f7ff 100%)',
+    boxShadow: '0 8px 18px rgba(22, 42, 74, 0.12)'
   },
   image: {
     width: '100%',
@@ -646,7 +745,8 @@ const styles = {
     objectFit: 'cover'
   },
   imageMeta: {
-    padding: '10px'
+    padding: '10px 12px',
+    color: '#1f3b5b'
   },
   primaryBadge: {
     display: 'inline-block',
@@ -658,7 +758,7 @@ const styles = {
     borderRadius: '999px'
   },
   tagHint: {
-    color: '#475569',
+    color: '#4f627e',
     fontSize: '14px',
     marginTop: 0
   },
@@ -669,12 +769,13 @@ const styles = {
   },
   tagChip: {
     padding: '8px 12px',
-    border: '1px solid #cbd5e1',
+    border: '1px solid #c4d7ed',
     borderRadius: '999px',
     background: '#fff',
-    color: '#1e293b',
+    color: '#1d3857',
     cursor: 'pointer',
-    fontWeight: '600'
+    fontWeight: '700',
+    boxShadow: '0 6px 12px rgba(22, 42, 74, 0.08)'
   },
   tagChipActive: {
     color: '#fff'
