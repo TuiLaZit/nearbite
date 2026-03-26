@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/network/api_client.dart';
 import 'core/sync/connectivity_sync_service.dart';
+import 'core/theme/app_theme.dart';
 import 'features/home/landing_screen.dart';
 
 class NearBiteApp extends StatelessWidget {
@@ -14,10 +15,7 @@ class NearBiteApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'NearBite Mobile',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D9488)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
       home: BootstrapScreen(apiClient: apiClient),
     );
   }

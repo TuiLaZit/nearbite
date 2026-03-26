@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -710,25 +711,37 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   Widget _buildPoiBottomPanel() {
     if (_isLanguageReloading) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        color: Colors.black87,
-        child: const Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Dang cap nhat ngon ngu POI...',
-                style: TextStyle(color: Colors.white),
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xEE12211F), Color(0xF012302B)],
               ),
             ),
-          ],
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Dang cap nhat ngon ngu POI...',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -742,90 +755,112 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final actionBusy = _isAudioActionInProgress || _isAudioPreparing;
     final canInteractAudio = isPlaying || !actionBusy;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      color: Colors.black87,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  location.nearestPlace.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              if (_batterySaverEnabled)
-                const Icon(
-                  Icons.battery_charging_full,
-                  color: Colors.lightGreenAccent,
-                  size: 18,
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _isInPoi ? 'Trang thai POI: Da vao POI (tu dong phat sau 2s)' : 'Trang thai POI: Chua vao POI',
-            style: TextStyle(
-              color: _isInPoi ? Colors.lightGreenAccent : Colors.orangeAccent,
-              fontWeight: FontWeight.w600,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xEF101D1B), Color(0xF0112E2A)],
+            ),
+            border: Border(
+              top: BorderSide(color: Colors.white.withOpacity(0.08)),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Distance: ${location.distanceKm.toStringAsFixed(3)} km',
-            style: const TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            location.narration,
-            style: const TextStyle(color: Colors.white),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 10),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 340;
-              return Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showPoiMenuSheet(location.nearestPlace),
-                      icon: const Icon(Icons.restaurant_menu, size: 18),
-                      label: const Text('Xem menu'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white70),
+                    child: Text(
+                      location.nearestPlace.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: canInteractAudio ? _togglePoiAudio : null,
-                      icon: Icon(isPlaying ? Icons.stop : Icons.volume_up, size: 18),
-                      label: Text(
-                        isPlaying
-                            ? 'Dung nghe'
-                            : (actionBusy ? 'Dang tai...' : (compact ? 'Nghe' : 'Nghe')),
-                      ),
-                      style: FilledButton.styleFrom(
-                        disabledBackgroundColor: const Color(0xFF00897B).withOpacity(0.45),
-                        disabledForegroundColor: Colors.white70,
-                      ),
+                  if (_batterySaverEnabled)
+                    const Icon(
+                      Icons.battery_charging_full,
+                      color: Colors.lightGreenAccent,
+                      size: 18,
                     ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _isInPoi ? 'Trang thai POI: Da vao POI (tu dong phat sau 2s)' : 'Trang thai POI: Chua vao POI',
+                style: TextStyle(
+                  color: _isInPoi ? Colors.lightGreenAccent : Colors.orangeAccent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.near_me, size: 14, color: Colors.white70),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Distance: ${location.distanceKm.toStringAsFixed(3)} km',
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ],
-              );
-            },
+              ),
+              const SizedBox(height: 6),
+              Text(
+                location.narration,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 340;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showPoiMenuSheet(location.nearestPlace),
+                          icon: const Icon(Icons.restaurant_menu, size: 18),
+                          label: const Text('Xem menu'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white70),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: canInteractAudio ? _togglePoiAudio : null,
+                          icon: Icon(isPlaying ? Icons.stop : Icons.volume_up, size: 18),
+                          label: Text(
+                            isPlaying
+                                ? 'Dung nghe'
+                                : (actionBusy ? 'Dang tai...' : (compact ? 'Nghe' : 'Nghe')),
+                          ),
+                          style: FilledButton.styleFrom(
+                            disabledBackgroundColor: const Color(0xFF00897B).withOpacity(0.45),
+                            disabledForegroundColor: Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

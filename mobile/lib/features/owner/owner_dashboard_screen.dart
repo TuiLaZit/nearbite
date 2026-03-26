@@ -316,13 +316,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     if (r == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Owner Dashboard')),
-        body: const Center(child: Text('No assigned restaurant')),
+        body: const Center(
+          child: Text(
+            'No assigned restaurant',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Owner Dashboard - ${r.name}'),
+        title: Text(r.name),
         actions: [
           IconButton(onPressed: _bootstrap, icon: const Icon(Icons.refresh)),
           IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
@@ -339,6 +344,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
       ),
       body: Column(
         children: [
+          const SizedBox(height: 8),
           if (_error != null)
             Container(
               width: double.infinity,

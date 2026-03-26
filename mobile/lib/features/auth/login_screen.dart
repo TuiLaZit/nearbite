@@ -311,25 +311,45 @@ class _LoginScreenState extends State<LoginScreen>
           ],
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildCustomerTab(),
-                  _buildOwnerTab(),
-                ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFEAF7F5), Color(0xFFF3F6F6), Color(0xFFFFFFFF)],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Expanded(
+                child: Card(
+                  elevation: 6,
+                  shadowColor: const Color(0x22000000),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildCustomerTab(),
+                        _buildOwnerTab(),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-            if (_error != null)
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-          ],
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -338,6 +358,15 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildCustomerTab() {
     return ListView(
       children: [
+        Text(
+          _t(
+            vi: 'Đăng nhập nhanh bằng OTP',
+            en: 'Fast OTP sign in',
+            fr: 'Connexion OTP rapide',
+          ),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
         TextField(
           controller: _customerEmailController,
           keyboardType: TextInputType.emailAddress,
@@ -372,6 +401,15 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildOwnerTab() {
     return ListView(
       children: [
+        Text(
+          _t(
+            vi: 'Bảng quản trị chủ quán',
+            en: 'Owner management access',
+            fr: 'Acces gestion proprietaire',
+          ),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
         TextField(
           controller: _ownerUsernameController,
           decoration: InputDecoration(labelText: _t(vi: 'Tên đăng nhập', en: 'Username', fr: 'Nom utilisateur')),
