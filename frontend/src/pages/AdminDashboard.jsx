@@ -426,10 +426,10 @@ function AdminDashboard({ role = 'admin' }) {
         @media (max-width: 768px) {
           .topbar-nav-btn {
             height: 36px;
-            padding: 0 12px;
+            padding: 0 10px;
             font-size: 13px;
-            white-space: nowrap;
-            flex: 0 0 auto;
+            white-space: normal;
+            text-align: center;
           }
 
           .topbar-logout-btn {
@@ -783,12 +783,13 @@ const styles = {
     justifyContent: 'center'
   },
   topNavMobile: {
-    justifyContent: 'flex-start',
-    flexWrap: 'nowrap',
-    overflowX: 'auto',
-    paddingBottom: '2px',
+    justifyContent: 'stretch',
+    flexWrap: 'wrap',
+    overflowX: 'hidden',
+    rowGap: '8px',
+    columnGap: '8px',
     width: '100%',
-    scrollbarWidth: 'thin'
+    paddingBottom: '2px'
   },
   topNavButton: {
     cursor: 'pointer',
@@ -796,7 +797,8 @@ const styles = {
     fontWeight: '650'
   },
   topNavButtonMobile: {
-    flex: '0 0 auto'
+    flex: '1 1 calc(50% - 8px)',
+    minWidth: '140px'
   },
   topbarLogout: {
     border: '1px solid rgba(132, 160, 195, 0.42)',
