@@ -36,6 +36,7 @@ function RestaurantManagement({
     poi_radius_km: '0.015',
     description: ''
   })
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
 
   useEffect(() => {
     // Check authentication first
@@ -74,6 +75,12 @@ function RestaurantManagement({
       setPagination(prev => ({ ...prev, page: 1 }))
     }
   }, [searchTerm, selectedTags, sortBy, isAuthenticated])
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const loadTags = () => {
     fetch(`${BASE_URL}/admin/tags`, {
@@ -401,6 +408,60 @@ function RestaurantManagement({
     )
   }
 
+  const isMobile = viewportWidth <= 768
+
+  const renderRestaurantActions = (restaurant, compact = false) => (
+    <div style={{ ...styles.actionButtons, ...(compact ? styles.actionButtonsMobile : {}) }}>
+      {isHidden ? (
+        <>
+          <button
+            style={styles.btnRestore}
+            onClick={() => handleRestore(restaurant.id, restaurant.name)}
+            title="Khôi phục quán"
+          >
+            ♻️ Khôi phục
+          </button>
+          <button
+            style={styles.btnDeletePermanent}
+            onClick={() => handleDelete(restaurant.id, restaurant.name)}
+            title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
+          >
+            {compact ? '⚠️ Xóa vv' : '⚠️ Xóa vĩnh viễn'}
+          </button>
+        </>
+      ) : (
+        <>
+          <button style={styles.btnEdit} onClick={() => handleEdit(restaurant)}>✏️</button>
+          <button
+            style={styles.btnTagAssign}
+            onClick={() => openTagEditor(restaurant)}
+            title="Gán tags cho quán"
+          >
+            {compact ? '🏷️ Tags' : '🏷️ Gán tags'}
+          </button>
+          {!isOwnerView && (
+            <button
+              style={restaurant.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
+              onClick={() => handleCreateOrResetAccount(restaurant)}
+              title={restaurant.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
+            >
+              {restaurant.has_account ? (compact ? '🔐 Reset' : '🔐 Quên mật khẩu') : (compact ? '👤 Tạo TK' : '👤 Tạo tài khoản')}
+            </button>
+          )}
+          {!isOwnerView && (
+            <button
+              style={styles.btnDelete}
+              onClick={() => handleDelete(restaurant.id, restaurant.name)}
+              title="Ẩn quán"
+            >
+              👻 Ẩn
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
+
   return (
     <div style={styles.container}>
       <div style={styles.heroPanel}>
@@ -495,8 +556,54 @@ function RestaurantManagement({
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
-              <table style={styles.table}>
+            {isMobile ? (
+              <div style={styles.mobileCardList}>
+                {restaurants.map(r => (
+                  <div key={r.id} style={styles.mobileCard}>
+                    <div style={styles.mobileCardHeader}>
+                      <div style={styles.restaurantName}>{r.name}</div>
+                      {!isHidden && <div style={styles.mobileStatBadge}>👁️ {r.visit_count || 0}</div>}
+                    </div>
+
+                    <div style={styles.restaurantTags}>
+                      {r.tags?.map(tag => (
+                        <span
+                          key={tag.id}
+                          style={{ ...styles.tagBadge, backgroundColor: tag.color }}
+                        >
+                          {tag.icon} {tag.name}
+                        </span>
+                      ))}
+                    </div>
+
+                    {!isHidden && (
+                      <div style={styles.mobileStatsRow}>
+                        <span>TG ghé: <strong>{r.avg_visit_duration || 0}</strong></span>
+                        <span>TG nghe: <strong>{r.avg_audio_duration || 0}</strong></span>
+                        <span>TG ăn: <strong>{r.avg_eat_time}</strong></span>
+                      </div>
+                    )}
+
+                    {!isHidden && !isOwnerView && (
+                      <div style={styles.mobileAccountRow}>
+                        <div>
+                          <strong>TK:</strong> {r.owner_username || 'Chưa có tài khoản'}
+                        </div>
+                        {r.has_account && (
+                          <div>
+                            <strong>PW:</strong> {r.owner_password_plain || 'Chưa có'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {renderRestaurantActions(r, true)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={styles.tableScrollWrap}>
+                <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Tên quán</th>
@@ -550,62 +657,13 @@ function RestaurantManagement({
                     {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
                     {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
                     {!isHidden && <td style={styles.td}>{r.avg_eat_time}</td>}
-                    <td style={styles.td}>
-                      <div style={styles.actionButtons}>
-                        {isHidden ? (
-                          <>
-                            <button 
-                              style={styles.btnRestore} 
-                              onClick={() => handleRestore(r.id, r.name)}
-                              title="Khôi phục quán"
-                            >
-                              ♻️ Khôi phục
-                            </button>
-                            <button 
-                              style={styles.btnDeletePermanent} 
-                              onClick={() => handleDelete(r.id, r.name)}
-                              title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
-                            >
-                              ⚠️ Xóa vĩnh viễn
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
-                            <button
-                              style={styles.btnTagAssign}
-                              onClick={() => openTagEditor(r)}
-                              title="Gán tags cho quán"
-                            >
-                              🏷️ Gán tags
-                            </button>
-                            {!isOwnerView && (
-                              <button
-                                style={r.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
-                                onClick={() => handleCreateOrResetAccount(r)}
-                                title={r.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
-                              >
-                                {r.has_account ? '🔐 Quên mật khẩu' : '👤 Tạo tài khoản'}
-                              </button>
-                            )}
-                            {!isOwnerView && (
-                              <button 
-                                style={styles.btnDelete} 
-                                onClick={() => handleDelete(r.id, r.name)}
-                                title="Ẩn quán"
-                              >
-                                👻 Ẩn
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
+                    <td style={styles.td}>{renderRestaurantActions(r, false)}</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-            </div>
+                </table>
+              </div>
+            )}
 
               {/* Pagination Controls */}
             {!isHidden && pagination.totalPages > 1 && (
@@ -902,6 +960,60 @@ const styles = {
     border: '1px solid #c5d9f3',
     boxShadow: '0 10px 22px rgba(20, 50, 92, 0.12)'
   },
+  tableScrollWrap: {
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    margin: '0 -10px',
+    padding: '0 10px'
+  },
+  tableScrollWrapMobile: {
+    margin: '0 -6px',
+    padding: '0 6px'
+  },
+  mobileCardList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  },
+  mobileCard: {
+    border: '1px solid #d6e3f5',
+    borderRadius: '12px',
+    padding: '12px',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f6faff 100%)'
+  },
+  mobileCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    marginBottom: '8px'
+  },
+  mobileStatBadge: {
+    fontSize: '12px',
+    fontWeight: '700',
+    color: '#1d4ed8',
+    background: '#e8f0ff',
+    borderRadius: '999px',
+    padding: '4px 8px',
+    whiteSpace: 'nowrap'
+  },
+  mobileStatsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px 14px',
+    marginTop: '8px',
+    fontSize: '13px',
+    color: '#334155'
+  },
+  mobileAccountRow: {
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px dashed #d7e3f4',
+    fontSize: '13px',
+    color: '#334155',
+    display: 'grid',
+    gap: '4px'
+  },
   th: {
     padding: '16px',
     textAlign: 'left',
@@ -921,6 +1033,11 @@ const styles = {
     fontSize: '14px',
     color: '#20324e',
     backgroundColor: 'rgba(255, 255, 255, 0.86)'
+  },
+  tdMobile: {
+    padding: '12px 10px',
+    fontSize: '13px',
+    whiteSpace: 'nowrap'
   },
   restaurantName: {
     fontWeight: '600',
@@ -960,6 +1077,9 @@ const styles = {
     display: 'flex',
     gap: '8px',
     flexWrap: 'wrap'
+  },
+  actionButtonsMobile: {
+    minWidth: '260px'
   },
   btnEdit: {
     padding: '6px 12px',
