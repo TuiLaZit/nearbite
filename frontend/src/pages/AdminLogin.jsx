@@ -284,20 +284,56 @@ function AdminLogin({
         .back-button {
           margin-top: 0;
           margin-bottom: 14px;
-          padding: 10px 14px;
-          background: rgba(20, 44, 70, 0.08);
+          padding: 10px 14px 10px 10px;
+          background: linear-gradient(180deg, #ffffff 0%, #f0f6ff 100%);
           color: #183a5d;
-          border: 1px solid #cad6e3;
-          border-radius: 10px;
+          border: 1px solid rgba(172, 194, 220, 0.9);
+          border-radius: 12px;
           font-size: 13px;
-          font-weight: 600;
-          box-shadow: none;
+          font-weight: 700;
+          letter-spacing: 0.1px;
+          box-shadow: 0 6px 14px rgba(22, 52, 84, 0.1);
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          width: fit-content;
+          transition: all 0.22s ease;
+        }
+
+        .back-button-icon {
+          width: 26px;
+          height: 26px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #d8e8fb 0%, #c1d8f6 100%);
+          border: 1px solid rgba(140, 170, 205, 0.9);
+          color: #123a63;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          flex: 0 0 auto;
+        }
+
+        .back-button-text {
+          display: inline-block;
+          text-align: left;
         }
 
         .back-button:hover {
-          background: rgba(18, 32, 54, 0.12);
-          transform: none;
-          filter: none;
+          background: linear-gradient(180deg, #ffffff 0%, #e8f2ff 100%);
+          border-color: rgba(118, 157, 201, 0.95);
+          transform: translateY(-1px);
+          box-shadow: 0 10px 18px rgba(22, 52, 84, 0.16);
+          filter: brightness(1.01);
+        }
+
+        .back-button:hover .back-button-icon {
+          transform: translateX(-1px);
+        }
+
+        .back-button:active {
+          transform: translateY(0);
+          box-shadow: 0 6px 10px rgba(22, 52, 84, 0.14);
         }
 
         button {
@@ -342,6 +378,11 @@ function AdminLogin({
           .login-card {
             padding: 34px 26px;
           }
+
+          .back-button {
+            width: 100%;
+            justify-content: center;
+          }
         }
       `}</style>
       <div className="admin-login-shell">
@@ -368,7 +409,8 @@ function AdminLogin({
 
           <div className="login-card">
             <button type="button" className="back-button" onClick={() => navigate('/login')}>
-              ← Quay lại đăng nhập khách/chủ quán
+              <span className="back-button-icon">←</span>
+              <span className="back-button-text">Quay lại đăng nhập khách/chủ quán</span>
             </button>
 
             <div className="header">
