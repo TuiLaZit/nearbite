@@ -92,6 +92,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   bool _selectedLoading = false;
   bool _selectedLoadError = false;
   DateTime? _poiEnteredAt;
+  bool _isPoiNarrationExpanded = false;
   double _poiPanelMeasuredHeight = 0;
   DateTime? _manualPlaybackUntil;
   int _selectedLoadRequestId = 0;
@@ -202,6 +203,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     bool suppressAutoPlay = false,
   }) async {
     final requestId = ++_locationCycleRequestId;
+    final previousPoiId = _lastLocationResult?.nearestPlace.id;
     final currentPos = position ?? await _locationService.getCurrentPosition();
     if (!_isLatestLocationCycle(requestId)) {
       return;
@@ -339,6 +341,22 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
 
       final inPoiRange = location.distanceKm <= location.poiRadiusKm;
       final now = DateTime.now();
+      final activeAudioPoiMismatch =
+          _activeAudioRestaurantId != null && _activeAudioRestaurantId != location.nearestPlace.id;
+      final poiChanged = previousPoiId != null && previousPoiId != location.nearestPlace.id;
+
+      if (poiChanged || activeAudioPoiMismatch) {
+        // Entering a new POI (or detecting stale old-audio) should stop old narration immediately.
+        if (activeAudioPoiMismatch) {
+          await _stopAudioAndTrack();
+        }
+
+        // Re-arm 2s debounce for the new POI instead of auto-playing instantly.
+        _poiEnteredAt = now;
+        _lastPlayedAudioKey = null;
+        _manualPlaybackUntil = null;
+        _isPoiNarrationExpanded = false;
+      }
 
       if (inPoiRange) {
         _poiEnteredAt ??= now;
@@ -935,11 +953,43 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                 ],
               ),
               const SizedBox(height: 6),
-              Text(
-                location.narration,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+              Builder(
+                builder: (context) {
+                  final narration = location.narration.trim();
+                  final canExpand = narration.length > 140;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        narration,
+                        style: const TextStyle(color: Colors.white),
+                        maxLines: _isPoiNarrationExpanded ? null : 3,
+                        overflow: _isPoiNarrationExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      ),
+                      if (canExpand)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _isPoiNarrationExpanded = !_isPoiNarrationExpanded;
+                              });
+                            },
+                            icon: Icon(
+                              _isPoiNarrationExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                              color: Colors.lightGreenAccent,
+                              size: 22,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                            splashRadius: 16,
+                            tooltip: _isPoiNarrationExpanded ? 'Collapse' : 'Expand',
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 10),
               LayoutBuilder(
