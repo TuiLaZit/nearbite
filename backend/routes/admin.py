@@ -14,6 +14,7 @@ import secrets
 import string
 import unicodedata
 import time
+from datetime import datetime
 from sqlalchemy import func, text
 from werkzeug.security import generate_password_hash
 
@@ -915,11 +916,6 @@ def register_admin_routes(app):
     @admin_required
     def upload_restaurant_image_file():
         """Upload image file to Supabase Storage and return URL"""
-        if not supabase_client:
-            return jsonify({
-                "error": "Image upload is not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_KEY in .env"
-            }), 500
-        
         # Check if file is present
         if 'file' not in request.files:
             return jsonify({"error": "No file provided"}), 400
@@ -953,18 +949,25 @@ def register_admin_routes(app):
             # Upload to Supabase with retry for transient storage/network errors.
             last_error = None
             public_url = None
-            for attempt in range(3):
-                try:
-                    public_url = upload_image(file_bytes, filename, content_type=content_type)
-                    break
-                except Exception as upload_error:
-                    last_error = upload_error
-                    if attempt == 2:
-                        raise
-                    time.sleep(0.4 * (attempt + 1))
+            if supabase_client:
+                for attempt in range(3):
+                    try:
+                        public_url = upload_image(file_bytes, filename, content_type=content_type)
+                        break
+                    except Exception as upload_error:
+                        last_error = upload_error
+                        if attempt == 2:
+                            break
+                        time.sleep(0.4 * (attempt + 1))
 
             if not public_url:
-                raise Exception(str(last_error or "Upload failed"))
+                # Fallback: persist image locally so owner flow can continue even when storage is down.
+                local_dir = os.path.join(app.static_folder, "uploads")
+                os.makedirs(local_dir, exist_ok=True)
+                local_path = os.path.join(local_dir, filename)
+                with open(local_path, "wb") as f:
+                    f.write(file_bytes)
+                public_url = f"{request.host_url.rstrip('/')}/static/uploads/{filename}"
             
             return jsonify({
                 "status": "success",

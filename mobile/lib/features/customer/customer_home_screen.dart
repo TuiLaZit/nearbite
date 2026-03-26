@@ -75,7 +75,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
 
   DateTime? _audioStartAt;
   int? _activeAudioRestaurantId;
-  String? _lastPlayedAudioUrl;
+  String? _lastPlayedAudioKey;
   StreamSubscription<void>? _sessionExpiredSub;
   StreamSubscription<PlayerState>? _playerStateSub;
   bool _isInPoi = false;
@@ -96,6 +96,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   DateTime? _manualPlaybackUntil;
   int _selectedLoadRequestId = 0;
   int _locationCycleRequestId = 0;
+  final Map<String, DateTime> _audioEnrichmentAttempts = <String, DateTime>{};
   final Map<int, DateTime> _playedRestaurants = <int, DateTime>{};
 
   static const Duration _poiDebounceDuration = Duration(seconds: 2);
@@ -267,6 +268,38 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
         return;
       }
 
+      final hasAudio = location.audioUrl != null && location.audioUrl!.trim().isNotEmpty;
+      if (!hasAudio && location.nearestPlace.id > 0) {
+        final enrichKey = '${location.nearestPlace.id}:${_apiLanguageCode(_language)}';
+        final lastAttempt = _audioEnrichmentAttempts[enrichKey];
+        final shouldRetryEnrich = lastAttempt == null ||
+            DateTime.now().difference(lastAttempt) > const Duration(seconds: 20);
+
+        if (shouldRetryEnrich) {
+          _audioEnrichmentAttempts[enrichKey] = DateTime.now();
+          try {
+            final enriched = await _api.postLocation(
+              lat: location.nearestPlace.lat,
+              lng: location.nearestPlace.lng,
+              language: _apiLanguageCode(_language),
+              allowNetworkTranslation: true,
+            );
+            if (_isLatestLocationCycle(requestId)) {
+              location = LocationResult(
+                narration: enriched.narration.isNotEmpty ? enriched.narration : location.narration,
+                distanceKm: location.distanceKm,
+                poiRadiusKm: location.poiRadiusKm,
+                nearestPlace: _mergeRestaurant(location.nearestPlace, enriched.nearestPlace),
+                audioUrl: enriched.audioUrl,
+                outOfRangeMessage: enriched.outOfRangeMessage,
+              );
+            }
+          } catch (_) {
+            // Keep local nearest data when enrichment fails.
+          }
+        }
+      }
+
       if (_isTracking && !widget.guestMode) {
         try {
           await _api.trackLocation(
@@ -320,6 +353,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
 
       final inCooldown = _isAutoPlayInCooldown(location.nearestPlace.id);
       final audioBusyOrPlaying = _isPoiAudioPlaying || _audioStartAt != null || _isAudioPreparing;
+      final resolvedAudio = _resolveAudioUrl(location.audioUrl);
+      final currentAudioKey = '${location.nearestPlace.id}|${resolvedAudio ?? ''}';
 
       if (!_isLatestLocationCycle(requestId)) {
         return;
@@ -332,40 +367,38 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
           !inCooldown &&
           !audioBusyOrPlaying &&
           !suppressAutoPlay &&
-          location.audioUrl != null &&
-          location.audioUrl!.isNotEmpty &&
-          _lastPlayedAudioUrl != location.audioUrl) {
-        final resolved = _resolveAudioUrl(location.audioUrl);
-        if (resolved != null) {
-          final updated = LocationResult(
-            narration: location.narration,
-            distanceKm: location.distanceKm,
-            poiRadiusKm: location.poiRadiusKm,
-            nearestPlace: location.nearestPlace,
-            audioUrl: resolved,
-            outOfRangeMessage: location.outOfRangeMessage,
+          resolvedAudio != null &&
+          resolvedAudio.isNotEmpty &&
+          _lastPlayedAudioKey != currentAudioKey) {
+        final resolved = resolvedAudio;
+        final updated = LocationResult(
+          narration: location.narration,
+          distanceKm: location.distanceKm,
+          poiRadiusKm: location.poiRadiusKm,
+          nearestPlace: location.nearestPlace,
+          audioUrl: resolved,
+          outOfRangeMessage: location.outOfRangeMessage,
+        );
+        try {
+          final cachedRecord = await _narrationCacheService.read(
+            restaurantId: location.nearestPlace.id,
+            language: _apiLanguageCode(_language),
           );
-          try {
-            final cachedRecord = await _narrationCacheService.read(
-              restaurantId: location.nearestPlace.id,
-              language: _apiLanguageCode(_language),
-            );
-            await _startAudio(updated, localAudioPath: cachedRecord?.audioFilePath);
-            _lastPlayedAudioUrl = resolved;
-            _playedRestaurants[location.nearestPlace.id] = DateTime.now();
-          } catch (e) {
-            if (_isIgnorableAudioError(e)) {
-              return;
-            }
-            if (!mounted) return;
-            setState(() {
-              _error = 'Khong the phat audio luc nay: $e';
-            });
+          await _startAudio(updated, localAudioPath: cachedRecord?.audioFilePath);
+          _lastPlayedAudioKey = currentAudioKey;
+          _playedRestaurants[location.nearestPlace.id] = DateTime.now();
+        } catch (e) {
+          if (_isIgnorableAudioError(e)) {
+            return;
           }
+          if (!mounted) return;
+          setState(() {
+            _error = 'Khong the phat audio luc nay: $e';
+          });
         }
       } else if (!inPoiRange && _audioStartAt != null) {
         await _stopAudioAndTrack();
-        _lastPlayedAudioUrl = null;
+        _lastPlayedAudioKey = null;
       }
     } catch (e) {
       if (!_isLatestLocationCycle(requestId)) {
@@ -997,7 +1030,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
       final localPath = cachedRecord?.audioFilePath ?? _poiCachedAudioPath;
 
       await _startAudio(updated, localAudioPath: localPath);
-      _lastPlayedAudioUrl = resolved;
+      _lastPlayedAudioKey = '${location.nearestPlace.id}|$resolved';
       _playedRestaurants[location.nearestPlace.id] = DateTime.now();
       _manualPlaybackUntil = DateTime.now().add(const Duration(seconds: 20));
     } finally {
@@ -1080,6 +1113,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     }
 
     _manualPlaybackUntil = DateTime.now().add(const Duration(seconds: 20));
+    _lastPlayedAudioKey = '${selected.id}|${resolved ?? ''}';
     _playedRestaurants[selected.id] = DateTime.now();
   }
 
@@ -1091,7 +1125,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     final normalizedForApi = _apiLanguageCode(lang);
 
     _playedRestaurants.clear();
-    _lastPlayedAudioUrl = null;
+    _lastPlayedAudioKey = null;
     _poiCachedAudioPath = null;
     _selectedCachedAudioPath = null;
 
@@ -1675,22 +1709,56 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
       return null;
     }
 
-    final userPoint = LatLng(position.latitude, position.longitude);
-    final distance = const Distance();
-
     final candidates = <_PoiCandidate>[];
     for (final restaurant in _restaurants) {
-      final restaurantPoint = LatLng(restaurant.lat, restaurant.lng);
-      final distanceKm = distance.as(LengthUnit.Kilometer, userPoint, restaurantPoint);
-      candidates.add(_PoiCandidate(restaurant: restaurant, distanceKm: distanceKm));
+      if (restaurant.lat.abs() > 90 || restaurant.lng.abs() > 180) {
+        continue;
+      }
+
+      final distanceMeters = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        restaurant.lat,
+        restaurant.lng,
+      );
+      final distanceKm = distanceMeters / 1000;
+      candidates.add(
+        _PoiCandidate(
+          restaurant: restaurant,
+          distanceKm: distanceKm,
+          qualityScore: _restaurantQualityScore(restaurant),
+        ),
+      );
     }
 
     if (candidates.isEmpty) {
       return null;
     }
 
-    candidates.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+    candidates.sort((a, b) {
+      final gap = (a.distanceKm - b.distanceKm).abs();
+      if (gap > 0.005) {
+        return a.distanceKm.compareTo(b.distanceKm);
+      }
+
+      final qualityOrder = b.qualityScore.compareTo(a.qualityScore);
+      if (qualityOrder != 0) {
+        return qualityOrder;
+      }
+
+      return a.restaurant.id.compareTo(b.restaurant.id);
+    });
     return candidates.first;
+  }
+
+  int _restaurantQualityScore(RestaurantModel restaurant) {
+    final descriptionLen = (restaurant.description ?? '').trim().length;
+    final score = restaurant.visitCount +
+        (restaurant.menu.length * 5) +
+        (restaurant.images.length * 3) +
+        (restaurant.tags.length * 2) +
+        (descriptionLen > 80 ? 4 : (descriptionLen > 20 ? 2 : 0));
+    return score;
   }
 
   RestaurantModel _mergeRestaurant(RestaurantModel base, RestaurantModel enriched) {
@@ -1713,10 +1781,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
 }
 
 class _PoiCandidate {
-  const _PoiCandidate({required this.restaurant, required this.distanceKm});
+  const _PoiCandidate({
+    required this.restaurant,
+    required this.distanceKm,
+    required this.qualityScore,
+  });
 
   final RestaurantModel restaurant;
   final double distanceKm;
+  final int qualityScore;
 }
 
 class _CountryBall extends StatelessWidget {

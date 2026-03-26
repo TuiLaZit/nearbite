@@ -401,7 +401,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
       setState(() {
         _error = status >= 500
             ? 'Upload image failed due to temporary server issue. Please try again in a few seconds. Details: $message'
-            : message;
+            : 'Upload image failed (HTTP $status): $message';
       });
     } catch (e) {
       setState(() => _error = e.toString());
