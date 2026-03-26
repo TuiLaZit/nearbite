@@ -495,7 +495,8 @@ function RestaurantManagement({
           </div>
         ) : (
           <>
-            <table style={styles.table}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
+              <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Tên quán</th>
@@ -604,8 +605,9 @@ function RestaurantManagement({
                 ))}
               </tbody>
             </table>
+            </div>
 
-            {/* Pagination Controls */}
+              {/* Pagination Controls */}
             {!isHidden && pagination.totalPages > 1 && (
               <div style={styles.paginationContainer}>
                 <button
@@ -1196,5 +1198,9 @@ const styles = {
 }
 
 export default RestaurantManagement
+
+
+
+
 
 

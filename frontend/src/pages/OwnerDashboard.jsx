@@ -369,7 +369,8 @@ function OwnerDashboard() {
               )}
             </form>
 
-            <table style={styles.table}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
+              <table style={styles.table}>
               <thead>
                 <tr>
                   <th>Tên món</th>
@@ -390,10 +391,11 @@ function OwnerDashboard() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+            </div>
+            </div>
+          )}
 
-        {activeTab === 'images' && (
+          {activeTab === 'images' && (
           <div style={styles.card}>
             <h3>Hình ảnh quán</h3>
             <form onSubmit={handleCreateImage} style={styles.imageForm}>
@@ -639,3 +641,5 @@ const styles = {
 }
 
 export default OwnerDashboard
+
+
