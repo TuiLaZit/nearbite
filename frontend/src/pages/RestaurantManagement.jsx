@@ -409,7 +409,58 @@ function RestaurantManagement({
   }
 
   const isMobile = viewportWidth <= 768
-  const tableMinWidth = isHidden ? 640 : (isOwnerView ? 860 : 1180)
+
+  const renderRestaurantActions = (restaurant, compact = false) => (
+    <div style={{ ...styles.actionButtons, ...(compact ? styles.actionButtonsMobile : {}) }}>
+      {isHidden ? (
+        <>
+          <button
+            style={styles.btnRestore}
+            onClick={() => handleRestore(restaurant.id, restaurant.name)}
+            title="Khôi phục quán"
+          >
+            ♻️ Khôi phục
+          </button>
+          <button
+            style={styles.btnDeletePermanent}
+            onClick={() => handleDelete(restaurant.id, restaurant.name)}
+            title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
+          >
+            {compact ? '⚠️ Xóa vv' : '⚠️ Xóa vĩnh viễn'}
+          </button>
+        </>
+      ) : (
+        <>
+          <button style={styles.btnEdit} onClick={() => handleEdit(restaurant)}>✏️</button>
+          <button
+            style={styles.btnTagAssign}
+            onClick={() => openTagEditor(restaurant)}
+            title="Gán tags cho quán"
+          >
+            {compact ? '🏷️ Tags' : '🏷️ Gán tags'}
+          </button>
+          {!isOwnerView && (
+            <button
+              style={restaurant.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
+              onClick={() => handleCreateOrResetAccount(restaurant)}
+              title={restaurant.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
+            >
+              {restaurant.has_account ? (compact ? '🔐 Reset' : '🔐 Quên mật khẩu') : (compact ? '👤 Tạo TK' : '👤 Tạo tài khoản')}
+            </button>
+          )}
+          {!isOwnerView && (
+            <button
+              style={styles.btnDelete}
+              onClick={() => handleDelete(restaurant.id, restaurant.name)}
+              title="Ẩn quán"
+            >
+              👻 Ẩn
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
 
   return (
     <div style={styles.container}>
@@ -505,24 +556,70 @@ function RestaurantManagement({
           </div>
         ) : (
           <>
-            <div style={{ ...styles.tableScrollWrap, ...(isMobile ? styles.tableScrollWrapMobile : {}) }}>
-              <table style={{ ...styles.table, ...(isMobile ? { minWidth: `${tableMinWidth}px` } : {}) }}>
+            {isMobile ? (
+              <div style={styles.mobileCardList}>
+                {restaurants.map(r => (
+                  <div key={r.id} style={styles.mobileCard}>
+                    <div style={styles.mobileCardHeader}>
+                      <div style={styles.restaurantName}>{r.name}</div>
+                      {!isHidden && <div style={styles.mobileStatBadge}>👁️ {r.visit_count || 0}</div>}
+                    </div>
+
+                    <div style={styles.restaurantTags}>
+                      {r.tags?.map(tag => (
+                        <span
+                          key={tag.id}
+                          style={{ ...styles.tagBadge, backgroundColor: tag.color }}
+                        >
+                          {tag.icon} {tag.name}
+                        </span>
+                      ))}
+                    </div>
+
+                    {!isHidden && (
+                      <div style={styles.mobileStatsRow}>
+                        <span>TG ghé: <strong>{r.avg_visit_duration || 0}</strong></span>
+                        <span>TG nghe: <strong>{r.avg_audio_duration || 0}</strong></span>
+                        <span>TG ăn: <strong>{r.avg_eat_time}</strong></span>
+                      </div>
+                    )}
+
+                    {!isHidden && !isOwnerView && (
+                      <div style={styles.mobileAccountRow}>
+                        <div>
+                          <strong>TK:</strong> {r.owner_username || 'Chưa có tài khoản'}
+                        </div>
+                        {r.has_account && (
+                          <div>
+                            <strong>PW:</strong> {r.owner_password_plain || 'Chưa có'}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {renderRestaurantActions(r, true)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={styles.tableScrollWrap}>
+                <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Tên quán</th>
-                  {!isHidden && !isOwnerView && <th style={styles.th}>{isMobile ? 'Tài khoản' : 'Tài khoản quán'}</th>}
+                  {!isHidden && !isOwnerView && <th style={styles.th}>Tài khoản quán</th>}
                   {!isHidden && !isOwnerView && <th style={styles.th}>Password</th>}
-                  {!isHidden && <th style={styles.th}>{isMobile ? 'Ghé' : 'Lượt ghé'}</th>}
-                  {!isHidden && <th style={styles.th}>{isMobile ? 'TG ghé' : 'TG ghé TB (phút)'}</th>}
-                  {!isHidden && <th style={styles.th}>{isMobile ? 'TG nghe' : 'TG nghe TB (giây)'}</th>}
-                  {!isHidden && <th style={styles.th}>{isMobile ? 'TG ăn' : 'TG ăn (phút)'}</th>}
+                  {!isHidden && <th style={styles.th}>Lượt ghé</th>}
+                  {!isHidden && <th style={styles.th}>TG ghé TB (phút)</th>}
+                  {!isHidden && <th style={styles.th}>TG nghe TB (giây)</th>}
+                  {!isHidden && <th style={styles.th}>TG ăn (phút)</th>}
                   <th style={styles.th}>Hành động</th>
                 </tr>
               </thead>
               <tbody>
                 {restaurants.map(r => (
                   <tr key={r.id} style={styles.tr}>
-                    <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
+                    <td style={styles.td}>
                       <div style={styles.restaurantName}>{r.name}</div>
                       <div style={styles.restaurantTags}>
                         {r.tags?.map(tag => (
@@ -536,7 +633,7 @@ function RestaurantManagement({
                       </div>
                     </td>
                     {!isHidden && !isOwnerView && (
-                      <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
+                      <td style={styles.td}>
                         {r.has_account ? (
                           <div>
                             <div style={styles.accountUsername}>{r.owner_username}</div>
@@ -548,7 +645,7 @@ function RestaurantManagement({
                       </td>
                     )}
                     {!isHidden && !isOwnerView && (
-                      <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
+                      <td style={styles.td}>
                         {r.has_account ? (
                           <span style={styles.passwordText}>{r.owner_password_plain || 'Chưa có'}</span>
                         ) : (
@@ -556,66 +653,17 @@ function RestaurantManagement({
                         )}
                       </td>
                     )}
-                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.visit_count || 0}</td>}
-                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.avg_visit_duration || 0}</td>}
-                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.avg_audio_duration || 0}</td>}
-                    {!isHidden && <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>{r.avg_eat_time}</td>}
-                    <td style={{ ...styles.td, ...(isMobile ? styles.tdMobile : {}) }}>
-                      <div style={{ ...styles.actionButtons, ...(isMobile ? styles.actionButtonsMobile : {}) }}>
-                        {isHidden ? (
-                          <>
-                            <button 
-                              style={styles.btnRestore} 
-                              onClick={() => handleRestore(r.id, r.name)}
-                              title="Khôi phục quán"
-                            >
-                              {isMobile ? '♻️ Khôi phục' : '♻️ Khôi phục'}
-                            </button>
-                            <button 
-                              style={styles.btnDeletePermanent} 
-                              onClick={() => handleDelete(r.id, r.name)}
-                              title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
-                            >
-                              {isMobile ? '⚠️ Xóa vv' : '⚠️ Xóa vĩnh viễn'}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button style={styles.btnEdit} onClick={() => handleEdit(r)}>✏️</button>
-                            <button
-                              style={styles.btnTagAssign}
-                              onClick={() => openTagEditor(r)}
-                              title="Gán tags cho quán"
-                            >
-                              {isMobile ? '🏷️ Tags' : '🏷️ Gán tags'}
-                            </button>
-                            {!isOwnerView && (
-                              <button
-                                style={r.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
-                                onClick={() => handleCreateOrResetAccount(r)}
-                                title={r.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
-                              >
-                                {r.has_account ? (isMobile ? '🔐 Reset' : '🔐 Quên mật khẩu') : (isMobile ? '👤 Tạo TK' : '👤 Tạo tài khoản')}
-                              </button>
-                            )}
-                            {!isOwnerView && (
-                              <button 
-                                style={styles.btnDelete} 
-                                onClick={() => handleDelete(r.id, r.name)}
-                                title="Ẩn quán"
-                              >
-                                {isMobile ? '👻 Ẩn' : '👻 Ẩn'}
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
+                    {!isHidden && <td style={styles.td}>{r.visit_count || 0}</td>}
+                    {!isHidden && <td style={styles.td}>{r.avg_visit_duration || 0}</td>}
+                    {!isHidden && <td style={styles.td}>{r.avg_audio_duration || 0}</td>}
+                    {!isHidden && <td style={styles.td}>{r.avg_eat_time}</td>}
+                    <td style={styles.td}>{renderRestaurantActions(r, false)}</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-            </div>
+                </table>
+              </div>
+            )}
 
               {/* Pagination Controls */}
             {!isHidden && pagination.totalPages > 1 && (
@@ -921,6 +969,50 @@ const styles = {
   tableScrollWrapMobile: {
     margin: '0 -6px',
     padding: '0 6px'
+  },
+  mobileCardList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  },
+  mobileCard: {
+    border: '1px solid #d6e3f5',
+    borderRadius: '12px',
+    padding: '12px',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f6faff 100%)'
+  },
+  mobileCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    marginBottom: '8px'
+  },
+  mobileStatBadge: {
+    fontSize: '12px',
+    fontWeight: '700',
+    color: '#1d4ed8',
+    background: '#e8f0ff',
+    borderRadius: '999px',
+    padding: '4px 8px',
+    whiteSpace: 'nowrap'
+  },
+  mobileStatsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px 14px',
+    marginTop: '8px',
+    fontSize: '13px',
+    color: '#334155'
+  },
+  mobileAccountRow: {
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px dashed #d7e3f4',
+    fontSize: '13px',
+    color: '#334155',
+    display: 'grid',
+    gap: '4px'
   },
   th: {
     padding: '16px',
