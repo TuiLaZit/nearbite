@@ -1358,7 +1358,15 @@ function LocationTracker() {
           }
 
           .tracker-root .tracker-brand {
-            grid-column: 1 / -1;
+            grid-column: 1;
+          }
+
+          .tracker-root .tracker-logout-btn {
+            grid-column: 2;
+            grid-row: 1;
+            justify-self: end;
+            padding: 9px 12px !important;
+            font-size: 12px !important;
           }
         }
       `}</style>
@@ -1433,6 +1441,7 @@ function LocationTracker() {
 
         {isCustomerAuthenticated ? (
           <button
+            className="tracker-logout-btn"
             onClick={handleCustomerLogout}
             style={{
               margin: 0,
