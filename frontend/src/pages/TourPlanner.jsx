@@ -139,331 +139,546 @@ function TourPlanner() {
     window.open(url, '_blank')
   }
 
+  const firstTourCardStyle = {
+    ...plannerStyles.tourCard,
+    ...plannerStyles.tourCardPrimary
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      {/* Header */}
-      <div style={{
-        background: '#fff',
-        borderBottom: '2px solid #ddd',
-        padding: '15px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '20px'
-      }}>
-        <button
-          onClick={() => navigate('/customer')}
-          style={{
-            padding: '8px 16px',
-            background: '#fff',
-            border: '2px solid #ddd',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          🍜
-        </button>
-        <h1 style={{ margin: 0, fontSize: '24px', flex: 1 }}>🗺️ {t('tourPlanning')}</h1>
-        
-        {/* Language selector */}
-        <select 
-          value={language} 
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{
-            padding: '10px 15px',
-            borderRadius: '8px',
-            border: '2px solid #ddd',
-            fontSize: '13px',
-            cursor: 'pointer',
-            background: 'white',
-            minWidth: '100px'
-          }}
-        >
-          {languages.map(lang => (
-            <option key={lang.code} value={lang.code}>{lang.label}</option>
-          ))}
-        </select>
-      </div>
+    <div style={plannerStyles.page}>
+      <style>{`
+        .tour-planner-root input,
+        .tour-planner-root select {
+          width: 100%;
+          border: 1px solid #cad8ec;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #16314f;
+          outline: none;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
 
-      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Form nhập liệu */}
-        <div style={{
-          background: '#fff',
-          padding: '20px',
-          borderRadius: '12px',
-          marginBottom: '20px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-        }}>
-          <h2 style={{ marginTop: 0 }}>📝 {t('tourInfo')}</h2>
+        .tour-planner-root input:focus,
+        .tour-planner-root select:focus {
+          border-color: #2f7e8f;
+          box-shadow: 0 0 0 3px rgba(47, 126, 143, 0.16);
+        }
 
-          {/* Thời gian */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              ⏱️ {t('totalTime')} ({t('minutes')}):
-            </label>
-            <input
-              type="number"
-              value={timeLimit}
-              onChange={(e) => setTimeLimit(parseInt(e.target.value))}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '2px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '16px'
-              }}
-              min="30"
-              max="480"
-            />
-            <small style={{ color: '#666' }}>{t('timeRangeHint')}</small>
-          </div>
+        @media (max-width: 860px) {
+          .tour-planner-header {
+            flex-wrap: wrap;
+            gap: 10px;
+          }
 
-          {/* Ngân sách */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              💰 {t('budget')}:
-            </label>
-            <input
-              type="number"
-              value={budget}
-              onChange={(e) => setBudget(parseInt(e.target.value))}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '2px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '16px'
-              }}
-              min="50000"
-              step="50000"
-            />
-            <small style={{ color: '#666' }}>{formatMoney(budget)}</small>
-          </div>
+          .tour-planner-title {
+            width: 100%;
+            order: 3;
+            margin-top: 6px;
+          }
 
-          {/* Tags */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-              🏷️ {t('selectTags')}:
-            </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {tags && tags.length > 0 ? tags.map(tag => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleTag(tag.id)}
-                  style={{
-                    padding: '8px 16px',
-                    border: `2px solid ${tag.color || '#ddd'}`,
-                    background: selectedTags.includes(tag.id) ? (tag.color || '#007bff') : '#fff',
-                    color: selectedTags.includes(tag.id) ? '#fff' : (tag.color || '#333'),
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: selectedTags.includes(tag.id) ? 'bold' : 'normal',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {tag.icon} {tag.name}
-                </button>
-              )) : (
-                <div style={{ color: '#666', fontStyle: 'italic' }}>{t('loading')}</div>
-              )}
-            </div>
-            <small style={{ color: '#666' }}>
-              {selectedTags.length > 0 ? t('selectedTags', {count: selectedTags.length}) : t('noTagsSelected')}
-            </small>
-          </div>
+          .tour-planner-settings-grid {
+            grid-template-columns: 1fr;
+          }
 
-          {/* Nút xếp tour */}
-          <button
-            onClick={handlePlanTour}
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '15px',
-              background: loading ? '#ccc' : '#28a745',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s'
-            }}
-          >
-            {loading ? `⏳ ${t('planning')}` : `🚀 ${t('planTourNow')}`}
+          .tour-planner-tour-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
+      <div className="tour-planner-root" style={plannerStyles.shell}>
+        <header className="tour-planner-header" style={plannerStyles.header}>
+          <button onClick={() => navigate('/customer')} style={plannerStyles.backButton} title="NearBite Home">
+            🍜
           </button>
-        </div>
+          <h1 className="tour-planner-title" style={plannerStyles.title}>🗺️ {t('tourPlanning')}</h1>
+          <select value={language} onChange={(e) => setLanguage(e.target.value)} style={plannerStyles.languageSelect}>
+            {languages.map(lang => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
+          </select>
+        </header>
 
-        {/* Hiển thị lỗi */}
-        {error && (
-          <div style={{
-            background: '#f8d7da',
-            color: '#721c24',
-            padding: '15px',
-            borderRadius: '8px',
-            marginBottom: '20px',
-            border: '1px solid #f5c6cb'
-          }}>
-            ⚠️ {t('connectionError')}: {error}
-          </div>
-        )}
-
-        {/* Hiển thị tours */}
-        {tours.length > 0 && (
-          <div>
-            <h2>✨ {t('tourSuggestions', {count: tours.length})}</h2>
-            <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))' }}>
-              {tours.map((tour, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: '#fff',
-                    padding: '20px',
-                    borderRadius: '12px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    border: idx === 0 ? '3px solid #28a745' : '1px solid #ddd'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h3 style={{ margin: 0 }}>
-                      {idx === 0 && '👑 '}
-                      {t('tour')} #{idx + 1}
-                    </h3>
-                    <span style={{
-                      background: idx === 0 ? '#28a745' : '#007bff',
-                      color: '#fff',
-                      padding: '4px 12px',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }}>
-                      {tour.strategy === 'best_score' && t('bestScore')}
-                      {tour.strategy === 'nearest' && t('nearest')}
-                      {tour.strategy === 'cheapest' && t('cheapest')}
-                    </span>
-                  </div>
-
-                  <div style={{ marginBottom: '15px', padding: '10px', background: '#f8f9fa', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span>🕐 {t('time')}:</span>
-                      <strong>{tour.total_time} {t('minutes')}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span>💵 {t('cost')}:</span>
-                      <strong style={{ color: '#28a745' }}>{formatMoney(tour.total_cost)}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>🍽️ {t('restaurants')}:</span>
-                      <strong>{t('restaurant_count', {count: tour.num_stops})}</strong>
-                    </div>
-                  </div>
-
-                  {/* Danh sách quán */}
-                  <div style={{ marginBottom: '15px' }}>
-                    {tour.restaurants.map((restaurant, rIdx) => (
-                      <div
-                        key={rIdx}
-                        style={{
-                          padding: '12px',
-                          background: '#f8f9fa',
-                          borderRadius: '8px',
-                          marginBottom: '10px',
-                          border: '1px solid #e9ecef'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                          <span style={{
-                            background: '#007bff',
-                            color: '#fff',
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}>
-                            {rIdx + 1}
-                          </span>
-                          <strong style={{ flex: 1 }}>{restaurant.name}</strong>
-                          <span style={{ fontSize: '12px', color: '#666' }}>
-                            {formatMoney(restaurant.avg_price)}
-                          </span>
-                        </div>
-
-                        {/* Tags */}
-                        {restaurant.tags && restaurant.tags.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
-                            {restaurant.tags.map(tag => (
-                              <span
-                                key={tag.id}
-                                style={{
-                                  padding: '2px 8px',
-                                  background: tag.color || '#ddd',
-                                  color: '#fff',
-                                  borderRadius: '10px',
-                                  fontSize: '11px'
-                                }}
-                              >
-                                {tag.icon} {tag.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Ảnh preview */}
-                        {restaurant.images && restaurant.images.length > 0 && (
-                          <div style={{ display: 'flex', gap: '5px' }}>
-                            {restaurant.images.map((img, imgIdx) => (
-                              <img
-                                key={imgIdx}
-                                src={img.image_url}
-                                alt={restaurant.name}
-                                style={{
-                                  width: '50px',
-                                  height: '50px',
-                                  objectFit: 'cover',
-                                  borderRadius: '5px'
-                                }}
-                                onError={(e) => e.target.style.display = 'none'}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Nút chỉ đường */}
-                  <button
-                    onClick={() => openTourInMaps(tour)}
-                    disabled={!userLocation}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      background: userLocation ? '#007bff' : '#ccc',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      cursor: userLocation ? 'pointer' : 'not-allowed'
-                    }}
-                  >
-                    🗺️ {t('viewDirections')}
-                  </button>
-                </div>
-              ))}
+        <main style={plannerStyles.content}>
+          <section style={plannerStyles.formCard}>
+            <div style={plannerStyles.formHeadingWrap}>
+              <h2 style={plannerStyles.formHeading}>📝 {t('tourInfo')}</h2>
+              <span style={plannerStyles.formBadge}>{tours.length > 0 ? `${tours.length} ${t('tour')}` : t('tourPlanning')}</span>
             </div>
-          </div>
-        )}
+
+            <div className="tour-planner-settings-grid" style={plannerStyles.settingsGrid}>
+              <div style={plannerStyles.fieldCard}>
+                <label style={plannerStyles.label}>⏱️ {t('totalTime')} ({t('minutes')})</label>
+                <input
+                  type="number"
+                  value={timeLimit}
+                  onChange={(e) => setTimeLimit(parseInt(e.target.value, 10) || 0)}
+                  style={plannerStyles.input}
+                  min="30"
+                  max="480"
+                />
+                <small style={plannerStyles.hint}>{t('timeRangeHint')}</small>
+              </div>
+
+              <div style={plannerStyles.fieldCard}>
+                <label style={plannerStyles.label}>💰 {t('budget')}</label>
+                <input
+                  type="number"
+                  value={budget}
+                  onChange={(e) => setBudget(parseInt(e.target.value, 10) || 0)}
+                  style={plannerStyles.input}
+                  min="50000"
+                  step="50000"
+                />
+                <small style={plannerStyles.hint}>{formatMoney(budget)}</small>
+              </div>
+            </div>
+
+            <div style={plannerStyles.fieldBlock}>
+              <label style={plannerStyles.label}>🏷️ {t('selectTags')}</label>
+              <div style={plannerStyles.tagWrap}>
+                {tags && tags.length > 0 ? tags.map(tag => {
+                  const active = selectedTags.includes(tag.id)
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => toggleTag(tag.id)}
+                      style={{
+                        ...plannerStyles.tagButton,
+                        borderColor: tag.color || '#9aaec8',
+                        color: active ? '#ffffff' : (tag.color || '#345076'),
+                        background: active ? (tag.color || '#2f7e8f') : '#f8fbff'
+                      }}
+                    >
+                      {tag.icon} {tag.name}
+                    </button>
+                  )
+                }) : (
+                  <div style={plannerStyles.placeholderText}>{translationLoading ? t('loading') : t('noTagsSelected')}</div>
+                )}
+              </div>
+              <small style={plannerStyles.hint}>
+                {selectedTags.length > 0 ? t('selectedTags', { count: selectedTags.length }) : t('noTagsSelected')}
+              </small>
+            </div>
+
+            <button onClick={handlePlanTour} disabled={loading} style={{ ...plannerStyles.submitButton, ...(loading ? plannerStyles.submitButtonLoading : {}) }}>
+              {loading ? `⏳ ${t('planning')}` : `🚀 ${t('planTourNow')}`}
+            </button>
+          </section>
+
+          {error && (
+            <div style={plannerStyles.errorCard}>
+              ⚠️ {t('connectionError')}: {error}
+            </div>
+          )}
+
+          {tours.length > 0 && (
+            <section>
+              <h2 style={plannerStyles.tourTitle}>✨ {t('tourSuggestions', { count: tours.length })}</h2>
+              <div className="tour-planner-tour-grid" style={plannerStyles.tourGrid}>
+                {tours.map((tour, idx) => (
+                  <article key={idx} style={idx === 0 ? firstTourCardStyle : plannerStyles.tourCard}>
+                    <div style={plannerStyles.tourCardHeader}>
+                      <h3 style={plannerStyles.tourCardTitle}>
+                        {idx === 0 && '👑 '}
+                        {t('tour')} #{idx + 1}
+                      </h3>
+                      <span style={{ ...plannerStyles.strategyBadge, ...(idx === 0 ? plannerStyles.strategyBadgePrimary : {}) }}>
+                        {tour.strategy === 'best_score' && t('bestScore')}
+                        {tour.strategy === 'nearest' && t('nearest')}
+                        {tour.strategy === 'cheapest' && t('cheapest')}
+                      </span>
+                    </div>
+
+                    <div style={plannerStyles.summaryCard}>
+                      <div style={plannerStyles.summaryRow}>
+                        <span>🕐 {t('time')}</span>
+                        <strong>{tour.total_time} {t('minutes')}</strong>
+                      </div>
+                      <div style={plannerStyles.summaryRow}>
+                        <span>💵 {t('cost')}</span>
+                        <strong style={plannerStyles.costValue}>{formatMoney(tour.total_cost)}</strong>
+                      </div>
+                      <div style={plannerStyles.summaryRow}>
+                        <span>🍽️ {t('restaurants')}</span>
+                        <strong>{t('restaurant_count', { count: tour.num_stops })}</strong>
+                      </div>
+                    </div>
+
+                    <div style={plannerStyles.restaurantList}>
+                      {tour.restaurants.map((restaurant, rIdx) => (
+                        <div key={rIdx} style={plannerStyles.restaurantCard}>
+                          <div style={plannerStyles.restaurantHeader}>
+                            <span style={plannerStyles.stopBadge}>{rIdx + 1}</span>
+                            <strong style={plannerStyles.restaurantName}>{restaurant.name}</strong>
+                            <span style={plannerStyles.priceText}>{formatMoney(restaurant.avg_price)}</span>
+                          </div>
+
+                          {restaurant.tags && restaurant.tags.length > 0 && (
+                            <div style={plannerStyles.restaurantTagWrap}>
+                              {restaurant.tags.map(tag => (
+                                <span key={tag.id} style={{ ...plannerStyles.restaurantTag, background: tag.color || '#4d698a' }}>
+                                  {tag.icon} {tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {restaurant.images && restaurant.images.length > 0 && (
+                            <div style={plannerStyles.imageStrip}>
+                              {restaurant.images.map((img, imgIdx) => (
+                                <img
+                                  key={imgIdx}
+                                  src={img.image_url}
+                                  alt={restaurant.name}
+                                  style={plannerStyles.imageThumb}
+                                  onError={(e) => { e.target.style.display = 'none' }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => openTourInMaps(tour)}
+                      disabled={!userLocation}
+                      style={{ ...plannerStyles.directionButton, ...(!userLocation ? plannerStyles.directionButtonDisabled : {}) }}
+                    >
+                      🗺️ {t('viewDirections')}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+        </main>
       </div>
     </div>
   )
+}
+
+const plannerStyles = {
+  page: {
+    minHeight: '100vh',
+    background: 'radial-gradient(900px 380px at 12% -8%, rgba(53, 130, 165, 0.18), transparent 68%), radial-gradient(900px 360px at 90% 0%, rgba(21, 113, 89, 0.14), transparent 72%), linear-gradient(160deg, #eef4fb 0%, #e7eff8 100%)',
+    padding: '14px'
+  },
+  shell: {
+    maxWidth: '1240px',
+    margin: '0 auto'
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '12px 14px',
+    borderRadius: '16px',
+    border: '1px solid rgba(156, 183, 214, 0.64)',
+    background: 'linear-gradient(130deg, rgba(15, 38, 66, 0.94) 0%, rgba(21, 77, 109, 0.88) 100%)',
+    boxShadow: '0 20px 34px rgba(17, 31, 57, 0.2)'
+  },
+  backButton: {
+    width: '46px',
+    height: '46px',
+    minWidth: '46px',
+    borderRadius: '12px',
+    border: '1px solid rgba(177, 211, 240, 0.55)',
+    background: 'linear-gradient(135deg, #1e5e83 0%, #2a8ea1 100%)',
+    color: '#f4fbff',
+    fontSize: '20px',
+    cursor: 'pointer',
+    margin: 0,
+    padding: 0,
+    display: 'grid',
+    placeItems: 'center'
+  },
+  title: {
+    margin: 0,
+    flex: 1,
+    color: '#eaf7ff',
+    fontSize: 'clamp(20px, 3vw, 28px)',
+    fontWeight: 800,
+    letterSpacing: '-0.02em'
+  },
+  languageSelect: {
+    minWidth: '130px',
+    maxWidth: '180px',
+    margin: 0,
+    padding: '11px 12px',
+    borderRadius: '12px',
+    border: '1px solid rgba(181, 209, 235, 0.7)',
+    background: '#f8fcff',
+    fontWeight: 600,
+    fontSize: '13px',
+    cursor: 'pointer'
+  },
+  content: {
+    marginTop: '16px',
+    display: 'grid',
+    gap: '18px'
+  },
+  formCard: {
+    background: 'linear-gradient(165deg, rgba(255,255,255,0.96) 0%, rgba(246, 251, 255, 0.93) 100%)',
+    borderRadius: '18px',
+    border: '1px solid rgba(189, 209, 232, 0.9)',
+    boxShadow: '0 18px 34px rgba(20, 43, 77, 0.12)',
+    padding: '18px'
+  },
+  formHeadingWrap: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '14px'
+  },
+  formHeading: {
+    margin: 0,
+    color: '#16314f',
+    fontSize: '22px',
+    fontWeight: 780
+  },
+  formBadge: {
+    borderRadius: '999px',
+    padding: '6px 10px',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#1f4f69',
+    background: '#e5f2fc',
+    border: '1px solid #b8d2eb'
+  },
+  settingsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '12px',
+    marginBottom: '12px'
+  },
+  fieldCard: {
+    borderRadius: '14px',
+    padding: '12px',
+    border: '1px solid #d7e4f2',
+    background: '#f9fcff'
+  },
+  fieldBlock: {
+    borderRadius: '14px',
+    padding: '12px',
+    border: '1px solid #d7e4f2',
+    background: '#f9fcff',
+    marginBottom: '14px'
+  },
+  label: {
+    display: 'block',
+    marginBottom: '8px',
+    color: '#1f3c5f',
+    fontWeight: 700,
+    fontSize: '14px'
+  },
+  input: {
+    margin: 0,
+    padding: '11px 12px',
+    fontSize: '15px'
+  },
+  hint: {
+    marginTop: '8px',
+    display: 'inline-block',
+    color: '#5f7695',
+    fontSize: '12px'
+  },
+  tagWrap: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px'
+  },
+  tagButton: {
+    margin: 0,
+    padding: '8px 12px',
+    borderRadius: '999px',
+    border: '1px solid #9aaec8',
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  placeholderText: {
+    fontSize: '13px',
+    color: '#647b99'
+  },
+  submitButton: {
+    width: '100%',
+    margin: 0,
+    padding: '14px',
+    borderRadius: '12px',
+    border: '1px solid rgba(118, 204, 194, 0.7)',
+    background: 'linear-gradient(135deg, #1f8e83 0%, #2fbc9a 100%)',
+    color: '#ffffff',
+    fontSize: '16px',
+    fontWeight: 800,
+    cursor: 'pointer',
+    boxShadow: '0 14px 24px rgba(32, 109, 102, 0.25)'
+  },
+  submitButtonLoading: {
+    background: '#9aa9b8',
+    borderColor: '#9aa9b8',
+    cursor: 'not-allowed',
+    boxShadow: 'none'
+  },
+  errorCard: {
+    borderRadius: '12px',
+    border: '1px solid #f1aab5',
+    background: '#fff3f5',
+    color: '#8c1b2f',
+    fontWeight: 600,
+    padding: '12px 14px'
+  },
+  tourTitle: {
+    marginTop: 0,
+    marginBottom: '12px',
+    fontSize: '22px',
+    color: '#18324f'
+  },
+  tourGrid: {
+    display: 'grid',
+    gap: '14px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))'
+  },
+  tourCard: {
+    background: 'linear-gradient(165deg, rgba(255,255,255,0.97) 0%, rgba(247, 251, 255, 0.93) 100%)',
+    borderRadius: '16px',
+    border: '1px solid #d4e3f4',
+    boxShadow: '0 14px 28px rgba(20, 43, 77, 0.12)',
+    padding: '16px'
+  },
+  tourCardPrimary: {
+    border: '1px solid #8ddcc9',
+    boxShadow: '0 16px 30px rgba(23, 122, 102, 0.18), 0 0 0 1px rgba(141, 220, 201, 0.3) inset'
+  },
+  tourCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+    marginBottom: '10px'
+  },
+  tourCardTitle: {
+    margin: 0,
+    fontSize: '18px',
+    color: '#17324f'
+  },
+  strategyBadge: {
+    borderRadius: '999px',
+    padding: '5px 10px',
+    fontSize: '11px',
+    fontWeight: 800,
+    background: '#e2ecfa',
+    color: '#2a4f7a'
+  },
+  strategyBadgePrimary: {
+    background: '#dff7ef',
+    color: '#1c7a60'
+  },
+  summaryCard: {
+    borderRadius: '12px',
+    background: '#f3f8ff',
+    border: '1px solid #d7e5f4',
+    padding: '10px 12px',
+    marginBottom: '10px'
+  },
+  summaryRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '13px',
+    color: '#365271',
+    marginBottom: '4px'
+  },
+  costValue: {
+    color: '#197a5b'
+  },
+  restaurantList: {
+    display: 'grid',
+    gap: '8px',
+    marginBottom: '12px'
+  },
+  restaurantCard: {
+    borderRadius: '12px',
+    border: '1px solid #dbe7f5',
+    background: '#fbfdff',
+    padding: '10px'
+  },
+  restaurantHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '8px'
+  },
+  stopBadge: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: '12px',
+    color: '#fff',
+    fontWeight: 800,
+    background: 'linear-gradient(135deg, #2f6f9d 0%, #2f9d92 100%)'
+  },
+  restaurantName: {
+    flex: 1,
+    color: '#1d3d5e',
+    fontSize: '14px'
+  },
+  priceText: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: '#486180'
+  },
+  restaurantTagWrap: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '5px',
+    marginBottom: '8px'
+  },
+  restaurantTag: {
+    padding: '3px 8px',
+    borderRadius: '999px',
+    color: '#fff',
+    fontSize: '11px',
+    fontWeight: 700
+  },
+  imageStrip: {
+    display: 'flex',
+    gap: '6px',
+    overflowX: 'auto',
+    paddingBottom: '2px'
+  },
+  imageThumb: {
+    width: '54px',
+    height: '54px',
+    minWidth: '54px',
+    objectFit: 'cover',
+    borderRadius: '8px',
+    border: '1px solid #d6e4f4'
+  },
+  directionButton: {
+    width: '100%',
+    margin: 0,
+    padding: '11px 12px',
+    borderRadius: '10px',
+    border: '1px solid rgba(133, 172, 214, 0.72)',
+    background: 'linear-gradient(135deg, #2b67aa 0%, #3f9fd1 100%)',
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: '14px',
+    cursor: 'pointer'
+  },
+  directionButtonDisabled: {
+    background: '#9bafc4',
+    borderColor: '#9bafc4',
+    cursor: 'not-allowed'
+  }
 }
 
 export default TourPlanner

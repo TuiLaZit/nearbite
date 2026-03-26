@@ -1337,26 +1337,49 @@ function LocationTracker() {
   const isCustomerAuthenticated = customerAuthStatus === 'authenticated'
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="tracker-root" style={{
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'radial-gradient(1000px 380px at 8% -12%, rgba(60, 136, 165, 0.2), transparent 70%), radial-gradient(900px 360px at 88% 0%, rgba(34, 132, 104, 0.14), transparent 72%), linear-gradient(160deg, #e9f1fb 0%, #e2ecf8 100%)'
+    }}>
+      <style>{`
+        .tracker-root .tracker-header {
+          display: grid;
+          grid-template-columns: auto 1fr auto auto;
+          align-items: center;
+          gap: 10px;
+        }
+
+        @media (max-width: 900px) {
+          .tracker-root .tracker-header {
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+          }
+
+          .tracker-root .tracker-brand {
+            grid-column: 1 / -1;
+          }
+        }
+      `}</style>
       {/* Header */}
-      <div style={{ 
-        padding: '10px 20px', 
-        background: '#fff', 
-        borderBottom: '2px solid #ddd', 
+      <div className="tracker-header" style={{
+        padding: '10px 14px',
+        background: 'linear-gradient(138deg, #0f2745 0%, #11416a 58%, #145063 100%)',
+        borderBottom: '1px solid rgba(167, 196, 228, 0.42)',
+        boxShadow: '0 12px 24px rgba(6, 18, 36, 0.24)',
         zIndex: 1000,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '15px'
+        gap: '10px'
       }}>
         {/* Logo & Name */}
-        <div style={{ 
-          fontSize: '28px', 
-          fontWeight: 'bold',
+        <div className="tracker-brand" style={{
+          fontSize: '26px',
+          fontWeight: '800',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          color: '#EA4335'
+          color: '#f0f8ff',
+          letterSpacing: '-0.01em'
         }}>
           🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
         </div>
@@ -1365,15 +1388,16 @@ function LocationTracker() {
           <button
             onClick={() => navigate('/customer/tour-planner')}
             style={{
-              padding: '10px 20px',
-              background: '#ff9800',
+              margin: 0,
+              padding: '10px 14px',
+              background: 'linear-gradient(135deg, #cf7b14 0%, #e39b1d 100%)',
               color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 'bold',
+              border: '1px solid rgba(255, 221, 171, 0.68)',
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontWeight: '700',
               cursor: 'pointer',
-              transition: 'background 0.2s'
+              transition: 'all 0.2s ease'
             }}
           >
             🗺️ {t('planTour')}
@@ -1385,12 +1409,13 @@ function LocationTracker() {
           value={language} 
           onChange={handleLanguageChange}
           style={{
-            padding: '10px 15px',
-            borderRadius: '8px',
-            border: '2px solid #ddd',
+            margin: 0,
+            padding: '10px 12px',
+            borderRadius: '10px',
+            border: '1px solid rgba(181, 209, 235, 0.72)',
             fontSize: '13px',
             cursor: 'pointer',
-            background: 'white',
+            background: '#f8fcff',
             minWidth: '100px'
           }}
         >
@@ -1403,13 +1428,14 @@ function LocationTracker() {
           <button
             onClick={handleCustomerLogout}
             style={{
-              padding: '10px 16px',
-              background: '#ef4444',
+              margin: 0,
+              padding: '10px 14px',
+              background: 'linear-gradient(135deg, #b72f3f 0%, #d84353 100%)',
               color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
+              border: '1px solid rgba(255, 196, 202, 0.68)',
+              borderRadius: '10px',
               fontSize: '13px',
-              fontWeight: 'bold',
+              fontWeight: '700',
               cursor: 'pointer'
             }}
           >
@@ -1419,13 +1445,14 @@ function LocationTracker() {
           <button
             onClick={() => navigate('/login')}
             style={{
-              padding: '10px 16px',
-              background: '#2563eb',
+              margin: 0,
+              padding: '10px 14px',
+              background: 'linear-gradient(135deg, #2255c9 0%, #2f7ae0 100%)',
               color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
+              border: '1px solid rgba(186, 214, 255, 0.7)',
+              borderRadius: '10px',
               fontSize: '13px',
-              fontWeight: 'bold',
+              fontWeight: '700',
               cursor: 'pointer'
             }}
           >
@@ -1435,7 +1462,7 @@ function LocationTracker() {
       </div>
 
       {/* Leaflet Map */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, position: 'relative', padding: '10px 10px 0' }}>
         {showWeakDeviceNote && (
           <div
             style={{
@@ -1509,7 +1536,7 @@ function LocationTracker() {
           key={`map-${language}`}
           center={mapCenter}
           zoom={16}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', borderRadius: '14px', boxShadow: '0 18px 36px rgba(17, 35, 61, 0.2)' }}
           zoomControl={true}
         >
           <TileLayer
@@ -1692,25 +1719,29 @@ function LocationTracker() {
 
       {/* Control Panel - Bottom */}
       <div style={{ 
-        padding: '20px', 
-        background: '#fff', 
-        borderTop: '2px solid #ddd',
-        boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
+        padding: '14px', 
+        background: 'linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(243, 249, 255, 0.95) 100%)', 
+        borderTop: '1px solid rgba(176, 201, 230, 0.7)',
+        boxShadow: '0 -10px 24px rgba(17, 35, 61, 0.14)',
         zIndex: 1000
       }}>
         <button
           onClick={() => isTracking ? stopTracking() : startTracking()}
           style={{
             width: '100%',
-            padding: '12px 20px',
-            background: isTracking ? '#EA4335' : '#34A853',
+            margin: 0,
+            padding: '13px 20px',
+            background: isTracking
+              ? 'linear-gradient(135deg, #bb3144 0%, #dd4a57 100%)'
+              : 'linear-gradient(135deg, #1f8e67 0%, #2cb489 100%)',
             color: 'white',
-            border: 'none',
-            borderRadius: '8px',
+            border: '1px solid rgba(176, 205, 232, 0.58)',
+            borderRadius: '12px',
             fontSize: '16px',
-            fontWeight: 'bold',
+            fontWeight: '800',
             cursor: 'pointer',
-            marginBottom: '15px'
+            marginBottom: '12px',
+            boxShadow: '0 10px 20px rgba(19, 46, 78, 0.22)'
           }}
         >
           {isTracking ? `⏹ ${t('stopTracking')}` : `▶️ ${t('startTracking')}`}
@@ -1721,10 +1752,11 @@ function LocationTracker() {
           <div style={{ 
             position: 'relative',
             background: '#f8f9fa', 
-            borderRadius: '8px',
-            border: '1px solid #ddd',
+            borderRadius: '12px',
+            border: '1px solid #cddbed',
             overflow: 'hidden',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            boxShadow: '0 10px 22px rgba(20, 41, 70, 0.12)'
           }}>
             {/* Header với nút collapse */}
             <div style={{
@@ -1732,8 +1764,8 @@ function LocationTracker() {
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '12px 15px',
-              background: '#e9ecef',
-              borderBottom: isPanelCollapsed ? 'none' : '1px solid #ddd',
+              background: 'linear-gradient(130deg, #e7f0fb 0%, #dce9f7 100%)',
+              borderBottom: isPanelCollapsed ? 'none' : '1px solid #c9d8ea',
               cursor: 'pointer'
             }}
             onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
@@ -1741,11 +1773,12 @@ function LocationTracker() {
               <h3 style={{ margin: 0, fontSize: '18px', flex: 1 }}>{currentNarration.name}</h3>
               <button
                 style={{
-                  background: 'transparent',
-                  border: 'none',
+                  background: '#f4f9ff',
+                  border: '1px solid #bfd2e8',
+                  borderRadius: '8px',
                   fontSize: '20px',
                   cursor: 'pointer',
-                  padding: '5px',
+                  padding: '3px 7px',
                   transition: 'transform 0.3s ease',
                   transform: isPanelCollapsed ? 'rotate(0deg)' : 'rotate(180deg)'
                 }}
@@ -1763,7 +1796,8 @@ function LocationTracker() {
               maxHeight: isPanelCollapsed ? '0' : '400px',
               overflowY: isPanelCollapsed ? 'hidden' : 'auto',
               transition: 'max-height 0.3s ease',
-              padding: isPanelCollapsed ? '0 15px' : '15px'
+              padding: isPanelCollapsed ? '0 15px' : '15px',
+              background: '#f8fbff'
             }}>
 
             
@@ -1850,11 +1884,12 @@ function LocationTracker() {
                   <button
                     onClick={openPoiMenuModal}
                     style={{
+                      margin: 0,
                       padding: '8px 14px',
-                      background: '#f59e0b',
+                      background: 'linear-gradient(135deg, #d18a12 0%, #e9a426 100%)',
                       color: 'white',
-                      border: 'none',
-                      borderRadius: '5px',
+                      border: '1px solid rgba(255, 215, 158, 0.7)',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       fontSize: '14px'
                     }}
@@ -1866,11 +1901,14 @@ function LocationTracker() {
                   <button
                     onClick={() => handleToggleAudio(currentNarration.audioUrl)}
                     style={{
+                      margin: 0,
                       padding: '8px 16px',
-                      background: isAudioPlaying ? '#EA4335' : '#4285F4',
+                      background: isAudioPlaying
+                        ? 'linear-gradient(135deg, #bf3647 0%, #de4e5b 100%)'
+                        : 'linear-gradient(135deg, #2f68c9 0%, #3d8be4 100%)',
                       color: 'white',
-                      border: 'none',
-                      borderRadius: '5px',
+                      border: '1px solid rgba(188, 213, 244, 0.68)',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       fontSize: '14px'
                     }}
@@ -1905,9 +1943,10 @@ function LocationTracker() {
               maxWidth: '520px',
               maxHeight: '80vh',
               overflowY: 'auto',
-              background: '#fff',
-              borderRadius: '12px',
-              border: '1px solid #dbe4ef',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.98) 0%, rgba(246, 251, 255, 0.95) 100%)',
+              borderRadius: '14px',
+              border: '1px solid #cedded',
+              boxShadow: '0 20px 34px rgba(15, 28, 49, 0.34)',
               padding: '16px'
             }}
             onClick={(e) => e.stopPropagation()}
