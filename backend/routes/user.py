@@ -4,7 +4,7 @@ from services import calculate_distance, generate_narration
 from translate import translate_text, translate_texts, LANGUAGE_LABELS
 from tts import text_to_speech
 from queue_manager import add_to_queue, QueueFullError
-from sqlalchemy import and_, or_, text
+from sqlalchemy import and_, or_, text, func
 from threading import Lock
 import copy
 import hashlib
@@ -710,7 +710,34 @@ def register_user_routes(app):
                     "message": "Không tìm thấy quán phù hợp với tiêu chí"
                 })
             
-            # Bước 2: Gán điểm cho từng quán (Scoring)
+            # Bước 2: Tính giá trung bình menu theo từng quán (aggregate 1 lần)
+            from models import MenuItem
+
+            restaurant_ids = [r.id for r in restaurants]
+            avg_price_rows = (
+                db.session.query(
+                    MenuItem.restaurant_id,
+                    func.avg(MenuItem.price).label("avg_price"),
+                )
+                .filter(MenuItem.restaurant_id.in_(restaurant_ids))
+                .group_by(MenuItem.restaurant_id)
+                .all()
+            )
+
+            avg_price_by_restaurant = {
+                int(row.restaurant_id): float(row.avg_price)
+                for row in avg_price_rows
+                if row.restaurant_id is not None and row.avg_price is not None
+            }
+
+            # Fallback mềm khi quán chưa có menu: dùng mặt bằng trung bình hiện có.
+            global_avg_price = (
+                sum(avg_price_by_restaurant.values()) / len(avg_price_by_restaurant)
+                if avg_price_by_restaurant
+                else 50000
+            )
+
+            # Bước 3: Gán điểm cho từng quán (Scoring)
             scored_restaurants = []
             for restaurant in restaurants:
                 score = 0
@@ -719,13 +746,8 @@ def register_user_routes(app):
                 matching_tags = len([tag for tag in restaurant.tags if tag.id in selected_tag_ids])
                 score += matching_tags * 10
                 
-                # Price fit: ưu tiên quán rẻ hơn (tính avg price từ menu)
-                from models import MenuItem
-                menu_items = MenuItem.query.filter_by(restaurant_id=restaurant.id).all()
-                if menu_items:
-                    avg_price = sum(item.price for item in menu_items) / len(menu_items)
-                else:
-                    avg_price = 50000  # Default nếu không có menu
+                # Price fit: dùng giá trung bình của toàn bộ menu quán.
+                avg_price = avg_price_by_restaurant.get(restaurant.id, global_avg_price)
                 
                 if avg_price < budget / 3:
                     score += 5
@@ -751,10 +773,10 @@ def register_user_routes(app):
                     "distance_from_user": distance_from_user  # Lưu khoảng cách để dùng sau
                 })
             
-            # Bước 3: Sắp xếp theo điểm (Sort)
+            # Bước 4: Sắp xếp theo điểm (Sort)
             scored_restaurants.sort(key=lambda x: x["score"], reverse=True)
             
-            # Bước 4: Build 3 tours khác nhau (Greedy)
+            # Bước 5: Build 3 tours khác nhau (Greedy)
             tours = []
             
             # Tour 1: Ưu tiên điểm cao nhất
