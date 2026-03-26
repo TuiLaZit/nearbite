@@ -201,6 +201,7 @@ function LocationTracker() {
   const [isBatterySaverEnabled, setIsBatterySaverEnabled] = useState(() => {
     return localStorage.getItem(BATTERY_SAVER_KEY) === 'true'
   })
+  const [mobileMapHeight, setMobileMapHeight] = useState(null)
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
@@ -338,6 +339,42 @@ function LocationTracker() {
       visualViewport?.removeEventListener('resize', syncViewportHeight)
       visualViewport?.removeEventListener('scroll', syncViewportHeight)
       root.style.removeProperty('--nb-vvh')
+    }
+  }, [])
+
+  // Use JS-computed map height on mobile to avoid inconsistent CSS viewport unit behavior.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const visualViewport = window.visualViewport
+
+    const syncMobileMapHeight = () => {
+      const viewportHeight = visualViewport?.height || window.innerHeight
+      const viewportWidth = window.innerWidth
+
+      if (viewportWidth > 900) {
+        setMobileMapHeight(null)
+        return
+      }
+
+      const ratio = viewportWidth <= 420 ? 0.64 : 0.68
+      const minHeight = viewportWidth <= 420 ? 340 : 380
+      const maxHeight = 760
+      const computedHeight = Math.round(Math.max(minHeight, Math.min(maxHeight, viewportHeight * ratio)))
+      setMobileMapHeight(`${computedHeight}px`)
+    }
+
+    syncMobileMapHeight()
+    window.addEventListener('resize', syncMobileMapHeight)
+    window.addEventListener('orientationchange', syncMobileMapHeight)
+    visualViewport?.addEventListener('resize', syncMobileMapHeight)
+    visualViewport?.addEventListener('scroll', syncMobileMapHeight)
+
+    return () => {
+      window.removeEventListener('resize', syncMobileMapHeight)
+      window.removeEventListener('orientationchange', syncMobileMapHeight)
+      visualViewport?.removeEventListener('resize', syncMobileMapHeight)
+      visualViewport?.removeEventListener('scroll', syncMobileMapHeight)
     }
   }, [])
 
@@ -1538,7 +1575,10 @@ function LocationTracker() {
       </div>
 
       {/* Leaflet Map */}
-      <div className="tracker-map-section">
+      <div
+        className="tracker-map-section"
+        style={mobileMapHeight ? { height: mobileMapHeight, flex: 'none' } : undefined}
+      >
         {showWeakDeviceNote && (
           <div
             style={{
