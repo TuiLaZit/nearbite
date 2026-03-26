@@ -167,12 +167,6 @@ function LoginPortal() {
     <div style={styles.page}>
       <div style={styles.gradient} />
       <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
-        <aside style={{ ...styles.brandPanel, ...(isMobile ? styles.brandPanelMobile : {}) }}>
-          <div>
-            <h2 style={styles.brandTitle}>NearBite</h2>
-          </div>
-        </aside>
-
         <div style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
           <div style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
             <button onClick={() => navigate('/')} style={{ ...styles.backButton, ...(isMobile ? styles.backButtonMobile : {}) }}>
@@ -338,9 +332,8 @@ const styles = {
     position: 'relative',
     zIndex: 1,
     width: '100%',
-    maxWidth: '1080px',
-    display: 'grid',
-    gridTemplateColumns: '1.05fr 1fr',
+    maxWidth: '620px',
+    display: 'block',
     borderRadius: '24px',
     overflow: 'hidden',
     border: '1px solid rgba(223, 232, 244, 0.22)',
@@ -348,33 +341,8 @@ const styles = {
     background: '#f6f9ff'
   },
   gridMobile: {
-    gridTemplateColumns: '1fr',
     maxWidth: '580px',
     borderRadius: '18px'
-  },
-  brandPanel: {
-    padding: '52px 44px',
-    background: 'linear-gradient(160deg, #0f2036 0%, #183a57 58%, #1f4b66 100%)',
-    borderRight: '1px solid rgba(255, 255, 255, 0.18)',
-    color: '#eef6ff',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    gap: '20px'
-  },
-  brandPanelMobile: {
-    borderRight: 'none',
-    borderBottom: '1px solid rgba(205, 214, 228, 0.16)',
-    padding: '18px 14px',
-    gap: '10px'
-  },
-  brandTitle: {
-    margin: 0,
-    fontFamily: "'Cormorant Garamond', serif",
-    fontSize: 'clamp(30px, 10vw, 56px)',
-    letterSpacing: '0.8px',
-    color: '#f7fbff',
-    lineHeight: 1
   },
   panel: {
     padding: '48px 42px',
