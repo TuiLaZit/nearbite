@@ -18,9 +18,14 @@ function OwnerDashboard() {
   const [selectedTagIds, setSelectedTagIds] = useState([])
   const [savingTags, setSavingTags] = useState(false)
   const [isTopBarHidden, setIsTopBarHidden] = useState(false)
+  const topBarRef = useRef(null)
+  const [topBarHeight, setTopBarHeight] = useState(0)
   const lastScrollYRef = useRef(0)
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
   const isMobile = viewportWidth <= 768
+  const mobileMainPaddingTop = isMobile
+    ? `${Math.max(14, isTopBarHidden ? 14 : Math.ceil(topBarHeight) + 14)}px`
+    : undefined
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -97,6 +102,13 @@ function OwnerDashboard() {
       ticking = true
 
       window.requestAnimationFrame(() => {
+        if (!isMobile) {
+          setIsTopBarHidden(false)
+          lastScrollYRef.current = currentScrollY
+          ticking = false
+          return
+        }
+
         const diff = currentScrollY - lastScrollYRef.current
 
         if (currentScrollY <= 8) {
@@ -117,7 +129,7 @@ function OwnerDashboard() {
     return () => {
       window.removeEventListener('scroll', handleScroll)
     }
-  }, [])
+  }, [isMobile])
 
   useEffect(() => {
     const handleResize = () => {
@@ -127,6 +139,32 @@ function OwnerDashboard() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setTopBarHeight(0)
+      return undefined
+    }
+
+    const topBarEl = topBarRef.current
+    if (!topBarEl) {
+      return undefined
+    }
+
+    const updateTopBarHeight = () => {
+      setTopBarHeight(topBarEl.getBoundingClientRect().height || 0)
+    }
+
+    updateTopBarHeight()
+    const observer = new ResizeObserver(updateTopBarHeight)
+    observer.observe(topBarEl)
+    window.addEventListener('orientationchange', updateTopBarHeight)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('orientationchange', updateTopBarHeight)
+    }
+  }, [isMobile, activeTab])
 
   const handleLogout = () => {
     fetch(`${BASE_URL}/owner/logout`, {
@@ -503,7 +541,7 @@ function OwnerDashboard() {
           }
 
           .owner-dashboard-content {
-            padding: 14px !important;
+            padding: 14px;
           }
 
           .owner-dashboard-title {
@@ -543,7 +581,7 @@ function OwnerDashboard() {
         }
       `}</style>
 
-      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}), ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
+      <header ref={topBarRef} className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}), ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
         {isMobile ? (
           <>
             <div style={styles.topBarHeadMobile}>
@@ -605,7 +643,7 @@ function OwnerDashboard() {
         )}
       </header>
 
-      <main className="owner-dashboard-content" style={styles.main}>
+      <main className="owner-dashboard-content" style={{ ...styles.main, ...(isMobile ? { paddingTop: mobileMainPaddingTop } : {}) }}>
         <h1 className="owner-dashboard-title" style={styles.title}>{restaurant.name}</h1>
 
         {activeTab === 'overview' && (
@@ -675,8 +713,24 @@ function OwnerDashboard() {
                       <td>{item.price.toLocaleString()}đ</td>
                       <td>
                         <div style={styles.compactActionGroup}>
-                          <button type="button" style={styles.compactActionButton} title="Sửa" aria-label="Sửa" onClick={() => handleEditMenu(item)}>✏️</button>
-                          <button type="button" style={styles.compactActionButtonDanger} title="Xóa" aria-label="Xóa" onClick={() => handleDeleteMenu(item.id)}>🗑️</button>
+                          <button
+                            type="button"
+                            style={styles.tableActionButton}
+                            title="Sửa"
+                            aria-label="Sửa"
+                            onClick={() => handleEditMenu(item)}
+                          >
+                            ✏️ Sửa
+                          </button>
+                          <button
+                            type="button"
+                            style={styles.tableActionButtonDanger}
+                            title="Xóa"
+                            aria-label="Xóa"
+                            onClick={() => handleDeleteMenu(item.id)}
+                          >
+                            🗑️ Xóa
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -815,6 +869,11 @@ const styles = {
     boxShadow: 'none'
   },
   topBarMobile: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 40,
     height: 'auto',
     padding: '14px 16px 14px',
     alignItems: 'stretch',
@@ -970,6 +1029,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px'
+  },
+  tableActionButton: {
+    minWidth: '84px',
+    height: '34px',
+    padding: '0 10px',
+    borderRadius: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    fontSize: '13px',
+    fontWeight: '700',
+    lineHeight: 1
+  },
+  tableActionButtonDanger: {
+    minWidth: '84px',
+    height: '34px',
+    padding: '0 10px',
+    borderRadius: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    fontSize: '13px',
+    fontWeight: '700',
+    lineHeight: 1,
+    background: 'linear-gradient(135deg, #bb2e2e 0%, #df3f3f 100%)',
+    borderColor: 'rgba(255, 185, 185, 0.65)',
+    boxShadow: '0 10px 18px rgba(138, 23, 23, 0.3)'
   },
   compactActionButton: {
     width: '34px',
