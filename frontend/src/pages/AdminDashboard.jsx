@@ -163,6 +163,8 @@ function AdminDashboard({ role = 'admin' }) {
   const [tileLoaded, setTileLoaded] = useState(false)
   const tileErrorCountRef = useRef(0)
   const [isTopbarHidden, setIsTopbarHidden] = useState(false)
+  const topbarRef = useRef(null)
+  const [topbarHeight, setTopbarHeight] = useState(0)
   const mainContentRef = useRef(null)
   const lastScrollTopRef = useRef(0)
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280))
@@ -172,6 +174,9 @@ function AdminDashboard({ role = 'admin' }) {
   const isMobile = viewportWidth <= 768
   const isTablet = viewportWidth <= 1024
   const mapHeight = isMobile ? 340 : isTablet ? 420 : MAP_HEIGHT_PX
+  const mobileMainContentPaddingTop = isMobile
+    ? `${Math.max(12, isTopbarHidden ? 12 : Math.ceil(topbarHeight) + 10)}px`
+    : undefined
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -444,6 +449,32 @@ function AdminDashboard({ role = 'admin' }) {
     }
   }, [isMobile])
 
+  useEffect(() => {
+    if (!isMobile) {
+      setTopbarHeight(0)
+      return undefined
+    }
+
+    const topbarEl = topbarRef.current
+    if (!topbarEl) {
+      return undefined
+    }
+
+    const updateTopbarHeight = () => {
+      setTopbarHeight(topbarEl.getBoundingClientRect().height || 0)
+    }
+
+    updateTopbarHeight()
+    const observer = new ResizeObserver(updateTopbarHeight)
+    observer.observe(topbarEl)
+    window.addEventListener('orientationchange', updateTopbarHeight)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('orientationchange', updateTopbarHeight)
+    }
+  }, [isMobile, activeTab, role])
+
   const handleLogout = () => {
     fetch(`${BASE_URL}${authBase}/logout`, {
       method: 'POST',
@@ -583,8 +614,7 @@ function AdminDashboard({ role = 'admin' }) {
         }
       `}</style>
       <div style={styles.container}>
-        {(!isMobile || !isTopbarHidden) && (
-        <header style={{ ...styles.topbar, ...(isMobile ? styles.topbarMobile : {}) }}>
+        <header ref={topbarRef} style={{ ...styles.topbar, ...(isMobile ? styles.topbarMobile : {}), ...(isTopbarHidden ? styles.topbarHidden : {}) }}>
           {isMobile ? (
             <>
               <div style={styles.topbarHeadMobile}>
@@ -625,10 +655,9 @@ function AdminDashboard({ role = 'admin' }) {
             </>
           )}
         </header>
-        )}
 
         {/* Main content */}
-        <div ref={mainContentRef} style={styles.mainContent}>
+        <div ref={mainContentRef} style={{ ...styles.mainContent, ...(isMobile ? { paddingTop: mobileMainContentPaddingTop } : {}) }}>
           <div style={styles.contentFrame}>
             {!isOwner && activeTab === 'dashboard' && (
               <div style={styles.dashboardContent}>
@@ -875,6 +904,11 @@ const styles = {
     boxShadow: 'none'
   },
   topbarMobile: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 40,
       height: 'auto',
       padding: '14px 16px 14px',
       alignItems: 'stretch',
