@@ -415,6 +415,13 @@ function AdminDashboard({ role = 'admin' }) {
 
       ticking = true
       window.requestAnimationFrame(() => {
+        if (!isMobile) {
+          setIsTopbarHidden(false)
+          lastScrollTopRef.current = currentScrollTop
+          ticking = false
+          return
+        }
+
         const diff = currentScrollTop - lastScrollTopRef.current
 
         if (currentScrollTop <= 8) {
@@ -435,7 +442,7 @@ function AdminDashboard({ role = 'admin' }) {
     return () => {
       scrollContainer.removeEventListener('scroll', handleScroll)
     }
-  }, [])
+  }, [isMobile])
 
   const handleLogout = () => {
     fetch(`${BASE_URL}${authBase}/logout`, {
@@ -576,7 +583,8 @@ function AdminDashboard({ role = 'admin' }) {
         }
       `}</style>
       <div style={styles.container}>
-        <header style={{ ...styles.topbar, ...(isMobile ? styles.topbarMobile : {}), ...(isTopbarHidden ? styles.topbarHidden : {}) }}>
+        {(!isMobile || !isTopbarHidden) && (
+        <header style={{ ...styles.topbar, ...(isMobile ? styles.topbarMobile : {}) }}>
           {isMobile ? (
             <>
               <div style={styles.topbarHeadMobile}>
@@ -617,6 +625,7 @@ function AdminDashboard({ role = 'admin' }) {
             </>
           )}
         </header>
+        )}
 
         {/* Main content */}
         <div ref={mainContentRef} style={styles.mainContent}>

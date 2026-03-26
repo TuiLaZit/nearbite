@@ -97,6 +97,13 @@ function OwnerDashboard() {
       ticking = true
 
       window.requestAnimationFrame(() => {
+        if (!isMobile) {
+          setIsTopBarHidden(false)
+          lastScrollYRef.current = currentScrollY
+          ticking = false
+          return
+        }
+
         const diff = currentScrollY - lastScrollYRef.current
 
         if (currentScrollY <= 8) {
@@ -117,7 +124,7 @@ function OwnerDashboard() {
     return () => {
       window.removeEventListener('scroll', handleScroll)
     }
-  }, [])
+  }, [isMobile])
 
   useEffect(() => {
     const handleResize = () => {
@@ -543,7 +550,8 @@ function OwnerDashboard() {
         }
       `}</style>
 
-      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}), ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
+      {(!isMobile || !isTopBarHidden) && (
+      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
         {isMobile ? (
           <>
             <div style={styles.topBarHeadMobile}>
@@ -604,6 +612,7 @@ function OwnerDashboard() {
           </>
         )}
       </header>
+      )}
 
       <main className="owner-dashboard-content" style={styles.main}>
         <h1 className="owner-dashboard-title" style={styles.title}>{restaurant.name}</h1>
@@ -675,8 +684,24 @@ function OwnerDashboard() {
                       <td>{item.price.toLocaleString()}đ</td>
                       <td>
                         <div style={styles.compactActionGroup}>
-                          <button type="button" style={styles.compactActionButton} title="Sửa" aria-label="Sửa" onClick={() => handleEditMenu(item)}>✏️</button>
-                          <button type="button" style={styles.compactActionButtonDanger} title="Xóa" aria-label="Xóa" onClick={() => handleDeleteMenu(item.id)}>🗑️</button>
+                          <button
+                            type="button"
+                            style={styles.tableActionButton}
+                            title="Sửa"
+                            aria-label="Sửa"
+                            onClick={() => handleEditMenu(item)}
+                          >
+                            ✏️ Sửa
+                          </button>
+                          <button
+                            type="button"
+                            style={styles.tableActionButtonDanger}
+                            title="Xóa"
+                            aria-label="Xóa"
+                            onClick={() => handleDeleteMenu(item.id)}
+                          >
+                            🗑️ Xóa
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -970,6 +995,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px'
+  },
+  tableActionButton: {
+    minWidth: '84px',
+    height: '34px',
+    padding: '0 10px',
+    borderRadius: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    fontSize: '13px',
+    fontWeight: '700',
+    lineHeight: 1
+  },
+  tableActionButtonDanger: {
+    minWidth: '84px',
+    height: '34px',
+    padding: '0 10px',
+    borderRadius: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    fontSize: '13px',
+    fontWeight: '700',
+    lineHeight: 1,
+    background: 'linear-gradient(135deg, #bb2e2e 0%, #df3f3f 100%)',
+    borderColor: 'rgba(255, 185, 185, 0.65)',
+    boxShadow: '0 10px 18px rgba(138, 23, 23, 0.3)'
   },
   compactActionButton: {
     width: '34px',
