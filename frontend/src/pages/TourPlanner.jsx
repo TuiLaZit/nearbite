@@ -169,8 +169,8 @@ function TourPlanner() {
             display: grid;
             grid-template-columns: auto 1fr;
             grid-template-areas:
-              'home language'
-              'title title';
+              'home title'
+              'language language';
             align-items: center;
             gap: 10px;
             padding: 10px 12px;
@@ -182,16 +182,19 @@ function TourPlanner() {
 
           .tour-planner-language {
             grid-area: language;
-            justify-self: end;
+            justify-self: stretch;
             width: 100%;
-            max-width: 190px;
-            min-width: 130px;
+            max-width: none;
+            min-width: 0;
           }
 
           .tour-planner-title {
             grid-area: title;
-            margin-top: 2px;
-            font-size: clamp(20px, 5.2vw, 28px);
+            margin-top: 0;
+            font-size: clamp(18px, 4.8vw, 24px);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
           .tour-planner-settings-grid {
@@ -216,9 +219,12 @@ function TourPlanner() {
           }
 
           .tour-planner-language {
-            max-width: 170px;
             font-size: 12px !important;
             padding: 10px 11px !important;
+          }
+
+          .tour-planner-title {
+            font-size: clamp(17px, 4.6vw, 20px);
           }
         }
       `}</style>
