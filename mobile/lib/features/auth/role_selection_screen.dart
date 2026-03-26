@@ -199,18 +199,26 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(_text('Chọn vai trò đăng nhập', 'Choose login role', 'Choisir le role'))),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 24),
-            Text(
-              _text('Trượt để chọn vai trò', 'Slide to choose role', 'Glissez pour choisir le role'),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<int>(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFEAF7F5), Color(0xFFF3F6F6), Color(0xFFFFFFFF)],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                _text('Trượt để chọn vai trò', 'Slide to choose role', 'Glissez pour choisir le role'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<int>(
               segments: [
                 ButtonSegment<int>(
                   value: 0,
@@ -235,18 +243,18 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   curve: Curves.easeOutCubic,
                 );
               },
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: PageView(
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: PageView(
                 controller: _pageController,
                 onPageChanged: (index) {
                   setState(() {
                     _selectedRole = index == 0 ? LoginRole.customer : LoginRole.owner;
                   });
                 },
-                children: [
-                  _RoleCard(
+                  children: [
+                    _RoleCard(
                     icon: Icons.person,
                     title: _text('Khách hàng', 'Customer', 'Client'),
                     child: Column(
@@ -290,8 +298,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                         ],
                       ],
                     ),
-                  ),
-                  _RoleCard(
+                    ),
+                    _RoleCard(
                     icon: Icons.store,
                     title: _text('Chủ quán', 'Owner', 'Gerant'),
                     child: Column(
@@ -305,58 +313,69 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                         const SizedBox(height: 10),
                         TextField(
                           controller: _ownerPasswordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
+                            ),
+                          ],
+                        ),
                             labelText: _text('Mật khẩu', 'Password', 'Mot de passe'),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            _error!,
+                            style: TextStyle(color: Theme.of(context).colorScheme.error),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton(
-                            onPressed: _loading ? null : _ownerLogin,
-                            child: Text(_loading
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+
+        class _RoleCard extends StatelessWidget {
+          const _RoleCard({
+            required this.icon,
+            required this.title,
+            required this.child,
+          });
+
+          final IconData icon;
+          final String title;
+          final Widget child;
+
+          @override
+          Widget build(BuildContext context) {
+            return Card(
+              elevation: 6,
+              shadowColor: const Color(0x22000000),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFBCEEE7),
+                        borderRadius: BorderRadius.circular(18),
                                 ? _text('Đang đăng nhập...', 'Signing in...', 'Connexion...')
+                      child: Icon(icon, size: 34, color: const Color(0xFF0A5C54)),
                                 : _text('Đăng nhập', 'Login', 'Connexion')),
-                          ),
+                    const SizedBox(height: 12),
+                    Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 14),
+                    child,
+                  ],
                         ),
                       ],
                     ),
                   ),
                 ],
-              ),
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
-    required this.icon,
-    required this.title,
-    required this.child,
-  });
-
-  final IconData icon;
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

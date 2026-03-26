@@ -192,70 +192,101 @@ class _TourPlannerScreenState extends State<TourPlannerScreen> {
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text('Time limit: $_timeLimit minutes'),
-          Slider(
-            value: _timeLimit.toDouble(),
-            min: 30,
-            max: 480,
-            divisions: 15,
-            label: _timeLimit.toString(),
-            onChanged: (value) => setState(() => _timeLimit = value.round()),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFEAF7F5), Color(0xFFF3F6F6), Color(0xFFFFFFFF)],
           ),
-          const SizedBox(height: 8),
-          Text('Budget: $_budget VND'),
-          Slider(
-            value: _budget.toDouble(),
-            min: 50000,
-            max: 2000000,
-            divisions: 39,
-            label: _budget.toString(),
-            onChanged: (value) => setState(() => _budget = value.round()),
-          ),
-          const SizedBox(height: 12),
-          const Text('Preferred tags'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _tags
-                .map(
-                  (tag) => FilterChip(
-                    selected: _selectedTagIds.contains(tag.id),
-                    label: Text('${tag.icon ?? ''} ${tag.name}'),
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedTagIds.add(tag.id);
-                        } else {
-                          _selectedTagIds.remove(tag.id);
-                        }
-                      });
-                    },
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _planning ? null : _planTour,
-            icon: const Icon(Icons.route),
-            label: Text(_planning ? 'Planning...' : 'Plan Tour'),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Planner settings', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 12),
+                    Text('Time limit: $_timeLimit minutes'),
+                    Slider(
+                      value: _timeLimit.toDouble(),
+                      min: 30,
+                      max: 480,
+                      divisions: 15,
+                      label: _timeLimit.toString(),
+                      onChanged: (value) => setState(() => _timeLimit = value.round()),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Budget: $_budget VND'),
+                    Slider(
+                      value: _budget.toDouble(),
+                      min: 50000,
+                      max: 2000000,
+                      divisions: 39,
+                      label: _budget.toString(),
+                      onChanged: (value) => setState(() => _budget = value.round()),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-          const SizedBox(height: 16),
-          ..._tours.asMap().entries.map((entry) {
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Preferred tags', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _tags
+                          .map(
+                            (tag) => FilterChip(
+                              selected: _selectedTagIds.contains(tag.id),
+                              label: Text('${tag.icon ?? ''} ${tag.name}'),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedTagIds.add(tag.id);
+                                  } else {
+                                    _selectedTagIds.remove(tag.id);
+                                  }
+                                });
+                              },
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: _planning ? null : _planTour,
+              icon: const Icon(Icons.route),
+              label: Text(_planning ? 'Planning...' : 'Plan Tour'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 16),
+            ..._tours.asMap().entries.map((entry) {
             final idx = entry.key;
             final tour = entry.value;
             return Card(
+              margin: const EdgeInsets.only(bottom: 12),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -288,8 +319,9 @@ class _TourPlannerScreenState extends State<TourPlannerScreen> {
                 ),
               ),
             );
-          }),
-        ],
+            }),
+          ],
+        ),
       ),
     );
   }
