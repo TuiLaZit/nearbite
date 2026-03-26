@@ -415,46 +415,52 @@ function RestaurantManagement({
       {isHidden ? (
         <>
           <button
-            style={styles.btnRestore}
+            style={{ ...styles.btnRestore, ...(compact ? styles.compactActionButton : {}) }}
             onClick={() => handleRestore(restaurant.id, restaurant.name)}
             title="Khôi phục quán"
           >
-            ♻️ Khôi phục
+            {compact ? '♻️' : '♻️ Khôi phục'}
           </button>
           <button
-            style={styles.btnDeletePermanent}
+            style={{ ...styles.btnDeletePermanent, ...(compact ? styles.compactActionButton : {}) }}
             onClick={() => handleDelete(restaurant.id, restaurant.name)}
             title="XÓA VĨNH VIỄN - Không thể hoàn tác!"
           >
-            {compact ? '⚠️ Xóa vv' : '⚠️ Xóa vĩnh viễn'}
+            {compact ? '⚠️' : '⚠️ Xóa vĩnh viễn'}
           </button>
         </>
       ) : (
         <>
-          <button style={styles.btnEdit} onClick={() => handleEdit(restaurant)}>✏️</button>
           <button
-            style={styles.btnTagAssign}
+            style={{ ...styles.btnEdit, ...(compact ? styles.compactActionButton : {}) }}
+            onClick={() => handleEdit(restaurant)}
+            title="Sửa quán"
+          >
+            ✏️
+          </button>
+          <button
+            style={{ ...styles.btnTagAssign, ...(compact ? styles.compactActionButton : {}) }}
             onClick={() => openTagEditor(restaurant)}
             title="Gán tags cho quán"
           >
-            {compact ? '🏷️ Tags' : '🏷️ Gán tags'}
+            {compact ? '🏷️' : '🏷️ Gán tags'}
           </button>
           {!isOwnerView && (
             <button
-              style={restaurant.has_account ? styles.btnResetPassword : styles.btnCreateAccount}
+              style={{ ...(restaurant.has_account ? styles.btnResetPassword : styles.btnCreateAccount), ...(compact ? styles.compactActionButton : {}) }}
               onClick={() => handleCreateOrResetAccount(restaurant)}
               title={restaurant.has_account ? 'Quên mật khẩu - tạo mật khẩu mới' : 'Tạo tài khoản cho quán'}
             >
-              {restaurant.has_account ? (compact ? '🔐 Reset' : '🔐 Quên mật khẩu') : (compact ? '👤 Tạo TK' : '👤 Tạo tài khoản')}
+              {restaurant.has_account ? (compact ? '🔐' : '🔐 Quên mật khẩu') : (compact ? '👤' : '👤 Tạo tài khoản')}
             </button>
           )}
           {!isOwnerView && (
             <button
-              style={styles.btnDelete}
+              style={{ ...styles.btnDelete, ...(compact ? styles.compactActionButton : {}) }}
               onClick={() => handleDelete(restaurant.id, restaurant.name)}
               title="Ẩn quán"
             >
-              👻 Ẩn
+              {compact ? '👻' : '👻 Ẩn'}
             </button>
           )}
         </>
@@ -1079,7 +1085,21 @@ const styles = {
     flexWrap: 'wrap'
   },
   actionButtonsMobile: {
-    minWidth: '260px'
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(42px, 1fr))',
+    width: '100%',
+    gap: '8px'
+  },
+  compactActionButton: {
+    height: '42px',
+    width: '100%',
+    minWidth: '42px',
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    lineHeight: 1
   },
   btnEdit: {
     padding: '6px 12px',
