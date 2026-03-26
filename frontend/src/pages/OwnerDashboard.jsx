@@ -18,9 +18,14 @@ function OwnerDashboard() {
   const [selectedTagIds, setSelectedTagIds] = useState([])
   const [savingTags, setSavingTags] = useState(false)
   const [isTopBarHidden, setIsTopBarHidden] = useState(false)
+  const topBarRef = useRef(null)
+  const [topBarHeight, setTopBarHeight] = useState(0)
   const lastScrollYRef = useRef(0)
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
   const isMobile = viewportWidth <= 768
+  const mobileMainPaddingTop = isMobile
+    ? `${Math.max(14, isTopBarHidden ? 14 : Math.ceil(topBarHeight) + 14)}px`
+    : undefined
 
   const stats = useMemo(() => {
     if (!restaurant) {
@@ -134,6 +139,32 @@ function OwnerDashboard() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setTopBarHeight(0)
+      return undefined
+    }
+
+    const topBarEl = topBarRef.current
+    if (!topBarEl) {
+      return undefined
+    }
+
+    const updateTopBarHeight = () => {
+      setTopBarHeight(topBarEl.getBoundingClientRect().height || 0)
+    }
+
+    updateTopBarHeight()
+    const observer = new ResizeObserver(updateTopBarHeight)
+    observer.observe(topBarEl)
+    window.addEventListener('orientationchange', updateTopBarHeight)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('orientationchange', updateTopBarHeight)
+    }
+  }, [isMobile, activeTab])
 
   const handleLogout = () => {
     fetch(`${BASE_URL}/owner/logout`, {
@@ -510,7 +541,7 @@ function OwnerDashboard() {
           }
 
           .owner-dashboard-content {
-            padding: 14px !important;
+            padding: 14px;
           }
 
           .owner-dashboard-title {
@@ -550,8 +581,7 @@ function OwnerDashboard() {
         }
       `}</style>
 
-      {(!isMobile || !isTopBarHidden) && (
-      <header className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
+      <header ref={topBarRef} className="owner-dashboard-topbar" style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}), ...(isTopBarHidden ? styles.topBarHidden : {}) }}>
         {isMobile ? (
           <>
             <div style={styles.topBarHeadMobile}>
@@ -612,9 +642,8 @@ function OwnerDashboard() {
           </>
         )}
       </header>
-      )}
 
-      <main className="owner-dashboard-content" style={styles.main}>
+      <main className="owner-dashboard-content" style={{ ...styles.main, ...(isMobile ? { paddingTop: mobileMainPaddingTop } : {}) }}>
         <h1 className="owner-dashboard-title" style={styles.title}>{restaurant.name}</h1>
 
         {activeTab === 'overview' && (
@@ -840,6 +869,11 @@ const styles = {
     boxShadow: 'none'
   },
   topBarMobile: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 40,
     height: 'auto',
     padding: '14px 16px 14px',
     alignItems: 'stretch',
