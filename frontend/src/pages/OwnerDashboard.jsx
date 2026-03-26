@@ -421,16 +421,67 @@ function OwnerDashboard() {
 
         .owner-topbar-logout-btn:hover {
           transform: translateY(-1px);
-          border-color: rgba(184, 216, 246, 0.76);
-          box-shadow: 0 9px 18px rgba(7, 23, 48, 0.25);
-          filter: brightness(1.07);
+          border-color: rgba(248, 165, 165, 0.9);
+          background: linear-gradient(135deg, #c62828 0%, #e53935 100%);
+          color: #fff5f5;
+          box-shadow: 0 10px 20px rgba(138, 23, 23, 0.35);
+        }
+
+        @media (max-width: 768px) {
+          .owner-dashboard-topbar {
+            padding: 12px;
+            align-items: stretch;
+            gap: 10px;
+          }
+
+          .owner-topbar-nav {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+          }
+
+          .owner-topbar-nav-btn,
+          .owner-topbar-logout-btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .owner-dashboard-content {
+            padding: 14px !important;
+          }
+
+          .owner-dashboard-title {
+            font-size: 28px !important;
+            margin-bottom: 14px !important;
+          }
+
+          .owner-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+
+          .owner-form-grid,
+          .owner-inline-form,
+          .owner-image-form {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .owner-topbar-nav {
+            grid-template-columns: 1fr;
+          }
+
+          .owner-stats-grid {
+            grid-template-columns: 1fr !important;
+          }
         }
       `}</style>
 
-      <header style={styles.topBar}>
+      <header className="owner-dashboard-topbar" style={styles.topBar}>
         <div style={styles.topBarTitle}>🏪 Chủ quán Dashboard</div>
 
-        <div style={styles.topBarNav}>
+        <div className="owner-topbar-nav" style={styles.topBarNav}>
           <button className={`owner-topbar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('overview')}>
             📊 Tổng quan
           </button>
@@ -449,11 +500,11 @@ function OwnerDashboard() {
       </header>
 
       <main className="owner-dashboard-content" style={styles.main}>
-        <h1 style={styles.title}>{restaurant.name}</h1>
+        <h1 className="owner-dashboard-title" style={styles.title}>{restaurant.name}</h1>
 
         {activeTab === 'overview' && (
           <>
-            <div style={styles.statsGrid}>
+            <div className="owner-stats-grid" style={styles.statsGrid}>
               <StatCard label="Lượt ghé" value={stats.visitCount} />
               <StatCard label="TG ghé TB (phút)" value={stats.avgVisit} />
               <StatCard label="TG nghe TB (giây)" value={stats.avgAudio} />
@@ -464,7 +515,7 @@ function OwnerDashboard() {
 
             <form onSubmit={handleUpdateRestaurant} style={styles.card}>
               <h3>Thông tin quán</h3>
-              <div style={styles.formGrid}>
+              <div className="owner-form-grid" style={styles.formGrid}>
                 <input value={restaurant.name} onChange={(e) => setRestaurant({ ...restaurant, name: e.target.value })} placeholder="Tên quán" required />
                 <input type="number" step="any" value={restaurant.lat} onChange={(e) => setRestaurant({ ...restaurant, lat: e.target.value })} placeholder="Latitude" required />
                 <input type="number" step="any" value={restaurant.lng} onChange={(e) => setRestaurant({ ...restaurant, lng: e.target.value })} placeholder="Longitude" required />
@@ -480,7 +531,7 @@ function OwnerDashboard() {
         {activeTab === 'menu' && (
           <div style={styles.card}>
             <h3>Menu của quán</h3>
-            <form onSubmit={handleSaveMenu} style={styles.inlineForm}>
+            <form className="owner-inline-form" onSubmit={handleSaveMenu} style={styles.inlineForm}>
               <input
                 value={menuForm.name}
                 onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })}
@@ -531,7 +582,7 @@ function OwnerDashboard() {
           {activeTab === 'images' && (
           <div style={styles.card}>
             <h3>Hình ảnh quán</h3>
-            <form onSubmit={handleCreateImage} style={styles.imageForm}>
+            <form className="owner-image-form" onSubmit={handleCreateImage} style={styles.imageForm}>
               <input type="file" accept="image/*" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} required />
               <input
                 value={imageForm.caption}
