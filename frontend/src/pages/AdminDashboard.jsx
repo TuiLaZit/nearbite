@@ -507,6 +507,18 @@ function AdminDashboard({ role = 'admin' }) {
           box-shadow: 0 12px 22px rgba(85, 9, 24, 0.42), inset 0 0 0 1px rgba(255, 211, 211, 0.26);
         }
 
+        .admin-map-canvas {
+          cursor: grab;
+        }
+
+        .admin-map-canvas.leaflet-dragging {
+          cursor: grabbing;
+        }
+
+        .admin-map-canvas .leaflet-interactive {
+          cursor: pointer;
+        }
+
         @media (max-width: 768px) {
           .topbar-nav-btn {
             height: 38px;
@@ -588,6 +600,7 @@ function AdminDashboard({ role = 'admin' }) {
                     <div style={{ ...styles.heatmapContainer, height: `${mapHeight}px`, minHeight: `${mapHeight}px` }}>
                       <div style={styles.mapSurfaceLayer}>
                         <MapContainer
+                          className="admin-map-canvas"
                           center={[10.760426862777551, 106.68198430250096]}
                           zoom={15}
                           style={{ height: `${mapHeight}px`, width: '100%' }}
