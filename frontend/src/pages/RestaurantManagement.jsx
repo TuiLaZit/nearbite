@@ -1105,6 +1105,8 @@ const styles = {
     maxHeight: '90vh',
     overflowY: 'auto',
     boxShadow: '0 26px 48px rgba(9, 18, 38, 0.28)',
+    border: '1px solid rgba(198, 214, 234, 0.75)'
+  },
   tagModalSubtitle: {
     margin: '0 0 12px',
     color: '#334155'
@@ -1126,8 +1128,6 @@ const styles = {
   },
   tagPickerChipActive: {
     color: '#fff'
-  },
-    border: '1px solid rgba(198, 214, 234, 0.75)'
   },
   modalTitle: {
     fontSize: '24px',
