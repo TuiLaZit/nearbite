@@ -400,28 +400,19 @@ function AdminLogin({
           .admin-login-brand {
             padding: 22px 18px;
             gap: 14px;
+            min-height: 0;
           }
 
           .admin-login-brand h2 {
             font-size: clamp(34px, 11vw, 42px);
+            line-height: 1;
           }
 
-          .admin-login-brand p {
-            font-size: 13px;
-            line-height: 1.5;
-          }
-
-          .admin-login-metrics {
-            grid-template-columns: 1fr;
-            gap: 8px;
-          }
-
-          .admin-login-metric {
-            padding: 12px;
-          }
-
-          .admin-login-metric span {
-            font-size: 19px;
+          .admin-login-brand p,
+          .admin-login-metrics,
+          .brand-description,
+          .brand-subtitle {
+            display: none;
           }
 
           .login-card {
@@ -445,6 +436,10 @@ function AdminLogin({
           .shield-icon {
             width: 28px;
             height: 28px;
+          }
+
+          .header h1 {
+            font-size: 22px;
           }
 
           .field-label {
@@ -490,7 +485,7 @@ function AdminLogin({
           }
 
           .admin-login-brand {
-            padding: 18px 14px;
+            padding: 16px 14px;
           }
 
           .login-card {
@@ -500,6 +495,10 @@ function AdminLogin({
           .back-button-text {
             font-size: 11.5px;
           }
+
+          .admin-login-brand h2 {
+            font-size: clamp(30px, 10vw, 36px);
+          }
         }
       `}</style>
       <div className="admin-login-shell">
@@ -507,9 +506,9 @@ function AdminLogin({
           <aside className="admin-login-brand">
             <div>
               <h2>NearBite</h2>
-              <p>Control Suite</p>
+              <p className="brand-subtitle">Control Suite</p>
             </div>
-            <p>
+            <p className="brand-description">
               Quản trị vận hành hệ thống, theo dõi chỉ số tăng trưởng, và quản lý dữ liệu nhà hàng trong một giao diện hiện đại.
             </p>
             <div className="admin-login-metrics">
