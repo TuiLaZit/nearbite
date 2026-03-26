@@ -202,8 +202,9 @@ function LoginPortal() {
             </button>
           </div>
 
-          {activeRole === 'customer' ? (
-            <div>
+          <div style={styles.contentFrame}>
+            {activeRole === 'customer' ? (
+              <div>
               <h2 style={styles.sectionTitle}>📩 {t('customerLoginTitle')}</h2>
               <form onSubmit={handleRequestOtp}>
                 <label style={styles.label}>{t('emailLabel')}:</label>
@@ -266,9 +267,9 @@ function LoginPortal() {
                   </form>
                 </div>
               )}
-            </div>
-          ) : (
-            <div>
+              </div>
+            ) : (
+              <div>
               <h2 style={styles.sectionTitle}>🏪 Dang nhap chu quan</h2>
               <form onSubmit={handleOwnerLogin}>
                 <label style={styles.label}>Tai khoan:</label>
@@ -304,8 +305,9 @@ function LoginPortal() {
                   🛡️ Toi la admin
                 </button>
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -321,12 +323,12 @@ const styles = {
     justifyContent: 'center',
     padding: '24px',
     overflow: 'hidden',
-    background: '#0f172a'
+    background: '#d9ecff'
   },
   gradient: {
     position: 'absolute',
     inset: 0,
-    background: 'radial-gradient(900px 520px at 8% 12%, rgba(197, 156, 84, 0.2), transparent 60%), radial-gradient(820px 480px at 92% 88%, rgba(22, 77, 76, 0.16), transparent 65%), linear-gradient(135deg, #071217 0%, #0f172a 46%, #152238 100%)'
+    background: 'radial-gradient(900px 520px at 8% 12%, rgba(120, 196, 255, 0.35), transparent 60%), radial-gradient(820px 480px at 92% 88%, rgba(143, 231, 210, 0.28), transparent 65%), linear-gradient(135deg, #eff7ff 0%, #dff0ff 48%, #f4fbff 100%)'
   },
   grid: {
     position: 'relative',
@@ -336,10 +338,10 @@ const styles = {
     display: 'block',
     borderRadius: '24px',
     overflow: 'hidden',
-    border: '1px solid rgba(223, 232, 244, 0.22)',
-    boxShadow: '0 34px 70px rgba(2, 7, 20, 0.5)',
+    border: '1px solid rgba(182, 207, 232, 0.8)',
+    boxShadow: '0 26px 52px rgba(37, 85, 127, 0.22)',
     backdropFilter: 'blur(16px)',
-    background: '#f6f9ff'
+    background: '#f8fbff'
   },
   gridMobile: {
     maxWidth: '580px',
@@ -347,7 +349,7 @@ const styles = {
   },
   panel: {
     padding: '48px 42px',
-    background: 'linear-gradient(170deg, #ffffff 0%, #eef4ff 100%)'
+    background: 'linear-gradient(170deg, #ffffff 0%, #f1f8ff 100%)'
   },
   panelMobile: {
     padding: '22px 18px'
@@ -397,7 +399,7 @@ const styles = {
     marginTop: 0,
     marginBottom: '18px',
     fontSize: '30px',
-    color: '#0f172a',
+    color: '#163454',
     fontWeight: '750',
     letterSpacing: '-0.02em',
     textAlign: 'left'
@@ -408,26 +410,33 @@ const styles = {
   roleTabs: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '8px',
+    gap: '18px',
     marginBottom: '18px'
   },
   roleTab: {
-    border: '1px solid #cbd5e1',
-    borderRadius: '10px',
-    background: '#f8fbff',
-    padding: '10px 12px',
+    border: 'none',
+    borderRadius: '0',
+    background: 'transparent',
+    padding: '8px 4px',
     fontWeight: '600',
     cursor: 'pointer',
-    color: '#1b3452',
+    color: '#4e6b88',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px'
+    gap: '8px',
+    borderBottom: '2px solid transparent'
   },
   roleTabActive: {
-    borderColor: '#2563eb',
-    background: '#dbeafe',
-    color: '#0f2f52'
+    color: '#184b7d',
+    borderBottomColor: '#1f7acb'
+  },
+  contentFrame: {
+    border: '1px solid #d7e8f8',
+    background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 248, 255, 0.98) 100%)',
+    borderRadius: '14px',
+    padding: '18px 16px',
+    boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.6)'
   },
   sectionTitle: {
     marginTop: 0,
@@ -469,8 +478,8 @@ const styles = {
   otpBox: {
     marginTop: '18px',
     padding: '14px',
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
+    border: '1px solid #cae4ff',
+    background: '#edf6ff',
     borderRadius: '8px'
   },
   inlineActions: {
@@ -493,9 +502,9 @@ const styles = {
     fontWeight: '700'
   },
   adminButton: {
-    background: '#1e293b',
+    background: '#174c7e',
     color: '#fff',
-    border: '1px solid #cbd5e1',
+    border: '1px solid #bcd6ee',
     borderRadius: '10px',
     padding: '10px 14px',
     cursor: 'pointer',
