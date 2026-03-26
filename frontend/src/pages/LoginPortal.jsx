@@ -165,6 +165,24 @@ function LoginPortal() {
 
   return (
     <div style={styles.page}>
+      <style>{`
+        .login-portal-role-tab {
+          transition: all 0.2s ease;
+        }
+
+        .login-portal-role-tab:hover {
+          color: #0b4d89;
+          border-color: #2f8de0;
+          background: linear-gradient(180deg, #f0f8ff 0%, #dfefff 100%);
+          box-shadow: 0 10px 18px rgba(47, 141, 224, 0.25);
+          transform: translateY(-1px);
+        }
+
+        .login-portal-role-tab:active {
+          transform: translateY(0);
+          box-shadow: 0 5px 10px rgba(47, 141, 224, 0.18);
+        }
+      `}</style>
       <div style={styles.gradient} />
       <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
         <div style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
@@ -188,6 +206,7 @@ function LoginPortal() {
           <div style={styles.roleTabs}>
             <button
               type="button"
+              className="login-portal-role-tab"
               style={{ ...styles.roleTab, ...(activeRole === 'customer' ? styles.roleTabActive : {}) }}
               onClick={() => switchRole('customer')}
             >
@@ -195,6 +214,7 @@ function LoginPortal() {
             </button>
             <button
               type="button"
+              className="login-portal-role-tab"
               style={{ ...styles.roleTab, ...(activeRole === 'owner' ? styles.roleTabActive : {}) }}
               onClick={() => switchRole('owner')}
             >
@@ -202,8 +222,9 @@ function LoginPortal() {
             </button>
           </div>
 
-          {activeRole === 'customer' ? (
-            <div>
+          <div style={styles.contentFrame}>
+            {activeRole === 'customer' ? (
+              <div>
               <h2 style={styles.sectionTitle}>📩 {t('customerLoginTitle')}</h2>
               <form onSubmit={handleRequestOtp}>
                 <label style={styles.label}>{t('emailLabel')}:</label>
@@ -266,22 +287,22 @@ function LoginPortal() {
                   </form>
                 </div>
               )}
-            </div>
-          ) : (
-            <div>
-              <h2 style={styles.sectionTitle}>🏪 Dang nhap chu quan</h2>
+              </div>
+            ) : (
+              <div>
+              <h2 style={styles.sectionTitle}>🏪 Đăng nhập chủ quán</h2>
               <form onSubmit={handleOwnerLogin}>
-                <label style={styles.label}>Tai khoan:</label>
+                <label style={styles.label}>Tài khoản:</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Vi du: bc4"
+                  placeholder="Ví dụ: bc4"
                   required
                   style={styles.input}
                 />
 
-                <label style={{ ...styles.label, marginTop: '12px' }}>Mat khau:</label>
+                <label style={{ ...styles.label, marginTop: '12px' }}>Mật khẩu:</label>
                 <input
                   type="password"
                   value={password}
@@ -291,7 +312,7 @@ function LoginPortal() {
                 />
 
                 <button type="submit" disabled={loading} style={styles.submitButton}>
-                  {loading ? 'Dang dang nhap...' : 'Dang nhap'}
+                  {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                 </button>
               </form>
 
@@ -301,11 +322,12 @@ function LoginPortal() {
                   onClick={() => navigate('/admin/login')}
                   style={{ ...styles.adminButton, ...(isMobile ? styles.adminButtonMobile : {}) }}
                 >
-                  🛡️ Toi la admin
+                  🛡️ Tôi là Admin
                 </button>
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -321,12 +343,12 @@ const styles = {
     justifyContent: 'center',
     padding: '24px',
     overflow: 'hidden',
-    background: '#0f172a'
+    background: '#d9ecff'
   },
   gradient: {
     position: 'absolute',
     inset: 0,
-    background: 'radial-gradient(900px 520px at 8% 12%, rgba(197, 156, 84, 0.2), transparent 60%), radial-gradient(820px 480px at 92% 88%, rgba(22, 77, 76, 0.16), transparent 65%), linear-gradient(135deg, #071217 0%, #0f172a 46%, #152238 100%)'
+    background: 'radial-gradient(900px 520px at 8% 12%, rgba(120, 196, 255, 0.35), transparent 60%), radial-gradient(820px 480px at 92% 88%, rgba(143, 231, 210, 0.28), transparent 65%), linear-gradient(135deg, #eff7ff 0%, #dff0ff 48%, #f4fbff 100%)'
   },
   grid: {
     position: 'relative',
@@ -336,9 +358,10 @@ const styles = {
     display: 'block',
     borderRadius: '24px',
     overflow: 'hidden',
-    border: '1px solid rgba(223, 232, 244, 0.22)',
-    boxShadow: '0 34px 70px rgba(2, 7, 20, 0.5)',
-    background: '#f6f9ff'
+    border: '1px solid rgba(182, 207, 232, 0.8)',
+    boxShadow: '0 26px 52px rgba(37, 85, 127, 0.22)',
+    backdropFilter: 'blur(16px)',
+    background: '#f8fbff'
   },
   gridMobile: {
     maxWidth: '580px',
@@ -346,10 +369,10 @@ const styles = {
   },
   panel: {
     padding: '48px 42px',
-    background: 'linear-gradient(170deg, #ffffff 0%, #eef4ff 100%)'
+    background: 'linear-gradient(170deg, #ffffff 0%, #f1f8ff 100%)'
   },
   panelMobile: {
-    padding: '18px 14px'
+    padding: '22px 18px'
   },
   topBar: {
     display: 'flex',
@@ -364,13 +387,16 @@ const styles = {
     marginBottom: '14px'
   },
   backButton: {
-    border: '1px solid #cad6e3',
-    borderRadius: '10px',
-    padding: '10px 12px',
+    border: '1px solid rgba(172, 194, 220, 0.9)',
+    borderRadius: '12px',
+    padding: '10px 14px',
     cursor: 'pointer',
-    background: 'rgba(20, 44, 70, 0.08)',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f0f6ff 100%)',
     fontWeight: '700',
-    color: '#183a5d'
+    color: '#183a5d',
+    fontSize: '13px',
+    letterSpacing: '0.1px',
+    boxShadow: '0 6px 14px rgba(22, 52, 84, 0.1)'
   },
   backButtonMobile: {
     width: '100%'
@@ -392,10 +418,11 @@ const styles = {
   title: {
     marginTop: 0,
     marginBottom: '18px',
-    fontSize: '28px',
-    color: '#10243f',
+    fontSize: '30px',
+    color: '#163454',
     fontWeight: '750',
-    letterSpacing: '-0.02em'
+    letterSpacing: '-0.02em',
+    textAlign: 'left'
   },
   titleMobile: {
     fontSize: '24px'
@@ -403,22 +430,34 @@ const styles = {
   roleTabs: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '8px',
+    gap: '18px',
     marginBottom: '18px'
   },
   roleTab: {
-    border: '1px solid #cbd5e1',
+    border: '2px solid #8fb7dc',
     borderRadius: '10px',
-    background: '#f8fbff',
-    padding: '10px 12px',
+    background: '#f6fbff',
+    padding: '8px 4px',
     fontWeight: '600',
     cursor: 'pointer',
-    color: '#1b3452'
+    color: '#34597c',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
   },
   roleTabActive: {
-    borderColor: '#2563eb',
-    background: '#dbeafe',
-    color: '#0f2f52'
+    color: '#0f4b84',
+    borderColor: '#1f7acb',
+    background: 'linear-gradient(180deg, #edf6ff 0%, #dcebff 100%)',
+    boxShadow: '0 8px 16px rgba(31, 122, 203, 0.22)'
+  },
+  contentFrame: {
+    border: '1px solid #d7e8f8',
+    background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 248, 255, 0.98) 100%)',
+    borderRadius: '14px',
+    padding: '18px 16px',
+    boxShadow: 'inset 0 0 0 1px rgba(255, 255, 255, 0.6)'
   },
   sectionTitle: {
     marginTop: 0,
@@ -429,33 +468,39 @@ const styles = {
     display: 'block',
     marginBottom: '8px',
     fontWeight: '600',
-    color: '#24405d'
+    color: '#24405d',
+    fontSize: '13px'
   },
   input: {
     width: '100%',
     padding: '12px 13px',
     borderRadius: '10px',
-    border: '1px solid #cbd5e1',
+    border: '1px solid #cad6e3',
     marginBottom: '10px',
     color: '#12263f',
-    background: '#ffffff'
+    background: 'rgba(255, 255, 255, 0.98)',
+    fontSize: '15px',
+    boxSizing: 'border-box'
   },
   submitButton: {
     width: '100%',
     border: 'none',
-    borderRadius: '10px',
-    padding: '12px 14px',
+    borderRadius: '12px',
+    padding: '14px 16px',
     background: 'linear-gradient(140deg, #0f5d5c 0%, #164d66 100%)',
     color: '#f5fbff',
     fontWeight: '700',
+    fontSize: '15px',
     cursor: 'pointer',
-    boxShadow: '0 14px 22px rgba(15, 73, 88, 0.32)'
+    letterSpacing: '0.2px',
+    boxShadow: '0 14px 22px rgba(15, 73, 88, 0.32)',
+    marginTop: '8px'
   },
   otpBox: {
     marginTop: '18px',
     padding: '14px',
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
+    border: '1px solid #cae4ff',
+    background: '#edf6ff',
     borderRadius: '8px'
   },
   inlineActions: {
@@ -478,12 +523,13 @@ const styles = {
     fontWeight: '700'
   },
   adminButton: {
-    background: '#1e293b',
+    background: '#174c7e',
     color: '#fff',
-    border: '1px solid #cbd5e1',
+    border: '1px solid #bcd6ee',
     borderRadius: '10px',
     padding: '10px 14px',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    fontWeight: '700'
   },
   adminButtonMobile: {
     width: '100%'
