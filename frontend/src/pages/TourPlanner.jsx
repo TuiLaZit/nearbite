@@ -196,10 +196,11 @@ function TourPlanner() {
 
           .tour-planner-language {
             grid-area: language;
-            justify-self: stretch;
-            width: 100%;
-            max-width: none;
-            min-width: 0;
+            justify-self: stretch !important;
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            display: block;
           }
 
           .tour-planner-title {
