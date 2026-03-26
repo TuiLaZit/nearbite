@@ -170,13 +170,7 @@ function LoginPortal() {
         <aside style={{ ...styles.brandPanel, ...(isMobile ? styles.brandPanelMobile : {}) }}>
           <div>
             <h2 style={styles.brandTitle}>NearBite</h2>
-            {!isMobile && <p style={styles.brandSubtitle}>Control Suite</p>}
           </div>
-          {!isMobile && (
-            <p style={styles.brandDescription}>
-              Dang nhap nhanh cho khach hang va chu quan trong mot giao dien dong bo voi he thong quan tri.
-            </p>
-          )}
         </aside>
 
         <div style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
@@ -282,9 +276,6 @@ function LoginPortal() {
           ) : (
             <div>
               <h2 style={styles.sectionTitle}>🏪 Dang nhap chu quan</h2>
-              <div style={styles.ownerHint}>
-                Trang nay chi danh cho chu quan. Tai khoan la username quan (vi du: bc4), khong phai email.
-              </div>
               <form onSubmit={handleOwnerLogin}>
                 <label style={styles.label}>Tai khoan:</label>
                 <input
@@ -384,18 +375,6 @@ const styles = {
     letterSpacing: '0.8px',
     color: '#f7fbff',
     lineHeight: 1
-  },
-  brandSubtitle: {
-    margin: 0,
-    color: 'rgba(231, 241, 255, 0.9)',
-    lineHeight: 1.65,
-    fontSize: '15px'
-  },
-  brandDescription: {
-    margin: 0,
-    color: 'rgba(231, 241, 255, 0.9)',
-    lineHeight: 1.65,
-    fontSize: '15px'
   },
   panel: {
     padding: '48px 42px',
@@ -529,14 +508,6 @@ const styles = {
     cursor: 'pointer',
     color: '#1e3c5b',
     fontWeight: '700'
-  },
-  ownerHint: {
-    background: '#fff7ed',
-    border: '1px solid #fed7aa',
-    borderRadius: '8px',
-    padding: '10px 12px',
-    marginBottom: '14px',
-    color: '#000'
   },
   adminButton: {
     background: '#1e293b',
