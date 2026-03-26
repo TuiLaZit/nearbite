@@ -57,6 +57,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   final GlobalKey _poiPanelKey = GlobalKey();
 
   StreamSubscription<Position>? _trackingSubscription;
+  Timer? _trackingFallbackTimer;
   HeartbeatService? _heartbeatService;
   bool _isTracking = false;
   bool _autoTrackEnabled = true;
@@ -210,29 +211,43 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
 
     try {
       final nearestCandidate = _pickNearestPoiForPosition(currentPos);
+      final fallbackNarration = _textForNearestFallback(nearestCandidate?.restaurant);
 
       LocationResult location;
       if (nearestCandidate != null) {
-        final candidateResult = await _api.postLocation(
-          lat: nearestCandidate.restaurant.lat,
-          lng: nearestCandidate.restaurant.lng,
-          language: _apiLanguageCode(_language),
-          allowNetworkTranslation: allowNetworkTranslation,
-        );
-
-        final mergedRestaurant = _mergeRestaurant(
-          nearestCandidate.restaurant,
-          candidateResult.nearestPlace,
-        );
-
         location = LocationResult(
-          narration: candidateResult.narration,
+          narration: fallbackNarration,
           distanceKm: nearestCandidate.distanceKm,
-          poiRadiusKm: mergedRestaurant.poiRadiusKm,
-          nearestPlace: mergedRestaurant,
-          audioUrl: candidateResult.audioUrl,
-          outOfRangeMessage: candidateResult.outOfRangeMessage,
+          poiRadiusKm: nearestCandidate.restaurant.poiRadiusKm,
+          nearestPlace: nearestCandidate.restaurant,
+          audioUrl: null,
+          outOfRangeMessage: null,
         );
+
+        try {
+          final candidateResult = await _api.postLocation(
+            lat: nearestCandidate.restaurant.lat,
+            lng: nearestCandidate.restaurant.lng,
+            language: _apiLanguageCode(_language),
+            allowNetworkTranslation: allowNetworkTranslation,
+          );
+
+          final mergedRestaurant = _mergeRestaurant(
+            nearestCandidate.restaurant,
+            candidateResult.nearestPlace,
+          );
+
+          location = LocationResult(
+            narration: candidateResult.narration.isNotEmpty ? candidateResult.narration : fallbackNarration,
+            distanceKm: nearestCandidate.distanceKm,
+            poiRadiusKm: mergedRestaurant.poiRadiusKm,
+            nearestPlace: mergedRestaurant,
+            audioUrl: candidateResult.audioUrl,
+            outOfRangeMessage: candidateResult.outOfRangeMessage,
+          );
+        } catch (_) {
+          // Keep local GPS-nearest result if backend enrichment fails.
+        }
       } else {
         location = await _api.postLocation(
           lat: currentPos.latitude,
@@ -267,6 +282,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
         _lastLocationResult = location;
         _isInPoi = location.distanceKm <= location.poiRadiusKm;
         _poiCachedAudioPath = null;
+        if (_selectedRestaurant != null) {
+          final d = const Distance().as(
+            LengthUnit.Kilometer,
+            LatLng(currentPos.latitude, currentPos.longitude),
+            LatLng(_selectedRestaurant!.lat, _selectedRestaurant!.lng),
+          );
+          _selectedDistanceKm = d;
+        }
       });
 
       unawaited(_warmNarrationCacheForLocation(location));
@@ -286,7 +309,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
           _manualPlaybackUntil != null && now.isBefore(_manualPlaybackUntil!);
 
       final inCooldown = _isAutoPlayInCooldown(location.nearestPlace.id);
-        final audioBusyOrPlaying = _isPoiAudioPlaying || _audioStartAt != null || _isAudioPreparing;
+      final audioBusyOrPlaying = _isPoiAudioPlaying || _audioStartAt != null || _isAudioPreparing;
 
       if (inPoiRange &&
           debouncePassed &&
@@ -416,6 +439,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
 
   void _startTracking() {
     _trackingSubscription?.cancel();
+    _trackingFallbackTimer?.cancel();
     _isTracking = true;
 
     final locationSettings = LocationSettings(
@@ -432,6 +456,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
       onError: (_) {},
     );
 
+    final fallbackInterval = _batterySaverEnabled
+        ? const Duration(seconds: 12)
+        : const Duration(seconds: 4);
+    _trackingFallbackTimer = Timer.periodic(fallbackInterval, (_) {
+      unawaited(_runLocationCycle());
+    });
+
     unawaited(_runLocationCycle());
 
     if (!widget.guestMode) {
@@ -447,6 +478,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   void _stopTracking() {
     _trackingSubscription?.cancel();
     _trackingSubscription = null;
+    _trackingFallbackTimer?.cancel();
+    _trackingFallbackTimer = null;
     _heartbeatService?.stop();
     _isTracking = false;
     setState(() {});
@@ -688,7 +721,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
               Text(restaurant.description ?? ''),
               if (_selectedDistanceKm != null) ...[
                 const SizedBox(height: 6),
-                Text('Cach ban: ${_selectedDistanceKm!.toStringAsFixed(3)} km'),
+                Text('Cach ban: ${_formatDistance(_selectedDistanceKm!)}'),
               ],
               const SizedBox(height: 8),
               if (_selectedLoading)
@@ -844,7 +877,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                   const Icon(Icons.near_me, size: 14, color: Colors.white70),
                   const SizedBox(width: 5),
                   Text(
-                    'Distance: ${location.distanceKm.toStringAsFixed(3)} km',
+                    'Distance: ${_formatDistance(location.distanceKm)}',
                     style: const TextStyle(color: Colors.white70),
                   ),
                 ],
@@ -1155,6 +1188,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _trackingSubscription?.cancel();
+    _trackingFallbackTimer?.cancel();
     _heartbeatService?.stop();
     _sessionExpiredSub?.cancel();
     _playerStateSub?.cancel();
@@ -1534,6 +1568,24 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
       return normalized.substring(0, dashIndex);
     }
     return normalized;
+  }
+
+  String _textForNearestFallback(RestaurantModel? nearest) {
+    if (nearest == null) {
+      return 'Dang cap nhat vi tri...';
+    }
+    final description = (nearest.description ?? '').trim();
+    if (description.isNotEmpty) {
+      return description;
+    }
+    return 'Ban dang o gan ${nearest.name}.';
+  }
+
+  String _formatDistance(double km) {
+    if (km < 1) {
+      return '${(km * 1000).round()} m';
+    }
+    return '${km.toStringAsFixed(3)} km';
   }
 
   bool _isIgnorableAudioError(Object error) {
