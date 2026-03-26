@@ -13,6 +13,7 @@ function LoginPortal() {
 
   const [activeRole, setActiveRole] = useState(initialRole)
   const [loading, setLoading] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
 
   // Customer login state
   const [email, setEmail] = useState('')
@@ -55,6 +56,12 @@ function LoginPortal() {
   useEffect(() => {
     setActiveRole(initialRole)
   }, [initialRole])
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const switchRole = (role) => {
     setActiveRole(role)
@@ -154,151 +161,152 @@ function LoginPortal() {
     }
   }
 
+  const isMobile = viewportWidth <= 920
+
   return (
     <div style={styles.page}>
       <div style={styles.gradient} />
-      <div style={styles.panel}>
-        <div style={styles.topBar}>
-          <button onClick={() => navigate('/')} style={styles.backButton}>
-            ← {t('back')}
-          </button>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            style={styles.languageSelect}
-          >
-            {languages.map((lang) => (
-              <option key={lang.code} value={lang.code}>{lang.label}</option>
-            ))}
-          </select>
-        </div>
+      <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
+        <div style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
+          <div style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
+            <button onClick={() => navigate('/')} style={{ ...styles.backButton, ...(isMobile ? styles.backButtonMobile : {}) }}>
+              ← {t('back')}
+            </button>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={{ ...styles.languageSelect, ...(isMobile ? styles.languageSelectMobile : {}) }}
+            >
+              {languages.map((lang) => (
+                <option key={lang.code} value={lang.code}>{lang.label}</option>
+              ))}
+            </select>
+          </div>
 
-        <h1 style={styles.title}>NearBite Login</h1>
+          <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>NearBite Login</h1>
 
-        <div style={styles.roleTabs}>
-          <button
-            type="button"
-            style={{ ...styles.roleTab, ...(activeRole === 'customer' ? styles.roleTabActive : {}) }}
-            onClick={() => switchRole('customer')}
-          >
-            🍜 {t('customerRole')}
-          </button>
-          <button
-            type="button"
-            style={{ ...styles.roleTab, ...(activeRole === 'owner' ? styles.roleTabActive : {}) }}
-            onClick={() => switchRole('owner')}
-          >
-            🏪 {t('ownerRole')}
-          </button>
-        </div>
+          <div style={styles.roleTabs}>
+            <button
+              type="button"
+              style={{ ...styles.roleTab, ...(activeRole === 'customer' ? styles.roleTabActive : {}) }}
+              onClick={() => switchRole('customer')}
+            >
+              🍜 {t('customerRole')}
+            </button>
+            <button
+              type="button"
+              style={{ ...styles.roleTab, ...(activeRole === 'owner' ? styles.roleTabActive : {}) }}
+              onClick={() => switchRole('owner')}
+            >
+              🏪 {t('ownerRole')}
+            </button>
+          </div>
 
-        {activeRole === 'customer' ? (
-          <div>
-            <h2 style={styles.sectionTitle}>📩 {t('customerLoginTitle')}</h2>
-            <form onSubmit={handleRequestOtp}>
-              <label style={styles.label}>{t('emailLabel')}:</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                disabled={otpSent}
-                style={styles.input}
-              />
-              <button type="submit" disabled={loading || !email || otpSent} style={styles.submitButton}>
-                {loading ? t('sending') : t('sendOtp')}
-              </button>
-            </form>
+          {activeRole === 'customer' ? (
+            <div>
+              <h2 style={styles.sectionTitle}>📩 {t('customerLoginTitle')}</h2>
+              <form onSubmit={handleRequestOtp}>
+                <label style={styles.label}>{t('emailLabel')}:</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  required
+                  disabled={otpSent}
+                  style={styles.input}
+                />
+                <button type="submit" disabled={loading || !email || otpSent} style={styles.submitButton}>
+                  {loading ? t('sending') : t('sendOtp')}
+                </button>
+              </form>
 
-            {otpSent && (
-              <div style={styles.otpBox}>
-                <p style={{ marginBottom: '8px' }}>
-                  {t('otpSentToEmail', { email })}
-                </p>
+              {otpSent && (
+                <div style={styles.otpBox}>
+                  <p style={{ marginBottom: '8px', color: '#1f3551' }}>
+                    {t('otpSentToEmail', { email })}
+                  </p>
 
-                <form onSubmit={handleVerifyOtp}>
-                  <label style={styles.label}>{t('otpCodeLabel')}:</label>
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder={t('otpPlaceholder')}
-                    maxLength={6}
-                    required
-                    style={styles.input}
-                  />
-                  {devOtp && (
-                    <p style={{ color: '#000', marginTop: '8px' }}>
-                      {t('otpLocalLabel')}: <strong>{devOtp}</strong>
-                    </p>
-                  )}
-                  <div style={styles.inlineActions}>
-                    <button type="submit" disabled={loading || otp.length !== 6} style={styles.secondaryButton}>
-                      {loading ? t('verifying') : t('verifyOtp')}
-                    </button>
-                    <button type="button" onClick={handleRequestOtp} disabled={loading} style={styles.secondaryButton}>
-                      {t('resendOtp')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtpSent(false)
-                        setOtp('')
-                        setDevOtp('')
-                      }}
-                      disabled={loading}
-                      style={styles.secondaryButton}
-                    >
-                      {t('changeEmail')}
-                    </button>
-                  </div>
-                </form>
+                  <form onSubmit={handleVerifyOtp}>
+                    <label style={styles.label}>{t('otpCodeLabel')}:</label>
+                    <input
+                      type="text"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      placeholder={t('otpPlaceholder')}
+                      maxLength={6}
+                      required
+                      style={styles.input}
+                    />
+                    {devOtp && (
+                      <p style={{ color: '#1f3551', marginTop: '8px' }}>
+                        {t('otpLocalLabel')}: <strong>{devOtp}</strong>
+                      </p>
+                    )}
+                    <div style={{ ...styles.inlineActions, ...(isMobile ? styles.inlineActionsMobile : {}) }}>
+                      <button type="submit" disabled={loading || otp.length !== 6} style={styles.secondaryButton}>
+                        {loading ? t('verifying') : t('verifyOtp')}
+                      </button>
+                      <button type="button" onClick={handleRequestOtp} disabled={loading} style={styles.secondaryButton}>
+                        {t('resendOtp')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpSent(false)
+                          setOtp('')
+                          setDevOtp('')
+                        }}
+                        disabled={loading}
+                        style={styles.secondaryButton}
+                      >
+                        {t('changeEmail')}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <h2 style={styles.sectionTitle}>🏪 Dang nhap chu quan</h2>
+              <form onSubmit={handleOwnerLogin}>
+                <label style={styles.label}>Tai khoan:</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Vi du: bc4"
+                  required
+                  style={styles.input}
+                />
+
+                <label style={{ ...styles.label, marginTop: '12px' }}>Mat khau:</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={styles.input}
+                />
+
+                <button type="submit" disabled={loading} style={styles.submitButton}>
+                  {loading ? 'Dang dang nhap...' : 'Dang nhap'}
+                </button>
+              </form>
+
+              <div style={{ marginTop: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/login')}
+                  style={{ ...styles.adminButton, ...(isMobile ? styles.adminButtonMobile : {}) }}
+                >
+                  🛡️ Toi la admin
+                </button>
               </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            <h2 style={styles.sectionTitle}>🏪 Dang nhap chu quan</h2>
-            <div style={styles.ownerHint}>
-              Trang nay chi danh cho chu quan. Tai khoan la username quan (vi du: bc4), khong phai email.
             </div>
-            <form onSubmit={handleOwnerLogin}>
-              <label style={styles.label}>Tai khoan:</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Vi du: bc4"
-                required
-                style={styles.input}
-              />
-
-              <label style={{ ...styles.label, marginTop: '12px' }}>Mat khau:</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                style={styles.input}
-              />
-
-              <button type="submit" disabled={loading} style={styles.submitButton}>
-                {loading ? 'Dang dang nhap...' : 'Dang nhap'}
-              </button>
-            </form>
-
-            <div style={{ marginTop: '12px' }}>
-              <button
-                type="button"
-                onClick={() => navigate('/admin/login')}
-                style={styles.adminButton}
-              >
-                🛡️ Toi la admin
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
@@ -313,57 +321,84 @@ const styles = {
     justifyContent: 'center',
     padding: '24px',
     overflow: 'hidden',
-    background: '#f8fafc'
+    background: '#0f172a'
   },
   gradient: {
     position: 'absolute',
     inset: 0,
-    background: 'radial-gradient(circle at 20% 10%, #fde68a, transparent 35%), radial-gradient(circle at 80% 90%, #bfdbfe, transparent 35%), linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)'
+    background: 'radial-gradient(900px 520px at 8% 12%, rgba(197, 156, 84, 0.2), transparent 60%), radial-gradient(820px 480px at 92% 88%, rgba(22, 77, 76, 0.16), transparent 65%), linear-gradient(135deg, #071217 0%, #0f172a 46%, #152238 100%)'
   },
-  panel: {
+  grid: {
     position: 'relative',
     zIndex: 1,
     width: '100%',
-    maxWidth: '600px',
-    background: 'rgba(255, 255, 255, 0.95)',
-    border: '1px solid #e2e8f0',
-    borderRadius: '20px',
-    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.12)',
-    padding: '28px',
-    color: '#000'
+    maxWidth: '620px',
+    display: 'block',
+    borderRadius: '24px',
+    overflow: 'hidden',
+    border: '1px solid rgba(223, 232, 244, 0.22)',
+    boxShadow: '0 34px 70px rgba(2, 7, 20, 0.5)',
+    background: '#f6f9ff'
+  },
+  gridMobile: {
+    maxWidth: '580px',
+    borderRadius: '18px'
+  },
+  panel: {
+    padding: '48px 42px',
+    background: 'linear-gradient(170deg, #ffffff 0%, #eef4ff 100%)'
+  },
+  panelMobile: {
+    padding: '18px 14px'
   },
   topBar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: '12px',
-    marginBottom: '8px'
+    marginBottom: '18px'
+  },
+  topBarMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    marginBottom: '14px'
   },
   backButton: {
-    border: 'none',
-    borderRadius: '8px',
-    padding: '8px 12px',
+    border: '1px solid #cad6e3',
+    borderRadius: '10px',
+    padding: '10px 12px',
     cursor: 'pointer',
-    background: '#e2e8f0',
-    fontWeight: '600',
-    color: '#000'
+    background: 'rgba(20, 44, 70, 0.08)',
+    fontWeight: '700',
+    color: '#183a5d'
+  },
+  backButtonMobile: {
+    width: '100%'
   },
   languageSelect: {
     padding: '10px 12px',
-    borderRadius: '8px',
-    border: '2px solid #ddd',
+    borderRadius: '10px',
+    border: '1px solid #cad6e3',
     fontSize: '13px',
     cursor: 'pointer',
     background: 'white',
     minWidth: '110px',
-    color: '#000'
+    color: '#183a5d',
+    fontWeight: '600'
+  },
+  languageSelectMobile: {
+    width: '100%'
   },
   title: {
-    marginTop: '8px',
+    marginTop: 0,
     marginBottom: '18px',
-    textAlign: 'center',
-    fontSize: '34px',
-    color: '#000'
+    fontSize: '28px',
+    color: '#10243f',
+    fontWeight: '750',
+    letterSpacing: '-0.02em'
+  },
+  titleMobile: {
+    fontSize: '24px'
   },
   roleTabs: {
     display: 'grid',
@@ -374,44 +409,47 @@ const styles = {
   roleTab: {
     border: '1px solid #cbd5e1',
     borderRadius: '10px',
-    background: '#f8fafc',
+    background: '#f8fbff',
     padding: '10px 12px',
     fontWeight: '600',
     cursor: 'pointer',
-    color: '#000'
+    color: '#1b3452'
   },
   roleTabActive: {
     borderColor: '#2563eb',
-    background: '#dbeafe'
+    background: '#dbeafe',
+    color: '#0f2f52'
   },
   sectionTitle: {
     marginTop: 0,
     marginBottom: '14px',
-    color: '#000'
+    color: '#10243f'
   },
   label: {
     display: 'block',
     marginBottom: '8px',
     fontWeight: '600',
-    color: '#000'
+    color: '#24405d'
   },
   input: {
     width: '100%',
-    padding: '10px 12px',
-    borderRadius: '8px',
+    padding: '12px 13px',
+    borderRadius: '10px',
     border: '1px solid #cbd5e1',
     marginBottom: '10px',
-    color: '#000'
+    color: '#12263f',
+    background: '#ffffff'
   },
   submitButton: {
     width: '100%',
     border: 'none',
-    borderRadius: '8px',
-    padding: '10px 14px',
-    background: '#2563eb',
-    color: '#000',
+    borderRadius: '10px',
+    padding: '12px 14px',
+    background: 'linear-gradient(140deg, #0f5d5c 0%, #164d66 100%)',
+    color: '#f5fbff',
     fontWeight: '700',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    boxShadow: '0 14px 22px rgba(15, 73, 88, 0.32)'
   },
   otpBox: {
     marginTop: '18px',
@@ -426,29 +464,29 @@ const styles = {
     marginTop: '10px',
     flexWrap: 'wrap'
   },
+  inlineActionsMobile: {
+    display: 'grid',
+    gridTemplateColumns: '1fr'
+  },
   secondaryButton: {
-    border: '1px solid #94a3b8',
-    borderRadius: '8px',
-    padding: '8px 10px',
+    border: '1px solid #c7d7eb',
+    borderRadius: '10px',
+    padding: '10px 12px',
     background: 'white',
     cursor: 'pointer',
-    color: '#000'
-  },
-  ownerHint: {
-    background: '#fff7ed',
-    border: '1px solid #fed7aa',
-    borderRadius: '8px',
-    padding: '10px 12px',
-    marginBottom: '14px',
-    color: '#000'
+    color: '#1e3c5b',
+    fontWeight: '700'
   },
   adminButton: {
     background: '#1e293b',
     color: '#fff',
     border: '1px solid #cbd5e1',
-    borderRadius: '8px',
+    borderRadius: '10px',
     padding: '10px 14px',
     cursor: 'pointer'
+  },
+  adminButtonMobile: {
+    width: '100%'
   }
 }
 
