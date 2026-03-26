@@ -367,6 +367,7 @@ function AdminLogin({
           .admin-login-grid {
             grid-template-columns: 1fr;
             max-width: 580px;
+            border-radius: 22px;
           }
 
           .admin-login-brand {
@@ -382,6 +383,122 @@ function AdminLogin({
           .back-button {
             width: 100%;
             justify-content: center;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .admin-login-shell {
+            padding: 14px;
+            align-items: flex-start;
+          }
+
+          .admin-login-grid {
+            margin-top: 10px;
+            border-radius: 18px;
+          }
+
+          .admin-login-brand {
+            padding: 22px 18px;
+            gap: 14px;
+          }
+
+          .admin-login-brand h2 {
+            font-size: clamp(34px, 11vw, 42px);
+          }
+
+          .admin-login-brand p {
+            font-size: 13px;
+            line-height: 1.5;
+          }
+
+          .admin-login-metrics {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+
+          .admin-login-metric {
+            padding: 12px;
+          }
+
+          .admin-login-metric span {
+            font-size: 19px;
+          }
+
+          .login-card {
+            padding: 22px 18px;
+          }
+
+          h1 {
+            font-size: 24px;
+          }
+
+          .header {
+            gap: 10px;
+            margin-bottom: 12px;
+          }
+
+          .header-text {
+            margin-bottom: 18px;
+            font-size: 13px;
+          }
+
+          .shield-icon {
+            width: 28px;
+            height: 28px;
+          }
+
+          .field-label {
+            font-size: 12px;
+          }
+
+          input {
+            padding: 12px 13px;
+            font-size: 14px;
+            border-radius: 10px;
+          }
+
+          .error-message {
+            font-size: 12px;
+            padding: 9px 10px;
+          }
+
+          .back-button {
+            margin-bottom: 12px;
+            padding: 9px 12px 9px 9px;
+            border-radius: 10px;
+            font-size: 12px;
+            gap: 8px;
+          }
+
+          .back-button-icon {
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+          }
+
+          button {
+            margin-top: 4px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .admin-login-shell {
+            padding: 10px;
+          }
+
+          .admin-login-brand {
+            padding: 18px 14px;
+          }
+
+          .login-card {
+            padding: 18px 14px;
+          }
+
+          .back-button-text {
+            font-size: 11.5px;
           }
         }
       `}</style>
