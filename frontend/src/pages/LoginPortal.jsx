@@ -165,6 +165,17 @@ function LoginPortal() {
 
   return (
     <div style={styles.page}>
+      <style>{`
+        .login-portal-role-tab {
+          transition: all 0.2s ease;
+        }
+
+        .login-portal-role-tab:hover {
+          color: #0f4f88;
+          border-color: #5fa7e8;
+          background: rgba(223, 239, 255, 0.55);
+        }
+      `}</style>
       <div style={styles.gradient} />
       <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
         <div style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
@@ -188,6 +199,7 @@ function LoginPortal() {
           <div style={styles.roleTabs}>
             <button
               type="button"
+              className="login-portal-role-tab"
               style={{ ...styles.roleTab, ...(activeRole === 'customer' ? styles.roleTabActive : {}) }}
               onClick={() => switchRole('customer')}
             >
@@ -195,6 +207,7 @@ function LoginPortal() {
             </button>
             <button
               type="button"
+              className="login-portal-role-tab"
               style={{ ...styles.roleTab, ...(activeRole === 'owner' ? styles.roleTabActive : {}) }}
               onClick={() => switchRole('owner')}
             >
@@ -414,9 +427,9 @@ const styles = {
     marginBottom: '18px'
   },
   roleTab: {
-    border: 'none',
-    borderRadius: '0',
-    background: 'transparent',
+    border: '1px solid #b7d2eb',
+    borderRadius: '10px',
+    background: '#f4f9ff',
     padding: '8px 4px',
     fontWeight: '600',
     cursor: 'pointer',
@@ -424,12 +437,13 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
-    borderBottom: '2px solid transparent'
+    gap: '8px'
   },
   roleTabActive: {
     color: '#184b7d',
-    borderBottomColor: '#1f7acb'
+    borderColor: '#1f7acb',
+    background: '#e9f3ff',
+    boxShadow: '0 6px 14px rgba(31, 122, 203, 0.18)'
   },
   contentFrame: {
     border: '1px solid #d7e8f8',
