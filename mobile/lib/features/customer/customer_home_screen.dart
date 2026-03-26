@@ -4,7 +4,6 @@ import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:latlong2/latlong.dart';
@@ -48,7 +47,7 @@ class CustomerHomeScreen extends StatefulWidget {
   State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
 }
 
-class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBindingObserver {
   late final BackendApi _api;
   final LocationService _locationService = LocationService();
   final AudioService _audioService = AudioService();
@@ -103,6 +102,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _api = BackendApi(widget.apiClient);
     _heartbeatService = HeartbeatService(_api);
     _playerStateSub = _audioService.player.playerStateStream.listen((state) {
@@ -208,18 +208,39 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       _mapController.camera.zoom.isFinite ? _mapController.camera.zoom : 16,
     );
 
-    // Keep GPS UI updated, but avoid POI recalculation while audio is playing.
-    if (_audioStartAt != null || _isAudioPreparing) {
-      return;
-    }
-
     try {
-      final location = await _api.postLocation(
-        lat: currentPos.latitude,
-        lng: currentPos.longitude,
-        language: _apiLanguageCode(_language),
-        allowNetworkTranslation: allowNetworkTranslation,
-      );
+      final bestCandidate = _pickBestPoiForPosition(currentPos);
+
+      LocationResult location;
+      if (bestCandidate != null) {
+        final candidateResult = await _api.postLocation(
+          lat: bestCandidate.restaurant.lat,
+          lng: bestCandidate.restaurant.lng,
+          language: _apiLanguageCode(_language),
+          allowNetworkTranslation: allowNetworkTranslation,
+        );
+
+        final mergedRestaurant = _mergeRestaurant(
+          bestCandidate.restaurant,
+          candidateResult.nearestPlace,
+        );
+
+        location = LocationResult(
+          narration: candidateResult.narration,
+          distanceKm: bestCandidate.distanceKm,
+          poiRadiusKm: mergedRestaurant.poiRadiusKm,
+          nearestPlace: mergedRestaurant,
+          audioUrl: candidateResult.audioUrl,
+          outOfRangeMessage: candidateResult.outOfRangeMessage,
+        );
+      } else {
+        location = await _api.postLocation(
+          lat: currentPos.latitude,
+          lng: currentPos.longitude,
+          language: _apiLanguageCode(_language),
+          allowNetworkTranslation: allowNetworkTranslation,
+        );
+      }
 
       if (_isTracking && !widget.guestMode) {
         try {
@@ -265,12 +286,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           _manualPlaybackUntil != null && now.isBefore(_manualPlaybackUntil!);
 
       final inCooldown = _isAutoPlayInCooldown(location.nearestPlace.id);
+        final audioBusyOrPlaying = _isPoiAudioPlaying || _audioStartAt != null || _isAudioPreparing;
 
       if (inPoiRange &&
           debouncePassed &&
           !manualPlaybackLocked &&
           !_batterySaverEnabled &&
           !inCooldown &&
+          !audioBusyOrPlaying &&
           !suppressAutoPlay &&
           location.audioUrl != null &&
           location.audioUrl!.isNotEmpty &&
@@ -320,7 +343,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   Future<void> _startAudio(LocationResult location, {String? localAudioPath}) async {
     final hasLocal = localAudioPath != null && localAudioPath.trim().isNotEmpty;
-    final hasRemote = location.audioUrl != null && location.audioUrl!.isNotEmpty;
+    final remoteUrl = location.audioUrl;
+    final hasRemote = remoteUrl != null && remoteUrl.isNotEmpty;
     if (!hasLocal && !hasRemote) {
       return;
     }
@@ -331,9 +355,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
     try {
       if (hasLocal) {
-        await _audioService.playFromFilePath(localAudioPath!);
+        await _audioService.playFromFilePath(localAudioPath);
       } else {
-        await _audioService.playFromUrl(location.audioUrl!);
+        final remote = remoteUrl;
+        if (remote == null) {
+          return;
+        }
+        await _audioService.playFromUrl(remote);
       }
       _audioStartAt = DateTime.now();
       _activeAudioRestaurantId = location.nearestPlace.id;
@@ -402,8 +430,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
     if (!widget.guestMode) {
       _heartbeatService?.start(
-        lat: () => _position?.latitude ?? 0,
-        lng: () => _position?.longitude ?? 0,
+        lat: () => _position?.latitude,
+        lng: () => _position?.longitude,
       );
     }
 
@@ -908,16 +936,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         language: _apiLanguageCode(_language),
       );
       final localPath = cachedRecord?.audioFilePath ?? _poiCachedAudioPath;
-      if (resolved == null && (localPath == null || localPath.isEmpty)) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quan nay hien chua co audio thuyet minh.')),
-        );
-        return;
-      }
 
       await _startAudio(updated, localAudioPath: localPath);
-      _lastPlayedAudioUrl = resolved ?? 'local-poi-${location.nearestPlace.id}-${_apiLanguageCode(_language)}';
+      _lastPlayedAudioUrl = resolved;
       _playedRestaurants[location.nearestPlace.id] = DateTime.now();
       _manualPlaybackUntil = DateTime.now().add(const Duration(seconds: 20));
     } finally {
@@ -1104,7 +1125,28 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    if (state == AppLifecycleState.resumed) {
+      if (_autoTrackEnabled) {
+        _resumeRealtimeFeaturesIfNeeded();
+      }
+
+      final position = _position;
+      if (!widget.guestMode && position != null) {
+        unawaited(
+          _heartbeatService?.beatNow(
+            lat: position.latitude,
+            lng: position.longitude,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _trackingTimer?.cancel();
     _heartbeatService?.stop();
     _sessionExpiredSub?.cancel();
@@ -1549,6 +1591,56 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
     return options.first.code;
   }
+
+  _PoiCandidate? _pickBestPoiForPosition(Position position) {
+    if (_restaurants.isEmpty) {
+      return null;
+    }
+
+    final userPoint = LatLng(position.latitude, position.longitude);
+    final distance = const Distance();
+
+    final inRange = <_PoiCandidate>[];
+    for (final restaurant in _restaurants) {
+      final restaurantPoint = LatLng(restaurant.lat, restaurant.lng);
+      final distanceKm = distance.as(LengthUnit.Kilometer, userPoint, restaurantPoint);
+      if (distanceKm <= restaurant.poiRadiusKm) {
+        inRange.add(_PoiCandidate(restaurant: restaurant, distanceKm: distanceKm));
+      }
+    }
+
+    if (inRange.isEmpty) {
+      return null;
+    }
+
+    inRange.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+    return inRange.first;
+  }
+
+  RestaurantModel _mergeRestaurant(RestaurantModel base, RestaurantModel enriched) {
+    return RestaurantModel(
+      id: base.id,
+      name: enriched.name.isNotEmpty ? enriched.name : base.name,
+      lat: base.lat,
+      lng: base.lng,
+      description: enriched.description ?? base.description,
+      avgEatTime: enriched.avgEatTime,
+      poiRadiusKm: enriched.poiRadiusKm,
+      visitCount: enriched.visitCount,
+      avgVisitDuration: enriched.avgVisitDuration,
+      avgAudioDuration: enriched.avgAudioDuration,
+      menu: enriched.menu,
+      images: enriched.images,
+      tags: enriched.tags,
+    );
+  }
+}
+
+class _PoiCandidate {
+  const _PoiCandidate({required this.restaurant, required this.distanceKm});
+
+  final RestaurantModel restaurant;
+  final double distanceKm;
 }
 
 class _CountryBall extends StatelessWidget {

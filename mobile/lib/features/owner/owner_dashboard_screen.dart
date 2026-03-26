@@ -10,7 +10,6 @@ import '../../core/models/restaurant_model.dart';
 import '../../core/models/tag_model.dart';
 import '../../core/network/api_client.dart';
 import '../../services/backend_api.dart';
-import '../auth/login_screen.dart';
 import '../auth/role_selection_screen.dart';
 
 class OwnerDashboardScreen extends StatefulWidget {
@@ -327,6 +326,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text(r.name),
         actions: [
           IconButton(onPressed: _bootstrap, icon: const Icon(Icons.refresh)),
@@ -334,6 +334,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          onTap: (index) {
+            if (_tabController.index != index) {
+              _tabController.animateTo(index);
+            }
+          },
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Menu'),
@@ -382,10 +387,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
         Text('Avg audio duration: ${r.avgAudioDuration}s'),
         const SizedBox(height: 16),
         TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name')),
+        const SizedBox(height: 10),
         TextField(controller: _latController, decoration: const InputDecoration(labelText: 'Latitude')),
+        const SizedBox(height: 10),
         TextField(controller: _lngController, decoration: const InputDecoration(labelText: 'Longitude')),
+        const SizedBox(height: 10),
         TextField(controller: _avgEatController, decoration: const InputDecoration(labelText: 'Avg eat time (min)')),
+        const SizedBox(height: 10),
         TextField(controller: _poiRadiusController, decoration: const InputDecoration(labelText: 'POI radius (km)')),
+        const SizedBox(height: 10),
         TextField(
           controller: _descriptionController,
           decoration: const InputDecoration(labelText: 'Description'),
@@ -408,6 +418,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
           controller: _menuNameController,
           decoration: const InputDecoration(labelText: 'Menu item name'),
         ),
+        const SizedBox(height: 10),
         TextField(
           controller: _menuPriceController,
           keyboardType: TextInputType.number,

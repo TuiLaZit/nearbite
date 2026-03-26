@@ -166,13 +166,18 @@ class BackendApi {
     required String deviceId,
     double? lat,
     double? lng,
+    String? userId,
   }) async {
-    final payload = {
-      'device_id': deviceId,
-      'latitude': lat,
-      'longitude': lng,
-      'user_id': null,
-    };
+    final payload = <String, dynamic>{'device_id': deviceId};
+    if (lat != null) {
+      payload['latitude'] = lat;
+    }
+    if (lng != null) {
+      payload['longitude'] = lng;
+    }
+    if (userId != null && userId.trim().isNotEmpty) {
+      payload['user_id'] = userId.trim();
+    }
     try {
       await _dio.post('/heartbeat', data: payload);
     } on DioException {
