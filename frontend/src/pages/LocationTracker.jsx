@@ -220,6 +220,8 @@ function LocationTracker() {
   const locationRequestSeqRef = useRef(0)
   const selectedRestaurantRequestControllerRef = useRef(null)
   const selectedRestaurantRequestSeqRef = useRef(0)
+  const headerRef = useRef(null)
+  const controlPanelRef = useRef(null)
 
   const performanceModeKey = getPerformanceModeKey(isWeakDevice, isBatterySaverEnabled)
   const gpsIntervalMs = GPS_INTERVAL_BY_MODE_MS[performanceModeKey]
@@ -357,11 +359,23 @@ function LocationTracker() {
         return
       }
 
-      const ratio = viewportWidth <= 420 ? 0.64 : 0.68
-      const minHeight = viewportWidth <= 420 ? 340 : 380
+      const headerHeight = headerRef.current?.offsetHeight || 110
+      const panelHeight = controlPanelRef.current?.offsetHeight || 110
+      const mapVerticalPadding = 8
+      const availableHeight = viewportHeight - headerHeight - panelHeight - mapVerticalPadding
+      const minHeight = viewportWidth <= 420 ? 240 : 280
       const maxHeight = 760
-      const computedHeight = Math.round(Math.max(minHeight, Math.min(maxHeight, viewportHeight * ratio)))
+      const computedHeight = Math.round(Math.max(minHeight, Math.min(maxHeight, availableHeight)))
       setMobileMapHeight(`${computedHeight}px`)
+    }
+
+    let headerObserver = null
+    let panelObserver = null
+    if (typeof ResizeObserver !== 'undefined') {
+      headerObserver = new ResizeObserver(syncMobileMapHeight)
+      panelObserver = new ResizeObserver(syncMobileMapHeight)
+      if (headerRef.current) headerObserver.observe(headerRef.current)
+      if (controlPanelRef.current) panelObserver.observe(controlPanelRef.current)
     }
 
     syncMobileMapHeight()
@@ -375,8 +389,10 @@ function LocationTracker() {
       window.removeEventListener('orientationchange', syncMobileMapHeight)
       visualViewport?.removeEventListener('resize', syncMobileMapHeight)
       visualViewport?.removeEventListener('scroll', syncMobileMapHeight)
+      headerObserver?.disconnect()
+      panelObserver?.disconnect()
     }
-  }, [])
+  }, [currentNarration, isPanelCollapsed, isCustomerAuthenticated])
 
   // When running as PWA and offline, load restaurants from local cache only.
   useEffect(() => {
@@ -1468,7 +1484,7 @@ function LocationTracker() {
         }
       `}</style>
       {/* Header */}
-      <div className="tracker-header" style={{
+      <div ref={headerRef} className="tracker-header" style={{
         padding: '10px 14px',
         background: 'linear-gradient(138deg, #0f2745 0%, #11416a 58%, #145063 100%)',
         borderBottom: '1px solid rgba(167, 196, 228, 0.42)',
@@ -1834,7 +1850,7 @@ function LocationTracker() {
       </div>
 
       {/* Control Panel - Bottom */}
-      <div style={{ 
+      <div ref={controlPanelRef} style={{ 
         padding: '14px', 
         background: 'linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(243, 249, 255, 0.95) 100%)', 
         borderTop: '1px solid rgba(176, 201, 230, 0.7)',
