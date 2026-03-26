@@ -342,7 +342,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
 
   Future<void> _pickImageFromGallery() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
     if (file == null) return;
     setState(() => _pickedImage = file);
   }
@@ -356,7 +361,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     }
 
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    final file = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 82,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      preferredCameraDevice: CameraDevice.rear,
+    );
     if (file == null) return;
     if (!mounted) return;
     setState(() => _pickedImage = file);
@@ -384,6 +395,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
       _imageCaptionController.clear();
       _imagePrimary = false;
       await _bootstrap();
+    } on DioException catch (e) {
+      final message = _dioMessage(e);
+      final status = e.response?.statusCode ?? 0;
+      setState(() {
+        _error = status >= 500
+            ? 'Upload image failed due to temporary server issue. Please try again in a few seconds. Details: $message'
+            : message;
+      });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {

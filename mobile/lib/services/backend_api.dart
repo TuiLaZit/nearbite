@@ -311,7 +311,27 @@ class BackendApi {
       'file': await MultipartFile.fromFile(filePath),
     });
 
-    final uploadResponse = await _dio.post('/admin/upload-image', data: formData);
+    Response<dynamic>? uploadResponse;
+    DioException? lastDioError;
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        uploadResponse = await _dio.post('/admin/upload-image', data: formData);
+        break;
+      } on DioException catch (e) {
+        lastDioError = e;
+        final code = e.response?.statusCode ?? 0;
+        final shouldRetry = code >= 500 || code == 0;
+        if (!shouldRetry || attempt == 2) {
+          rethrow;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+    }
+
+    if (uploadResponse == null) {
+      throw lastDioError ?? DioException(requestOptions: RequestOptions(path: '/admin/upload-image'));
+    }
+
     final uploadData = (uploadResponse.data as Map).cast<String, dynamic>();
     final imageUrl = (uploadData['url'] ?? '').toString();
 
