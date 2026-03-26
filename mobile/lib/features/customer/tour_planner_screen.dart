@@ -267,7 +267,7 @@ class _TourPlannerScreenState extends State<TourPlannerScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text('Total time: ${tour.totalTime} min'),
-                    Text('Total cost: ${tour.totalCost} VND'),
+                    Text('Estimated cost: ${tour.totalCost} VND'),
                     const SizedBox(height: 8),
                     ...tour.restaurants.map(
                       (r) => ListTile(
