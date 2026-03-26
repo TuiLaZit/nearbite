@@ -57,6 +57,7 @@ const BATTERY_SAVER_KEY = 'nearbiteBatterySaverEnabled'
 const DEVICE_PROFILE_OVERRIDE_KEY = 'nearbiteDeviceProfileOverride'
 const PWA_AUDIO_INDEX_KEY = 'nearbitePwaAudioIndexV1'
 const PWA_CACHED_RESTAURANTS_KEY = 'nearbitePwaCachedRestaurantsV1'
+const PWA_CACHED_RESTAURANT_DETAIL_KEY = 'nearbitePwaCachedRestaurantDetailV1'
 
 const GPS_INTERVAL_BY_MODE_MS = {
   normal: 3000,
@@ -103,6 +104,12 @@ const readCachedRestaurantIds = () => Object.keys(readJsonObject(PWA_AUDIO_INDEX
 const readCachedRestaurants = () => {
   const map = readJsonObject(PWA_CACHED_RESTAURANTS_KEY)
   return Object.values(map).filter(Boolean)
+}
+
+const readCachedRestaurantDetail = (restaurantId) => {
+  if (!restaurantId) return null
+  const map = readJsonObject(PWA_CACHED_RESTAURANT_DETAIL_KEY)
+  return map[String(restaurantId)] || null
 }
 
 const isLikelyWeakDevice = () => {
@@ -232,7 +239,7 @@ function LocationTracker() {
     writeJsonObject(PWA_CACHED_RESTAURANTS_KEY, cacheMap)
   }
 
-  const cacheNarrationForOffline = async ({ restaurant, audioUrl }) => {
+  const cacheNarrationForOffline = async ({ restaurant, audioUrl, narration }) => {
     if (!isPwaRuntime || !restaurant?.id || !audioUrl) return
 
     const resolvedAudioUrl = resolveAudioUrl(audioUrl)
@@ -245,6 +252,16 @@ function LocationTracker() {
     }
     writeJsonObject(PWA_AUDIO_INDEX_KEY, index)
     rememberCachedRestaurant(restaurant)
+
+    const detailMap = readJsonObject(PWA_CACHED_RESTAURANT_DETAIL_KEY)
+    detailMap[String(restaurant.id)] = {
+      ...restaurant,
+      narration: narration || restaurant.narration || '',
+      audioUrl: resolvedAudioUrl,
+      updatedAt: Date.now()
+    }
+    writeJsonObject(PWA_CACHED_RESTAURANT_DETAIL_KEY, detailMap)
+
     setCachedRestaurantIds(Object.keys(index))
 
     if (typeof navigator !== 'undefined' && navigator.onLine) {
@@ -620,7 +637,8 @@ function LocationTracker() {
 
             cacheNarrationForOffline({
               restaurant: data.nearest_place,
-              audioUrl: data.audio_url
+              audioUrl: data.audio_url,
+              narration: data.narration
             })
 
             // Kiểm tra cooldown 5 phút
@@ -707,7 +725,8 @@ function LocationTracker() {
 
             cacheNarrationForOffline({
               restaurant: data.nearest_place,
-              audioUrl: data.audio_url
+              audioUrl: data.audio_url,
+              narration: data.narration
             })
 
             // Kiểm tra cooldown 5 phút
@@ -1037,6 +1056,42 @@ function LocationTracker() {
     // Dừng audio cũ nếu đang phát
     stopAudio()
 
+    if (isPwaRuntime && isOfflineMode) {
+      const cachedDetail = readCachedRestaurantDetail(restaurant.id)
+      const audioIndex = readJsonObject(PWA_AUDIO_INDEX_KEY)
+      const fallbackAudioUrl = audioIndex[String(restaurant.id)]?.audioUrl || null
+      const distance = userLocation
+        ? calculateDistance(userLocation[0], userLocation[1], restaurant.lat, restaurant.lng)
+        : undefined
+
+      if (cachedDetail) {
+        setSelectedRestaurant({
+          ...restaurant,
+          ...cachedDetail,
+          distance,
+          loading: false,
+          error: false
+        })
+      } else if (fallbackAudioUrl) {
+        setSelectedRestaurant({
+          ...restaurant,
+          narration: restaurant.narration || '',
+          audioUrl: fallbackAudioUrl,
+          distance,
+          loading: false,
+          error: false
+        })
+      } else {
+        setSelectedRestaurant({
+          ...restaurant,
+          distance,
+          loading: false,
+          error: true
+        })
+      }
+      return
+    }
+
     // Set loading state ngay lập tức để popup hiển thị "Đang tải..."
     setSelectedRestaurant({
       ...restaurant,
@@ -1093,7 +1148,8 @@ function LocationTracker() {
 
           cacheNarrationForOffline({
             restaurant: { ...restaurant, ...selectedPlace },
-            audioUrl: data.audio_url
+            audioUrl: data.audio_url,
+            narration: data.narration
           })
         })
         .catch(err => {
@@ -1160,7 +1216,8 @@ function LocationTracker() {
 
           cacheNarrationForOffline({
             restaurant: { ...restaurant, ...selectedPlace },
-            audioUrl: data.audio_url
+            audioUrl: data.audio_url,
+            narration: data.narration
           })
         })
         .catch(err => {
