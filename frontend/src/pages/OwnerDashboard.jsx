@@ -484,20 +484,19 @@ function OwnerDashboard() {
 
           .owner-topbar-nav {
             grid-column: 1 / -1;
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 6px;
-            overflow-x: auto;
-            padding-bottom: 2px;
-            scrollbar-width: thin;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            width: 100%;
           }
 
           .owner-topbar-nav-btn {
             height: 34px;
-            padding: 0 10px;
+            padding: 0 8px;
             font-size: 12px;
             border-radius: 999px;
-            flex: 0 0 auto;
+            width: 100%;
+            text-align: center;
           }
 
           .owner-topbar-logout-btn {
@@ -545,6 +544,10 @@ function OwnerDashboard() {
         }
 
         @media (max-width: 520px) {
+          .owner-topbar-nav {
+            grid-template-columns: 1fr;
+          }
+
           .owner-stats-grid {
             grid-template-columns: 1fr !important;
           }
