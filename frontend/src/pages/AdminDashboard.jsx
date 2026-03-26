@@ -162,6 +162,13 @@ function AdminDashboard({ role = 'admin' }) {
   const [tileProviderIndex, setTileProviderIndex] = useState(0)
   const [tileLoaded, setTileLoaded] = useState(false)
   const tileErrorCountRef = useRef(0)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280))
+  const onlineStatsRequestControllerRef = useRef(null)
+  const onlineStatsRequestSeqRef = useRef(0)
+
+  const isMobile = viewportWidth <= 768
+  const isTablet = viewportWidth <= 1024
+  const mapHeight = isMobile ? 340 : isTablet ? 420 : MAP_HEIGHT_PX
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -206,8 +213,18 @@ function AdminDashboard({ role = 'admin' }) {
   // Load heatmap và restaurants khi load component
 
   const loadOnlineStats = () => {
+    const requestSeq = ++onlineStatsRequestSeqRef.current
+
+    if (onlineStatsRequestControllerRef.current) {
+      onlineStatsRequestControllerRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    onlineStatsRequestControllerRef.current = controller
+
     fetch(`${BASE_URL}/admin/online-users`, {
-      credentials: 'include'
+      credentials: 'include',
+      signal: controller.signal
     })
       .then(res => {
         if (!res.ok) {
@@ -216,6 +233,10 @@ function AdminDashboard({ role = 'admin' }) {
         return res.json()
       })
       .then(data => {
+        if (requestSeq !== onlineStatsRequestSeqRef.current) {
+          return
+        }
+
         setOnlineStats({
           window_seconds: data.window_seconds || 30,
           online_devices: data.online_devices || 0,
@@ -223,7 +244,15 @@ function AdminDashboard({ role = 'admin' }) {
         })
       })
       .catch(err => {
+        if (err?.name === 'AbortError') {
+          return
+        }
         console.error('Error loading online users:', err)
+      })
+      .finally(() => {
+        if (requestSeq === onlineStatsRequestSeqRef.current) {
+          onlineStatsRequestControllerRef.current = null
+        }
       })
   }
 
@@ -326,6 +355,15 @@ function AdminDashboard({ role = 'admin' }) {
   }, [activeTab, isOwner])
 
   useEffect(() => {
+    return () => {
+      if (onlineStatsRequestControllerRef.current) {
+        onlineStatsRequestControllerRef.current.abort()
+        onlineStatsRequestControllerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (activeTab !== 'dashboard') return
     setTileProviderIndex(0)
     setTileLoaded(false)
@@ -349,6 +387,17 @@ function AdminDashboard({ role = 'admin' }) {
     }
   }, [activeTab, tileLoaded, tileProviderIndex])
 
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
   const handleLogout = () => {
     fetch(`${BASE_URL}${authBase}/logout`, {
       method: 'POST',
@@ -359,6 +408,57 @@ function AdminDashboard({ role = 'admin' }) {
       navigate(loginPath)
     })
   }
+
+  const topNavButtons = (
+    <>
+      {!isOwner && (
+        <button
+          className={`topbar-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
+          onClick={() => {
+            setActiveTab('dashboard')
+            loadHeatmapData()
+          }}
+        >
+          Dashboard
+        </button>
+      )}
+      <button
+        className={`topbar-nav-btn ${activeTab === 'restaurants' ? 'active' : ''}`}
+        style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
+        onClick={() => setActiveTab('restaurants')}
+      >
+        Quản lý quán
+      </button>
+      {!isOwner && (
+        <button
+          className={`topbar-nav-btn ${activeTab === 'hidden' ? 'active' : ''}`}
+          style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
+          onClick={() => setActiveTab('hidden')}
+        >
+          Quán đã ẩn
+        </button>
+      )}
+      {!isOwner && (
+        <button
+          className={`topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`}
+          style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
+          onClick={() => setActiveTab('tags')}
+        >
+          Quản lý tags
+        </button>
+      )}
+      {!isOwner && (
+        <button
+          className={`topbar-nav-btn ${activeTab === 'adminAccounts' ? 'active' : ''}`}
+          style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
+          onClick={() => setActiveTab('adminAccounts')}
+        >
+          Tài khoản admin
+        </button>
+      )}
+    </>
+  )
 
   return (
     <>
@@ -406,69 +506,65 @@ function AdminDashboard({ role = 'admin' }) {
           background: linear-gradient(135deg, #a61b2d 0%, #d62f46 100%) !important;
           box-shadow: 0 12px 22px rgba(85, 9, 24, 0.42), inset 0 0 0 1px rgba(255, 211, 211, 0.26);
         }
+
+        @media (max-width: 768px) {
+          .topbar-nav-btn {
+            height: 38px;
+            padding: 0 8px;
+            font-size: 12.5px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.15;
+            border-radius: 10px;
+          }
+
+          .topbar-logout-btn {
+            height: 36px;
+            padding: 0 12px;
+          }
+        }
       `}</style>
       <div style={styles.container}>
-        <header style={styles.topbar}>
-          <div style={styles.topbarBrand}>
-            <div style={styles.brandDot} />
-            <div>
-              <div style={styles.topbarTitle}>{isOwner ? 'Owner Command' : 'Admin Command Center'}</div>
-              <div style={styles.topbarSub}>{isOwner ? 'Restaurant Operations' : 'NearBite Control Suite'}</div>
-            </div>
-          </div>
+        <header style={{ ...styles.topbar, ...(isMobile ? styles.topbarMobile : {}) }}>
+          {isMobile ? (
+            <>
+              <div style={styles.topbarHeadMobile}>
+                <div style={{ ...styles.topbarBrand, ...styles.topbarBrandMobile }}>
+                  <div style={styles.brandDot} />
+                  <div>
+                    <div style={styles.topbarTitle}>{isOwner ? 'Owner Command' : 'Admin Command Center'}</div>
+                    <div style={{ ...styles.topbarSub, ...styles.topbarSubMobile }}>{isOwner ? 'Restaurant Operations' : 'NearBite Control Suite'}</div>
+                  </div>
+                </div>
 
-          <nav style={styles.topNav}>
-            {!isOwner && (
-              <button
-                className={`topbar-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                style={styles.topNavButton}
-                onClick={() => {
-                  setActiveTab('dashboard')
-                  loadHeatmapData()
-                }}
-              >
-                Dashboard
-              </button>
-            )}
-            <button
-              className={`topbar-nav-btn ${activeTab === 'restaurants' ? 'active' : ''}`}
-              style={styles.topNavButton}
-              onClick={() => setActiveTab('restaurants')}
-            >
-              Quản lý quán
-            </button>
-            {!isOwner && (
-              <button
-                className={`topbar-nav-btn ${activeTab === 'hidden' ? 'active' : ''}`}
-                style={styles.topNavButton}
-                onClick={() => setActiveTab('hidden')}
-              >
-                Quán đã ẩn
-              </button>
-            )}
-            {!isOwner && (
-              <button
-                className={`topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`}
-                style={styles.topNavButton}
-                onClick={() => setActiveTab('tags')}
-              >
-                Quản lý tags
-              </button>
-            )}
-            {!isOwner && (
-              <button
-                className={`topbar-nav-btn ${activeTab === 'adminAccounts' ? 'active' : ''}`}
-                style={styles.topNavButton}
-                onClick={() => setActiveTab('adminAccounts')}
-              >
-                Tài khoản admin
-              </button>
-            )}
-          </nav>
+                <button className="topbar-logout-btn" style={{ ...styles.topbarLogout, ...styles.topbarLogoutCompactMobile }} onClick={handleLogout}>
+                  Đăng xuất
+                </button>
+              </div>
 
-          <button className="topbar-logout-btn" style={styles.topbarLogout} onClick={handleLogout}>
-            Đăng xuất
-          </button>
+              <nav style={{ ...styles.topNav, ...styles.topNavMobile }}>
+                {topNavButtons}
+              </nav>
+            </>
+          ) : (
+            <>
+              <div style={styles.topbarBrand}>
+                <div style={styles.brandDot} />
+                <div>
+                  <div style={styles.topbarTitle}>{isOwner ? 'Owner Command' : 'Admin Command Center'}</div>
+                  <div style={styles.topbarSub}>{isOwner ? 'Restaurant Operations' : 'NearBite Control Suite'}</div>
+                </div>
+              </div>
+
+              <nav style={styles.topNav}>
+                {topNavButtons}
+              </nav>
+
+              <button className="topbar-logout-btn" style={styles.topbarLogout} onClick={handleLogout}>
+                Đăng xuất
+              </button>
+            </>
+          )}
         </header>
 
         {/* Main content */}
@@ -478,9 +574,9 @@ function AdminDashboard({ role = 'admin' }) {
               <div style={styles.dashboardContent}>
                 <div style={styles.dashboardLayout}>
                   <div style={styles.mapContainer}>
-                    <div style={styles.mapHeaderRow}>
-                      <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
-                      <div style={styles.mapSourceBadge}>
+                    <div style={{ ...styles.mapHeaderRow, ...(isMobile ? styles.mapHeaderRowMobile : {}) }}>
+                      <h3 style={{ ...styles.mapTitle, ...(isMobile ? styles.mapTitleMobile : {}) }}>📍 Bản đồ Quán ăn & Heatmap User</h3>
+                      <div style={{ ...styles.mapSourceBadge, ...(isMobile ? styles.mapSourceBadgeMobile : {}) }}>
                         {tileLoaded ? 'Tile OK' : 'Dang tai tile...'} | {TILE_SOURCES[tileProviderIndex].name}
                       </div>
                     </div>
@@ -489,12 +585,12 @@ function AdminDashboard({ role = 'admin' }) {
                         ℹ️ Chưa có quán ăn nào trong hệ thống.
                       </div>
                     )}
-                    <div style={styles.heatmapContainer}>
+                    <div style={{ ...styles.heatmapContainer, height: `${mapHeight}px`, minHeight: `${mapHeight}px` }}>
                       <div style={styles.mapSurfaceLayer}>
                         <MapContainer
                           center={[10.760426862777551, 106.68198430250096]}
                           zoom={15}
-                          style={{ height: `${MAP_HEIGHT_PX}px`, width: '100%' }}
+                          style={{ height: `${mapHeight}px`, width: '100%' }}
                           zoomControl={true}
                           key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
                         >
@@ -705,11 +801,29 @@ const styles = {
     background: 'linear-gradient(145deg, #0b1b33 0%, #102847 52%, #113850 100%)',
     boxShadow: '0 14px 28px rgba(12, 23, 43, 0.28)'
   },
+  topbarMobile: {
+    height: 'auto',
+    padding: '10px 10px 8px',
+    alignItems: 'stretch',
+    gap: '8px',
+    flexDirection: 'column'
+  },
+  topbarHeadMobile: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px'
+  },
   topbarBrand: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     minWidth: '250px'
+  },
+  topbarBrandMobile: {
+    minWidth: 0,
+    gap: '10px',
+    flex: 1
   },
   brandDot: {
     width: '12px',
@@ -731,6 +845,10 @@ const styles = {
     textTransform: 'uppercase',
     marginTop: '2px'
   },
+  topbarSubMobile: {
+    fontSize: '10px',
+    letterSpacing: '0.25px'
+  },
   topNav: {
     display: 'flex',
     alignItems: 'center',
@@ -738,10 +856,21 @@ const styles = {
     flexWrap: 'wrap',
     justifyContent: 'center'
   },
+  topNavMobile: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    rowGap: '7px',
+    columnGap: '7px',
+    width: '100%',
+    paddingBottom: '2px'
+  },
   topNavButton: {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '650'
+  },
+  topNavButtonMobile: {
+    width: '100%'
   },
   topbarLogout: {
     border: '1px solid rgba(132, 160, 195, 0.42)',
@@ -750,6 +879,15 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '700'
+  },
+  topbarLogoutMobile: {
+    width: '100%'
+  },
+  topbarLogoutCompactMobile: {
+    width: 'auto',
+    minWidth: '102px',
+    fontSize: '13px',
+    padding: '0 12px'
   },
   mainContent: {
     flex: 1,
@@ -794,7 +932,7 @@ const styles = {
   topTablesContainer: {
     width: '100%',
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '16px',
     alignItems: 'stretch'
   },
@@ -903,6 +1041,11 @@ const styles = {
     gap: '12px',
     marginBottom: '8px'
   },
+  mapHeaderRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '8px'
+  },
   mapSourceBadge: {
     fontSize: '12px',
     fontWeight: '600',
@@ -912,12 +1055,21 @@ const styles = {
     borderRadius: '999px',
     padding: '6px 10px'
   },
+  mapSourceBadgeMobile: {
+    maxWidth: '100%',
+    borderRadius: '10px',
+    wordBreak: 'break-word'
+  },
   mapTitle: {
     fontSize: '18px',
     fontWeight: '700',
     color: '#132745',
     marginBottom: '0',
     marginTop: '0'
+  },
+  mapTitleMobile: {
+    fontSize: '16px',
+    lineHeight: 1.3
   },
   noDataMessage: {
     padding: '12px',

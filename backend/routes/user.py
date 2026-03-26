@@ -268,6 +268,26 @@ def register_user_routes(app):
             if updated_rows:
                 row = dict(updated_rows[0])
                 action = "updated"
+
+                # Historical environments may contain duplicate rows for one device_id.
+                # Keep one canonical row and remove duplicates so online counters stay stable.
+                if len(updated_rows) > 1:
+                    keep_id = row.get("id")
+                    if keep_id:
+                        db.session.execute(
+                            text(
+                                """
+                                DELETE FROM user_activity
+                                WHERE device_id = :device_id
+                                  AND id <> :keep_id
+                                """
+                            ),
+                            {
+                                "device_id": device_id,
+                                "keep_id": keep_id,
+                            }
+                        )
+                        action = "deduplicated_updated"
             else:
                 inserted_row = db.session.execute(
                     text(
