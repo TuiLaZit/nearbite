@@ -171,9 +171,16 @@ function LoginPortal() {
         }
 
         .login-portal-role-tab:hover {
-          color: #0f4f88;
-          border-color: #5fa7e8;
-          background: rgba(223, 239, 255, 0.55);
+          color: #0b4d89;
+          border-color: #2f8de0;
+          background: linear-gradient(180deg, #f0f8ff 0%, #dfefff 100%);
+          box-shadow: 0 10px 18px rgba(47, 141, 224, 0.25);
+          transform: translateY(-1px);
+        }
+
+        .login-portal-role-tab:active {
+          transform: translateY(0);
+          box-shadow: 0 5px 10px rgba(47, 141, 224, 0.18);
         }
       `}</style>
       <div style={styles.gradient} />
@@ -427,23 +434,23 @@ const styles = {
     marginBottom: '18px'
   },
   roleTab: {
-    border: '1px solid #b7d2eb',
+    border: '2px solid #8fb7dc',
     borderRadius: '10px',
-    background: '#f4f9ff',
+    background: '#f6fbff',
     padding: '8px 4px',
     fontWeight: '600',
     cursor: 'pointer',
-    color: '#4e6b88',
+    color: '#34597c',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px'
   },
   roleTabActive: {
-    color: '#184b7d',
+    color: '#0f4b84',
     borderColor: '#1f7acb',
-    background: '#e9f3ff',
-    boxShadow: '0 6px 14px rgba(31, 122, 203, 0.18)'
+    background: 'linear-gradient(180deg, #edf6ff 0%, #dcebff 100%)',
+    boxShadow: '0 8px 16px rgba(31, 122, 203, 0.22)'
   },
   contentFrame: {
     border: '1px solid #d7e8f8',
