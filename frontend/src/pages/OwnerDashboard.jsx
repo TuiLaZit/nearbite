@@ -297,23 +297,74 @@ function OwnerDashboard() {
 
   return (
     <div style={styles.page}>
-      <aside style={styles.sidebar}>
-        <h2 style={styles.sidebarTitle}>🏪 Chủ quán Dashboard</h2>
-        <button style={{ ...styles.navBtn, ...(activeTab === 'overview' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('overview')}>
-          📊 Tổng quan
-        </button>
-        <button style={{ ...styles.navBtn, ...(activeTab === 'menu' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('menu')}>
-          🍽️ Quản lý Menu
-        </button>
-        <button style={{ ...styles.navBtn, ...(activeTab === 'images' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('images')}>
-          🖼️ Quản lý Hình ảnh
-        </button>
-        <button style={{ ...styles.navBtn, ...(activeTab === 'tags' ? styles.navBtnActive : {}) }} onClick={() => setActiveTab('tags')}>
-          🏷️ Quản lý Tags
-        </button>
+      <style>{`
+        .owner-topbar-nav-btn {
+          margin: 0;
+          border: 1px solid rgba(120, 148, 181, 0.34);
+          background: rgba(14, 33, 61, 0.5);
+          color: #d9e7f8;
+          border-radius: 12px;
+          height: 40px;
+          padding: 0 14px;
+          transition: all 0.22s ease;
+          white-space: nowrap;
+        }
 
-        <button style={styles.logoutBtn} onClick={handleLogout}>🚪 Đăng xuất</button>
-      </aside>
+        .owner-topbar-nav-btn:hover {
+          border: 1px solid rgba(158, 193, 234, 0.68);
+          background: linear-gradient(128deg, rgba(42, 88, 156, 0.85), rgba(34, 119, 136, 0.72));
+          color: #f5fbff;
+          transform: translateY(-1px);
+          box-shadow: 0 10px 18px rgba(6, 18, 40, 0.24);
+        }
+
+        .owner-topbar-nav-btn.active {
+          border: 1px solid rgba(196, 227, 255, 0.94);
+          background: linear-gradient(128deg, rgba(74, 145, 235, 0.94), rgba(72, 200, 220, 0.86));
+          color: #ffffff;
+          box-shadow: 0 12px 22px rgba(8, 24, 50, 0.3), 0 0 20px rgba(130, 207, 255, 0.35);
+        }
+
+        .owner-topbar-logout-btn {
+          margin: 0;
+          border-radius: 12px;
+          border: 1px solid rgba(132, 160, 195, 0.42);
+          background: linear-gradient(135deg, rgba(18, 59, 117, 0.84) 0%, rgba(18, 98, 122, 0.84) 100%);
+          color: #f0f6ff;
+          height: 40px;
+          padding: 0 16px;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        }
+
+        .owner-topbar-logout-btn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(184, 216, 246, 0.76);
+          box-shadow: 0 9px 18px rgba(7, 23, 48, 0.25);
+          filter: brightness(1.07);
+        }
+      `}</style>
+
+      <header style={styles.topBar}>
+        <div style={styles.topBarTitle}>🏪 Chủ quán Dashboard</div>
+
+        <div style={styles.topBarNav}>
+          <button className={`owner-topbar-nav-btn ${activeTab === 'overview' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('overview')}>
+            📊 Tổng quan
+          </button>
+          <button className={`owner-topbar-nav-btn ${activeTab === 'menu' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('menu')}>
+            🍽️ Quản lý Menu
+          </button>
+          <button className={`owner-topbar-nav-btn ${activeTab === 'images' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('images')}>
+            🖼️ Quản lý Hình ảnh
+          </button>
+          <button className={`owner-topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`} style={styles.topBarButton} onClick={() => setActiveTab('tags')}>
+            🏷️ Quản lý Tags
+          </button>
+        </div>
+
+        <button className="owner-topbar-logout-btn" onClick={handleLogout}>🚪 Đăng xuất</button>
+      </header>
 
       <main style={styles.main}>
         <h1 style={styles.title}>{restaurant.name}</h1>
@@ -483,41 +534,37 @@ function StatCard({ label, value }) {
 const styles = {
   page: {
     minHeight: '100vh',
-    display: 'grid',
-    gridTemplateColumns: '280px 1fr',
-    background: '#eef2f7'
-  },
-  sidebar: {
-    background: '#1e293b',
-    color: 'white',
-    padding: '20px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px'
+    background: '#eef2f7'
   },
-  sidebarTitle: {
-    marginBottom: '12px'
+  topBar: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 30,
+    background: 'linear-gradient(130deg, #0e203f 0%, #17385a 56%, #1c4b66 100%)',
+    borderBottom: '1px solid rgba(169, 200, 230, 0.26)',
+    boxShadow: '0 14px 30px rgba(5, 17, 35, 0.28)',
+    padding: '14px 18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexWrap: 'wrap'
   },
-  navBtn: {
-    background: 'transparent',
-    color: '#cbd5e1',
-    border: 'none',
-    textAlign: 'left',
-    padding: '12px',
-    borderRadius: '8px',
-    cursor: 'pointer'
+  topBarTitle: {
+    color: '#eff7ff',
+    fontWeight: '700',
+    fontSize: '20px',
+    letterSpacing: '0.2px'
   },
-  navBtnActive: {
-    background: '#334155',
-    color: 'white'
+  topBarNav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap'
   },
-  logoutBtn: {
-    marginTop: 'auto',
-    background: '#ef4444',
-    border: 'none',
-    color: 'white',
-    borderRadius: '8px',
-    padding: '12px',
+  topBarButton: {
     cursor: 'pointer'
   },
   main: {
