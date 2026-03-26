@@ -334,11 +334,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          onTap: (index) {
-            if (_tabController.index != index) {
-              _tabController.animateTo(index);
-            }
-          },
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Menu'),
@@ -358,14 +353,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
               child: Text(_error!),
             ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _overviewTab(r),
-                _menuTab(r),
-                _tagsTab(r),
-                _imagesTab(r),
-              ],
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, _) {
+                return _tabContentByIndex(r, _tabController.index);
+              },
             ),
           ),
           if (_saving)
@@ -376,6 +368,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
         ],
       ),
     );
+  }
+
+  Widget _tabContentByIndex(RestaurantModel r, int index) {
+    switch (index) {
+      case 1:
+        return _menuTab(r);
+      case 2:
+        return _tagsTab(r);
+      case 3:
+        return _imagesTab(r);
+      case 0:
+      default:
+        return _overviewTab(r);
+    }
   }
 
   Widget _overviewTab(RestaurantModel r) {
@@ -414,6 +420,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Text(
+          'Manage menu items',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
         TextField(
           controller: _menuNameController,
           decoration: const InputDecoration(labelText: 'Menu item name'),
@@ -446,6 +457,16 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
           ],
         ),
         const SizedBox(height: 16),
+        if (r.menu.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0x22000000)),
+            ),
+            child: const Text('No menu items yet. Add your first item above.'),
+          ),
         ...r.menu.map(
           (m) => ListTile(
             title: Text(m.name),
