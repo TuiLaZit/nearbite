@@ -7,6 +7,7 @@ from supabase_client import upload_image, delete_image, supabase_client, ensure_
 from translate import invalidate_translation_cache, cleanup_expired_translation_cache
 from tts import invalidate_tts_cache, cleanup_expired_tts_cache, TTS_BUCKET
 from cache_warmup import schedule_restaurant_rewarm
+import os
 import uuid
 import re
 import secrets
@@ -16,6 +17,8 @@ from sqlalchemy import func, text
 from werkzeug.security import generate_password_hash
 
 def register_admin_routes(app):
+    online_window_seconds = int((os.getenv("HEARTBEAT_ONLINE_WINDOW_SECONDS") or "45").strip() or "45")
+    online_window_seconds = max(15, min(300, online_window_seconds))
 
     def invalidate_restaurant_content_cache(restaurant_id, reason="admin-crud"):
         try:
@@ -477,10 +480,10 @@ def register_admin_routes(app):
     @admin_required
     def get_online_users_stats():
         """
-        Thống kê online trong 30 giây gần nhất.
+        Thống kê online trong cửa sổ heartbeat gần nhất.
 
-        - online_devices: số lượng device có heartbeat mới nhất trong cửa sổ 30s
-        - online_users: số lượng user_id khác null trong cửa sổ 30s
+        - online_devices: số lượng device có heartbeat mới nhất trong cửa sổ online
+        - online_users: số lượng user_id/user_identity khác null trong cửa sổ online
         - online_user_list: danh sách user online (bonus)
         """
         admin_only_error = require_admin_only()
@@ -492,12 +495,13 @@ def register_admin_routes(app):
                 text(
                     """
                     SELECT
-                        COUNT(*)::int AS online_devices,
+                        COUNT(DISTINCT device_id)::int AS online_devices,
                         COUNT(DISTINCT COALESCE(user_id::text, user_identity))::int AS online_users
                     FROM user_activity
-                    WHERE last_seen > NOW() - INTERVAL '30 seconds'
+                    WHERE last_seen > NOW() - (:window_seconds * INTERVAL '1 second')
                     """
-                )
+                ),
+                {"window_seconds": online_window_seconds}
             ).mappings().first() or {}
 
             online_users_rows = db.session.execute(
@@ -506,14 +510,15 @@ def register_admin_routes(app):
                     SELECT
                         COALESCE(user_id::text, user_identity) AS online_identity,
                         MAX(last_seen) AS last_seen,
-                        COUNT(*)::int AS device_count
+                        COUNT(DISTINCT device_id)::int AS device_count
                     FROM user_activity
                     WHERE COALESCE(user_id::text, user_identity) IS NOT NULL
-                      AND last_seen > NOW() - INTERVAL '30 seconds'
+                      AND last_seen > NOW() - (:window_seconds * INTERVAL '1 second')
                     GROUP BY COALESCE(user_id::text, user_identity)
                     ORDER BY MAX(last_seen) DESC
                     """
-                )
+                ),
+                {"window_seconds": online_window_seconds}
             ).mappings().all()
 
             online_user_list = [
@@ -527,7 +532,7 @@ def register_admin_routes(app):
 
             return jsonify({
                 "status": "success",
-                "window_seconds": 30,
+                "window_seconds": online_window_seconds,
                 "online_devices": int(counts_row.get("online_devices") or 0),
                 "online_users": int(counts_row.get("online_users") or 0),
                 "online_user_list": online_user_list,

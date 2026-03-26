@@ -53,6 +53,51 @@ const activeRestaurantIcon = new L.Icon({
 })
 
 const POI_DEBOUNCE_MS = 2000
+const BATTERY_SAVER_KEY = 'nearbiteBatterySaverEnabled'
+const DEVICE_PROFILE_OVERRIDE_KEY = 'nearbiteDeviceProfileOverride'
+
+const GPS_INTERVAL_BY_MODE_MS = {
+  normal: 3000,
+  normalBattery: 6000,
+  weak: 10000,
+  weakBattery: 15000
+}
+
+const MODE_LABEL_BY_KEY = {
+  normal: 'Binh thuong',
+  normalBattery: 'Tiet kiem pin',
+  weak: 'May yeu',
+  weakBattery: 'May yeu + tiet kiem pin'
+}
+
+const isLikelyWeakDevice = () => {
+  if (typeof navigator === 'undefined') return false
+
+  const forcedProfile = localStorage.getItem(DEVICE_PROFILE_OVERRIDE_KEY)
+  if (forcedProfile === 'weak') return true
+  if (forcedProfile === 'normal') return false
+
+  const memory = typeof navigator.deviceMemory === 'number' ? navigator.deviceMemory : null
+  const cores = typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : null
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+  const effectiveType = connection?.effectiveType || ''
+  const saveData = Boolean(connection?.saveData)
+
+  // Heuristic: low memory/cores or constrained network => weak profile.
+  return Boolean(
+    saveData ||
+    (memory !== null && memory <= 4) ||
+    (cores !== null && cores <= 4) ||
+    /(^2g$|^slow-2g$|^3g$)/i.test(effectiveType)
+  )
+}
+
+const getPerformanceModeKey = (weakDevice, batterySaverEnabled) => {
+  if (!weakDevice && !batterySaverEnabled) return 'normal'
+  if (!weakDevice && batterySaverEnabled) return 'normalBattery'
+  if (weakDevice && !batterySaverEnabled) return 'weak'
+  return 'weakBattery'
+}
 
 // Component để tự động center map khi user di chuyển
 function MapUpdater({ center }) {
@@ -85,6 +130,10 @@ function LocationTracker() {
     const saved = localStorage.getItem('narrationPanelCollapsed')
     return saved === 'true'
   })
+  const [isWeakDevice, setIsWeakDevice] = useState(() => isLikelyWeakDevice())
+  const [isBatterySaverEnabled, setIsBatterySaverEnabled] = useState(() => {
+    return localStorage.getItem(BATTERY_SAVER_KEY) === 'true'
+  })
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
@@ -104,6 +153,14 @@ function LocationTracker() {
   const selectedRestaurantRequestControllerRef = useRef(null)
   const selectedRestaurantRequestSeqRef = useRef(0)
 
+  const performanceModeKey = getPerformanceModeKey(isWeakDevice, isBatterySaverEnabled)
+  const gpsIntervalMs = GPS_INTERVAL_BY_MODE_MS[performanceModeKey]
+  const canAutoPlayAudio = performanceModeKey === 'normal'
+  const showWeakDeviceNote = isWeakDevice
+  const weakDeviceNote = isBatterySaverEnabled
+    ? 'Thiết bị đang chạy chế độ tối ưu cho cấu hình yếu và giảm tải.'
+    : 'Thiết bị đang chạy chế độ tối ưu cho cấu hình yếu.'
+
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
     languageRef.current = language
@@ -113,6 +170,16 @@ function LocationTracker() {
   useEffect(() => {
     localStorage.setItem('narrationPanelCollapsed', isPanelCollapsed)
   }, [isPanelCollapsed])
+
+  // Re-check profile once mounted; useful when browser exposes hardware/network hints late.
+  useEffect(() => {
+    setIsWeakDevice(isLikelyWeakDevice())
+  }, [])
+
+  // Persist user-controlled battery saver mode.
+  useEffect(() => {
+    localStorage.setItem(BATTERY_SAVER_KEY, String(isBatterySaverEnabled))
+  }, [isBatterySaverEnabled])
 
   // Fetch danh sách ngôn ngữ từ API
   useEffect(() => {
@@ -411,8 +478,8 @@ function LocationTracker() {
               return
             }
 
-            // DEBOUNCER: Đợi 2 giây trước khi phát audio
-            if (data.audio_url) {
+            // DEBOUNCER: Đợi 2 giây trước khi phát audio (chỉ bật ở mức hiệu năng bình thường)
+            if (data.audio_url && canAutoPlayAudio) {
 
               poiEntryTimeRef.current = now
               poiDebounceTimerRef.current = setTimeout(() => {
@@ -492,8 +559,8 @@ function LocationTracker() {
               return
             }
 
-            // DEBOUNCER: Đợi 2 giây trước khi phát audio
-            if (data.audio_url && !isAudioPlaying) {
+            // DEBOUNCER: Đợi 2 giây trước khi phát audio (chỉ bật ở mức hiệu năng bình thường)
+            if (data.audio_url && !isAudioPlaying && canAutoPlayAudio) {
 
               poiEntryTimeRef.current = now
               poiDebounceTimerRef.current = setTimeout(() => {
@@ -673,9 +740,6 @@ function LocationTracker() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         fetchAndUpdateLocation(pos)
-        watchTimerRef.current = setInterval(() => {
-          navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
-        }, 5000)
       },
       (error) => {
         console.error('Geolocation error:', error)
@@ -683,6 +747,25 @@ function LocationTracker() {
       }
     )
   }
+
+  useEffect(() => {
+    if (!isTracking) return
+
+    if (watchTimerRef.current) {
+      clearInterval(watchTimerRef.current)
+    }
+
+    watchTimerRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(fetchAndUpdateLocation)
+    }, gpsIntervalMs)
+
+    return () => {
+      if (watchTimerRef.current) {
+        clearInterval(watchTimerRef.current)
+        watchTimerRef.current = null
+      }
+    }
+  }, [isTracking, gpsIntervalMs])
 
   // Dừng tracking
   const stopTracking = () => {
@@ -1124,6 +1207,54 @@ function LocationTracker() {
 
       {/* Leaflet Map */}
       <div style={{ flex: 1, position: 'relative' }}>
+        {showWeakDeviceNote && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              zIndex: 1200,
+              padding: '4px 8px',
+              borderRadius: '999px',
+              fontSize: '11px',
+              color: '#475569',
+              background: 'rgba(255,255,255,0.92)',
+              border: '1px solid #dbe4ef',
+              boxShadow: '0 1px 5px rgba(15, 23, 42, 0.12)'
+            }}
+            title={`Profile: ${MODE_LABEL_BY_KEY[performanceModeKey]} | GPS ${gpsIntervalMs / 1000}s`}
+          >
+            ⚠ {weakDeviceNote}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setIsBatterySaverEnabled(prev => !prev)}
+          title={`Che do pin: ${isBatterySaverEnabled ? 'bat' : 'tat'} | Profile: ${MODE_LABEL_BY_KEY[performanceModeKey]}`}
+          style={{
+            position: 'absolute',
+            right: '14px',
+            bottom: '14px',
+            zIndex: 1200,
+            width: '48px',
+            height: '48px',
+            borderRadius: '999px',
+            border: '1px solid #dbe4ef',
+            background: isBatterySaverEnabled ? '#14532d' : '#ffffff',
+            color: isBatterySaverEnabled ? '#dcfce7' : '#0f172a',
+            boxShadow: '0 6px 16px rgba(15, 23, 42, 0.2)',
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: '20px',
+            padding: 0,
+            margin: 0,
+            lineHeight: 1
+          }}
+        >
+          {isBatterySaverEnabled ? '🔋' : '🪫'}
+        </button>
+
         <MapContainer
           key={`map-${language}`}
           center={mapCenter}
