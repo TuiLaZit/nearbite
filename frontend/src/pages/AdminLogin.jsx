@@ -140,22 +140,22 @@ function AdminLogin({
           grid-template-columns: 1.1fr 1fr;
           border-radius: 26px;
           overflow: hidden;
-          border: 1px solid rgba(223, 232, 244, 0.18);
-          box-shadow: 0 34px 70px rgba(2, 7, 20, 0.45);
-          background: rgba(255, 255, 255, 0.94);
+          border: 1px solid rgba(223, 232, 244, 0.22);
+          box-shadow: 0 34px 70px rgba(2, 7, 20, 0.5);
+          background: #f6f9ff;
           backdrop-filter: blur(18px);
         }
 
         .admin-login-brand {
           padding: 54px 48px;
           background:
-            linear-gradient(160deg, rgba(247, 250, 255, 0.98) 0%, rgba(236, 242, 249, 0.94) 100%);
-          border-right: 1px solid rgba(205, 214, 228, 0.16);
+            linear-gradient(160deg, #0f2036 0%, #183a57 58%, #1f4b66 100%);
+          border-right: 1px solid rgba(255, 255, 255, 0.18);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           gap: 20px;
-          color: #000;
+          color: #eef6ff;
         }
 
         .admin-login-brand h2 {
@@ -163,13 +163,13 @@ function AdminLogin({
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(42px, 4vw, 58px);
           letter-spacing: 0.8px;
-          color: #000;
+          color: #f7fbff;
           line-height: 0.95;
         }
 
         .admin-login-brand p {
           margin: 0;
-          color: #000;
+          color: rgba(231, 241, 255, 0.9);
           line-height: 1.65;
           font-size: 15px;
         }
@@ -183,27 +183,28 @@ function AdminLogin({
         .admin-login-metric {
           padding: 14px;
           border-radius: 14px;
-          border: 1px solid rgba(227, 236, 246, 0.16);
-          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid rgba(180, 211, 241, 0.28);
+          background: rgba(11, 31, 50, 0.34);
         }
 
         .admin-login-metric span {
           display: block;
           font-size: 22px;
           font-weight: 700;
-          color: #000;
+          color: #f4fbff;
         }
 
         .admin-login-metric small {
-          color: #000;
+          color: rgba(225, 238, 255, 0.82);
           font-size: 12px;
         }
 
         .login-card {
           padding: 54px 46px;
           background:
-            linear-gradient(170deg, rgba(246, 250, 255, 0.98) 0%, rgba(236, 242, 249, 0.94) 100%);
+            linear-gradient(170deg, #ffffff 0%, #eef4ff 100%);
           position: relative;
+          color: #10243f;
         }
 
         .header {
@@ -215,7 +216,7 @@ function AdminLogin({
 
         .header-text {
           margin: 0 0 26px;
-          color: #000;
+          color: #3c516b;
           font-size: 14px;
           line-height: 1.5;
         }
@@ -223,12 +224,12 @@ function AdminLogin({
         .shield-icon {
           width: 32px;
           height: 32px;
-          color: #000;
+          color: #133c61;
         }
 
         h1 {
           margin: 0;
-          color: #000;
+          color: #10243f;
           font-size: 30px;
           font-weight: 750;
           letter-spacing: -0.02em;
@@ -242,7 +243,7 @@ function AdminLogin({
 
         .field-label {
           font-size: 13px;
-          color: #000;
+          color: #24405d;
           text-align: left;
           font-weight: 600;
           margin: 2px 0;
@@ -254,8 +255,8 @@ function AdminLogin({
           border: 1px solid #cad6e3;
           border-radius: 12px;
           font-size: 15px;
-          background-color: rgba(255, 255, 255, 0.86);
-          color: #000;
+          background-color: rgba(255, 255, 255, 0.98);
+          color: #12263f;
           transition: all 0.22s ease;
         }
 
@@ -283,27 +284,63 @@ function AdminLogin({
         .back-button {
           margin-top: 0;
           margin-bottom: 14px;
-          padding: 10px 14px;
-          background: rgba(18, 32, 54, 0.08);
-          color: #000;
-          border: 1px solid #cad6e3;
-          border-radius: 10px;
+          padding: 10px 14px 10px 10px;
+          background: linear-gradient(180deg, #ffffff 0%, #f0f6ff 100%);
+          color: #183a5d;
+          border: 1px solid rgba(172, 194, 220, 0.9);
+          border-radius: 12px;
           font-size: 13px;
-          font-weight: 600;
-          box-shadow: none;
+          font-weight: 700;
+          letter-spacing: 0.1px;
+          box-shadow: 0 6px 14px rgba(22, 52, 84, 0.1);
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          width: fit-content;
+          transition: all 0.22s ease;
+        }
+
+        .back-button-icon {
+          width: 26px;
+          height: 26px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #d8e8fb 0%, #c1d8f6 100%);
+          border: 1px solid rgba(140, 170, 205, 0.9);
+          color: #123a63;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          flex: 0 0 auto;
+        }
+
+        .back-button-text {
+          display: inline-block;
+          text-align: left;
         }
 
         .back-button:hover {
-          background: rgba(18, 32, 54, 0.12);
-          transform: none;
-          filter: none;
+          background: linear-gradient(180deg, #ffffff 0%, #e8f2ff 100%);
+          border-color: rgba(118, 157, 201, 0.95);
+          transform: translateY(-1px);
+          box-shadow: 0 10px 18px rgba(22, 52, 84, 0.16);
+          filter: brightness(1.01);
+        }
+
+        .back-button:hover .back-button-icon {
+          transform: translateX(-1px);
+        }
+
+        .back-button:active {
+          transform: translateY(0);
+          box-shadow: 0 6px 10px rgba(22, 52, 84, 0.14);
         }
 
         button {
           margin-top: 8px;
           padding: 14px 16px;
           background: linear-gradient(140deg, #0f5d5c 0%, #164d66 100%);
-          color: #000;
+          color: #f5fbff;
           border: none;
           border-radius: 12px;
           font-size: 15px;
@@ -330,6 +367,7 @@ function AdminLogin({
           .admin-login-grid {
             grid-template-columns: 1fr;
             max-width: 580px;
+            border-radius: 22px;
           }
 
           .admin-login-brand {
@@ -340,6 +378,127 @@ function AdminLogin({
 
           .login-card {
             padding: 34px 26px;
+          }
+
+          .back-button {
+            width: 100%;
+            justify-content: center;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .admin-login-shell {
+            padding: 14px;
+            align-items: flex-start;
+          }
+
+          .admin-login-grid {
+            margin-top: 10px;
+            border-radius: 18px;
+          }
+
+          .admin-login-brand {
+            padding: 22px 18px;
+            gap: 14px;
+          }
+
+          .admin-login-brand h2 {
+            font-size: clamp(34px, 11vw, 42px);
+          }
+
+          .admin-login-brand p {
+            font-size: 13px;
+            line-height: 1.5;
+          }
+
+          .admin-login-metrics {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+
+          .admin-login-metric {
+            padding: 12px;
+          }
+
+          .admin-login-metric span {
+            font-size: 19px;
+          }
+
+          .login-card {
+            padding: 22px 18px;
+          }
+
+          h1 {
+            font-size: 24px;
+          }
+
+          .header {
+            gap: 10px;
+            margin-bottom: 12px;
+          }
+
+          .header-text {
+            margin-bottom: 18px;
+            font-size: 13px;
+          }
+
+          .shield-icon {
+            width: 28px;
+            height: 28px;
+          }
+
+          .field-label {
+            font-size: 12px;
+          }
+
+          input {
+            padding: 12px 13px;
+            font-size: 14px;
+            border-radius: 10px;
+          }
+
+          .error-message {
+            font-size: 12px;
+            padding: 9px 10px;
+          }
+
+          .back-button {
+            margin-bottom: 12px;
+            padding: 9px 12px 9px 9px;
+            border-radius: 10px;
+            font-size: 12px;
+            gap: 8px;
+          }
+
+          .back-button-icon {
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+          }
+
+          button {
+            margin-top: 4px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 14px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .admin-login-shell {
+            padding: 10px;
+          }
+
+          .admin-login-brand {
+            padding: 18px 14px;
+          }
+
+          .login-card {
+            padding: 18px 14px;
+          }
+
+          .back-button-text {
+            font-size: 11.5px;
           }
         }
       `}</style>
@@ -367,7 +526,8 @@ function AdminLogin({
 
           <div className="login-card">
             <button type="button" className="back-button" onClick={() => navigate('/login')}>
-              ← Quay lại đăng nhập khách/chủ quán
+              <span className="back-button-icon">←</span>
+              <span className="back-button-text">Quay lại đăng nhập khách/chủ quán</span>
             </button>
 
             <div className="header">
