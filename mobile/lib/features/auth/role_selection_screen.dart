@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/auth/session_store.dart';
 import '../../core/network/api_client.dart';
 import '../../core/settings/language_store.dart';
+import '../../services/backend_api.dart';
 import '../customer/customer_home_screen.dart';
 import '../owner/owner_dashboard_screen.dart';
-import '../../services/backend_api.dart';
-import 'login_screen.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key, required this.apiClient});
@@ -19,7 +18,7 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  LoginRole _selectedRole = LoginRole.customer;
+  _RoleType _selectedRole = _RoleType.customer;
   String _language = 'vi';
   late final PageController _pageController;
   late final BackendApi _api;
@@ -121,7 +120,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
         throw Exception('Session cookie check failed for customer login');
       }
 
-      await SessionStore.instance.saveCustomer(email: (result['email'] ?? '').toString());
+      await SessionStore.instance.saveCustomer(
+        email: (result['email'] ?? '').toString(),
+      );
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -166,7 +167,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
 
       await _api.ownerCheck();
 
-      await SessionStore.instance.saveOwner(username: (result['username'] ?? '').toString());
+      await SessionStore.instance.saveOwner(
+        username: (result['username'] ?? '').toString(),
+      );
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -195,10 +198,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = _selectedRole == LoginRole.customer ? 0 : 1;
+    final selectedIndex = _selectedRole == _RoleType.customer ? 0 : 1;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_text('Chọn vai trò đăng nhập', 'Choose login role', 'Choisir le role'))),
+      appBar: AppBar(
+        title: Text(
+          _text('Chọn vai trò đăng nhập', 'Choose login role', 'Choisir le role'),
+        ),
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -214,174 +221,187 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             children: [
               const SizedBox(height: 16),
               Text(
-                _text('Trượt để chọn vai trò', 'Slide to choose role', 'Glissez pour choisir le role'),
+                _text(
+                  'Trượt để chọn vai trò',
+                  'Slide to choose role',
+                  'Glissez pour choisir le role',
+                ),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
               SegmentedButton<int>(
-              segments: [
-                ButtonSegment<int>(
-                  value: 0,
-                  icon: const Icon(Icons.person),
-                  label: Text(_text('Khách hàng', 'Customer', 'Client')),
-                ),
-                ButtonSegment<int>(
-                  value: 1,
-                  icon: const Icon(Icons.store),
-                  label: Text(_text('Chủ quán', 'Owner', 'Gerant')),
-                ),
-              ],
-              selected: <int>{selectedIndex},
-              onSelectionChanged: (values) {
-                final value = values.first;
-                setState(() {
-                  _selectedRole = value == 0 ? LoginRole.customer : LoginRole.owner;
-                });
-                _pageController.animateToPage(
-                  value,
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                );
-              },
+                segments: [
+                  ButtonSegment<int>(
+                    value: 0,
+                    icon: const Icon(Icons.person),
+                    label: Text(_text('Khách hàng', 'Customer', 'Client')),
+                  ),
+                  ButtonSegment<int>(
+                    value: 1,
+                    icon: const Icon(Icons.store),
+                    label: Text(_text('Chủ quán', 'Owner', 'Gerant')),
+                  ),
+                ],
+                selected: <int>{selectedIndex},
+                onSelectionChanged: (values) {
+                  final value = values.first;
+                  setState(() {
+                    _selectedRole = value == 0 ? _RoleType.customer : _RoleType.owner;
+                  });
+                  _pageController.animateToPage(
+                    value,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _selectedRole = index == 0 ? LoginRole.customer : LoginRole.owner;
-                  });
-                },
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _selectedRole = index == 0 ? _RoleType.customer : _RoleType.owner;
+                    });
+                  },
                   children: [
                     _RoleCard(
-                    icon: Icons.person,
-                    title: _text('Khách hàng', 'Customer', 'Client'),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _customerEmailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: _text('Email', 'Email', 'Email'),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton(
-                            onPressed: _loading ? null : _requestOtp,
-                            child: Text(_loading
-                                ? _text('Đang gửi...', 'Sending...', 'Envoi...')
-                                : _text('Gửi OTP', 'Send OTP', 'Envoyer OTP')),
-                          ),
-                        ),
-                        if (_otpSent) ...[
-                          const SizedBox(height: 10),
+                      icon: Icons.person,
+                      title: _text('Khách hàng', 'Customer', 'Client'),
+                      child: Column(
+                        children: [
                           TextField(
-                            controller: _customerOtpController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
+                            controller: _customerEmailController,
+                            keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              labelText: _text('Mã OTP', 'OTP Code', 'Code OTP'),
+                              labelText: _text('Email', 'Email', 'Email'),
                             ),
                           ),
+                          const SizedBox(height: 10),
                           Align(
                             alignment: Alignment.centerRight,
                             child: FilledButton(
-                              onPressed: _loading ? null : _verifyOtp,
-                              child: Text(_loading
-                                  ? _text('Đang xác minh...', 'Verifying...', 'Verification...')
-                                  : _text('Đăng nhập', 'Login', 'Connexion')),
+                              onPressed: _loading ? null : _requestOtp,
+                              child: Text(
+                                _loading
+                                    ? _text('Đang gửi...', 'Sending...', 'Envoi...')
+                                    : _text('Gửi OTP', 'Send OTP', 'Envoyer OTP'),
+                              ),
+                            ),
+                          ),
+                          if (_otpSent) ...[
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _customerOtpController,
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
+                              decoration: InputDecoration(
+                                labelText: _text('Mã OTP', 'OTP Code', 'Code OTP'),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: FilledButton(
+                                onPressed: _loading ? null : _verifyOtp,
+                                child: Text(
+                                  _loading
+                                      ? _text('Đang xác minh...', 'Verifying...', 'Verification...')
+                                      : _text('Đăng nhập', 'Login', 'Connexion'),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    _RoleCard(
+                      icon: Icons.store,
+                      title: _text('Chủ quán', 'Owner', 'Gerant'),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _ownerUsernameController,
+                            decoration: InputDecoration(
+                              labelText: _text('Tên đăng nhập', 'Username', 'Nom utilisateur'),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _ownerPasswordController,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: _text('Mật khẩu', 'Password', 'Mot de passe'),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(
+                              onPressed: _loading ? null : _ownerLogin,
+                              child: Text(
+                                _loading
+                                    ? _text('Đang đăng nhập...', 'Signing in...', 'Connexion...')
+                                    : _text('Đăng nhập', 'Login', 'Connexion'),
+                              ),
                             ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                    ),
-                    _RoleCard(
-                    icon: Icons.store,
-                    title: _text('Chủ quán', 'Owner', 'Gerant'),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _ownerUsernameController,
-                          decoration: InputDecoration(
-                            labelText: _text('Tên đăng nhập', 'Username', 'Nom utilisateur'),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _ownerPasswordController,
-                            ),
-                          ],
-                        ),
-                            labelText: _text('Mật khẩu', 'Password', 'Mot de passe'),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            _error!,
-                            style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
-            );
-          }
-        }
-
-        class _RoleCard extends StatelessWidget {
-          const _RoleCard({
-            required this.icon,
-            required this.title,
-            required this.child,
-          });
-
-          final IconData icon;
-          final String title;
-          final Widget child;
-
-          @override
-          Widget build(BuildContext context) {
-            return Card(
-              elevation: 6,
-              shadowColor: const Color(0x22000000),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFBCEEE7),
-                        borderRadius: BorderRadius.circular(18),
-                                ? _text('Đang đăng nhập...', 'Signing in...', 'Connexion...')
-                      child: Icon(icon, size: 34, color: const Color(0xFF0A5C54)),
-                                : _text('Đăng nhập', 'Login', 'Connexion')),
-                    const SizedBox(height: 12),
-                    Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 14),
-                    child,
-                  ],
-                        ),
-                      ],
-                    ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
                   ),
-                ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _RoleType { customer, owner }
+
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 6,
+      shadowColor: const Color(0x22000000),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(icon, size: 52),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFBCEEE7),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(icon, size: 34, color: const Color(0xFF0A5C54)),
+            ),
             const SizedBox(height: 12),
             Text(title, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 14),
