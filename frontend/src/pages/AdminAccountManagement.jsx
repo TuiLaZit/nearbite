@@ -103,7 +103,8 @@ function AdminAccountManagement() {
 
       <div style={styles.tableSection}>
         <h3 style={styles.sectionTitle}>📋 Danh sách tài khoản hiện tại</h3>
-        <table style={styles.table}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
+          <table style={styles.table}>
           <thead>
             <tr>
               <th style={styles.th}>Email</th>
@@ -128,8 +129,9 @@ function AdminAccountManagement() {
             ))}
           </tbody>
         </table>
+          </div>
+        </div>
       </div>
-    </div>
   )
 }
 
@@ -296,3 +298,4 @@ const styles = {
 }
 
 export default AdminAccountManagement
+

@@ -272,10 +272,11 @@ const styles = {
     boxShadow: '0 12px 26px rgba(22, 42, 73, 0.11)'
   },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '16px'
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '16px',
+      flexWrap: 'wrap'
   },
   title: {
     fontSize: '32px',
@@ -299,6 +300,7 @@ const styles = {
     fontSize: '15px',
     fontWeight: '600',
     cursor: 'pointer',
+      whiteSpace: 'nowrap',
     transition: 'transform 0.2s ease, filter 0.2s ease',
     boxShadow: '0 14px 24px rgba(20, 78, 98, 0.28)'
   },
@@ -466,3 +468,5 @@ const styles = {
 }
 
 export default TagManagement
+
+
