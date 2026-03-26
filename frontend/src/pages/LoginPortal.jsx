@@ -283,19 +283,19 @@ function LoginPortal() {
               </div>
             ) : (
               <div>
-              <h2 style={styles.sectionTitle}>🏪 Dang nhap chu quan</h2>
+              <h2 style={styles.sectionTitle}>🏪 Đăng nhập chủ quán</h2>
               <form onSubmit={handleOwnerLogin}>
-                <label style={styles.label}>Tai khoan:</label>
+                <label style={styles.label}>Tài khoản:</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Vi du: bc4"
+                  placeholder="Ví dụ: bc4"
                   required
                   style={styles.input}
                 />
 
-                <label style={{ ...styles.label, marginTop: '12px' }}>Mat khau:</label>
+                <label style={{ ...styles.label, marginTop: '12px' }}>Mật khẩu:</label>
                 <input
                   type="password"
                   value={password}
@@ -305,7 +305,7 @@ function LoginPortal() {
                 />
 
                 <button type="submit" disabled={loading} style={styles.submitButton}>
-                  {loading ? 'Dang dang nhap...' : 'Dang nhap'}
+                  {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                 </button>
               </form>
 
@@ -315,7 +315,7 @@ function LoginPortal() {
                   onClick={() => navigate('/admin/login')}
                   style={{ ...styles.adminButton, ...(isMobile ? styles.adminButtonMobile : {}) }}
                 >
-                  🛡️ Toi la admin
+                  🛡️ Tôi là Admin
                 </button>
               </div>
               </div>
