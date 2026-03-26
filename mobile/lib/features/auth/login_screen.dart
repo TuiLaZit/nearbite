@@ -267,10 +267,37 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<void> _continueAsGuest() async {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => CustomerHomeScreen(
+          apiClient: widget.apiClient,
+          title: 'NearBite',
+          guestMode: true,
+          showTourButton: false,
+          showLanguageSelector: true,
+          initialLanguage: _language,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          tooltip: _t(
+            vi: 'Về màn hình khách',
+            en: 'Back to guest mode',
+            fr: 'Retour mode invite',
+          ),
+          onPressed: _continueAsGuest,
+          icon: const Icon(Icons.arrow_back),
+        ),
         title: Text(_t(vi: 'Đăng nhập NearBite', en: 'NearBite Login', fr: 'Connexion NearBite')),
         actions: [
           if (_languages.isNotEmpty)
