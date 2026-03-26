@@ -5,6 +5,7 @@ function AdminAccountManagement() {
   const [accounts, setAccounts] = useState([])
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
 
   const loadAccounts = async () => {
     const response = await fetch(`${BASE_URL}/admin/accounts`, {
@@ -23,6 +24,12 @@ function AdminAccountManagement() {
     loadAccounts().catch((error) => {
       alert(error.message)
     })
+  }, [])
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const handleAdd = async (e) => {
@@ -70,6 +77,8 @@ function AdminAccountManagement() {
     await loadAccounts()
   }
 
+  const isMobile = viewportWidth <= 768
+
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>👤 Tài khoản đăng nhập Admin</h2>
@@ -103,34 +112,54 @@ function AdminAccountManagement() {
 
       <div style={styles.tableSection}>
         <h3 style={styles.sectionTitle}>📋 Danh sách tài khoản hiện tại</h3>
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
-          <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Ngày tạo</th>
-              <th style={styles.th}>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
+        {isMobile ? (
+          <div style={styles.mobileCardList}>
             {accounts.map(account => (
-              <tr key={account.id}>
-                <td style={styles.td}>{account.email}</td>
-                <td style={styles.td}>{new Date(account.created_at).toLocaleString()}</td>
-                <td style={styles.td}>
+              <div key={account.id} style={styles.mobileCard}>
+                <div style={styles.mobileCardEmail}>{account.email}</div>
+                <div style={styles.mobileCardMeta}>Tạo lúc: {new Date(account.created_at).toLocaleString()}</div>
+                <div style={styles.mobileCardActions}>
                   <button
                     onClick={() => handleDelete(account.id, account.email)}
-                    style={styles.deleteButton}
+                    style={{ ...styles.deleteButton, ...styles.mobileDeleteButton }}
+                    title="Gỡ quyền admin"
                   >
-                    🗑️ Gỡ quyền
+                    🗑️
                   </button>
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
           </div>
-        </div>
+        ) : (
+          <div style={styles.tableScrollWrap}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Email</th>
+                  <th style={styles.th}>Ngày tạo</th>
+                  <th style={styles.th}>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map(account => (
+                  <tr key={account.id}>
+                    <td style={styles.td}>{account.email}</td>
+                    <td style={styles.td}>{new Date(account.created_at).toLocaleString()}</td>
+                    <td style={styles.td}>
+                      <button
+                        onClick={() => handleDelete(account.id, account.email)}
+                        style={styles.deleteButton}
+                      >
+                        🗑️ Gỡ quyền
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       </div>
   )
 }
@@ -239,6 +268,7 @@ const styles = {
     position: 'relative',
     zIndex: 2,
     display: 'flex',
+    flexWrap: 'wrap',
     gap: '10px',
     marginBottom: 0
   },
@@ -271,6 +301,40 @@ const styles = {
     border: '1px solid #c5d9f3',
     boxShadow: '0 10px 22px rgba(20, 50, 92, 0.12)'
   },
+  tableScrollWrap: {
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    margin: '0 -10px',
+    padding: '0 10px'
+  },
+  mobileCardList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+  },
+  mobileCard: {
+    border: '1px solid #d6e3f5',
+    borderRadius: '12px',
+    padding: '12px',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f6faff 100%)'
+  },
+  mobileCardEmail: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#20324e',
+    wordBreak: 'break-word'
+  },
+  mobileCardMeta: {
+    marginTop: '6px',
+    fontSize: '12px',
+    color: '#64748b'
+  },
+  mobileCardActions: {
+    marginTop: '10px',
+    display: 'grid',
+    gridTemplateColumns: '42px',
+    justifyContent: 'end'
+  },
   th: {
     textAlign: 'left',
     padding: '12px',
@@ -294,6 +358,15 @@ const styles = {
     color: 'white',
     cursor: 'pointer',
     fontWeight: '600'
+  },
+  mobileDeleteButton: {
+    width: '42px',
+    height: '42px',
+    padding: 0,
+    fontSize: '18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 }
 
