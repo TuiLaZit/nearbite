@@ -667,7 +667,8 @@ function AdminDashboard({ role = 'admin' }) {
                     {/* Top 5 by visits */}
                     <div style={styles.topTableCard}>
                       <h3 style={styles.topTableTitle}>🔥 Top 5 Quán được ghé nhiều nhất</h3>
-                      <table style={styles.topTable}>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table style={styles.topTable}>
                         <thead>
                           <tr>
                             <th style={styles.topTableTh}>#</th>
@@ -691,12 +692,14 @@ function AdminDashboard({ role = 'admin' }) {
                           )}
                         </tbody>
                       </table>
-                    </div>
+                        </div>
+                      </div>
 
-                    {/* Top 5 by duration */}
+                      {/* Top 5 by duration */}
                     <div style={styles.topTableCard}>
                       <h3 style={styles.topTableTitle}>⏱️ Top 5 Quán được ghé lâu nhất</h3>
-                      <table style={styles.topTable}>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table style={styles.topTable}>
                         <thead>
                           <tr>
                             <th style={styles.topTableTh}>#</th>
@@ -720,12 +723,14 @@ function AdminDashboard({ role = 'admin' }) {
                           )}
                         </tbody>
                       </table>
-                    </div>
+                        </div>
+                      </div>
 
-                    {/* Top 5 by audio */}
+                      {/* Top 5 by audio */}
                     <div style={styles.topTableCard}>
                       <h3 style={styles.topTableTitle}>🎧 Top 5 Quán có audio được nghe nhiều nhất</h3>
-                      <table style={styles.topTable}>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table style={styles.topTable}>
                         <thead>
                           <tr>
                             <th style={styles.topTableTh}>#</th>
@@ -753,6 +758,7 @@ function AdminDashboard({ role = 'admin' }) {
                   </div>
 
                 </div>
+              </div>
               </div>
             )}
 
@@ -1104,5 +1110,7 @@ const styles = {
 }
 
 export default AdminDashboard
+
+
 
 

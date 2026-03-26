@@ -495,7 +495,8 @@ function RestaurantManagement({
           </div>
         ) : (
           <>
-            <table style={styles.table}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
+              <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Tên quán</th>
@@ -604,8 +605,9 @@ function RestaurantManagement({
                 ))}
               </tbody>
             </table>
+            </div>
 
-            {/* Pagination Controls */}
+              {/* Pagination Controls */}
             {!isHidden && pagination.totalPages > 1 && (
               <div style={styles.paginationContainer}>
                 <button
@@ -796,10 +798,11 @@ const styles = {
     boxShadow: '0 12px 26px rgba(22, 42, 73, 0.11)'
   },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '16px'
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '16px',
+      flexWrap: 'wrap'
   },
   title: {
     fontSize: '32px',
@@ -815,7 +818,8 @@ const styles = {
     lineHeight: '1.45'
   },
   addButton: {
-    padding: '12px 24px',
+      whiteSpace: 'nowrap',
+      padding: '12px 24px',
     background: 'linear-gradient(130deg, #0d5f5f 0%, #1e5f88 100%)',
     color: 'white',
     border: 'none',
@@ -1194,3 +1198,9 @@ const styles = {
 }
 
 export default RestaurantManagement
+
+
+
+
+
+
