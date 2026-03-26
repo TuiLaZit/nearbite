@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 
 import '../../core/auth/session_store.dart';
@@ -43,6 +44,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
 
   final _imageCaptionController = TextEditingController();
   bool _imagePrimary = false;
+  bool _cameraPermissionGranted = false;
   XFile? _pickedImage;
   StreamSubscription<void>? _sessionExpiredSub;
 
@@ -58,6 +60,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
         (route) => false,
       );
     });
+    unawaited(_syncCameraPermissionState());
     _bootstrap();
   }
 
@@ -306,10 +309,56 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     }
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _syncCameraPermissionState() async {
+    final status = await Permission.camera.status;
+    if (!mounted) return;
+    setState(() {
+      _cameraPermissionGranted = status.isGranted;
+    });
+  }
+
+  Future<void> _requestCameraPermission() async {
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+
+    setState(() {
+      _cameraPermissionGranted = status.isGranted;
+    });
+
+    if (status.isPermanentlyDenied) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Camera permission is permanently denied. Please enable it in app settings.')),
+      );
+      await openAppSettings();
+      return;
+    }
+
+    if (!status.isGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Camera permission is required to capture images.')),
+      );
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
     if (file == null) return;
+    setState(() => _pickedImage = file);
+  }
+
+  Future<void> _captureImageFromCamera() async {
+    if (!_cameraPermissionGranted) {
+      await _requestCameraPermission();
+      if (!_cameraPermissionGranted) {
+        return;
+      }
+    }
+
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    if (file == null) return;
+    if (!mounted) return;
     setState(() => _pickedImage = file);
   }
 
@@ -559,10 +608,41 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
       padding: const EdgeInsets.all(16),
       children: [
         OutlinedButton.icon(
-          onPressed: _saving ? null : _pickImage,
-          icon: const Icon(Icons.photo_library),
-          label: Text(_pickedImage == null ? 'Pick image' : _pickedImage!.name),
+          onPressed: _saving ? null : _requestCameraPermission,
+          icon: Icon(
+            _cameraPermissionGranted ? Icons.check_circle : Icons.camera_alt_outlined,
+          ),
+          label: Text(
+            _cameraPermissionGranted ? 'Camera permission granted' : 'Request camera permission',
+          ),
         ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _saving ? null : _captureImageFromCamera,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Capture photo'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _saving ? null : _pickImageFromGallery,
+                icon: const Icon(Icons.photo_library),
+                label: Text(_pickedImage == null ? 'Choose from gallery' : 'Selected: ${_pickedImage!.name}'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_pickedImage != null)
+          Text(
+            'Selected image: ${_pickedImage!.name}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        const SizedBox(height: 8),
         TextField(
           controller: _imageCaptionController,
           decoration: const InputDecoration(labelText: 'Caption'),

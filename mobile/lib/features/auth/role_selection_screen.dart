@@ -196,12 +196,35 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     }
   }
 
+  Future<void> _continueAsGuest() async {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => CustomerHomeScreen(
+          apiClient: widget.apiClient,
+          title: 'NearBite',
+          guestMode: true,
+          showTourButton: false,
+          showLanguageSelector: true,
+          initialLanguage: _language,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _selectedRole == _RoleType.customer ? 0 : 1;
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          tooltip: _text('Về màn hình khách', 'Back to guest mode', 'Retour mode invite'),
+          onPressed: _continueAsGuest,
+          icon: const Icon(Icons.arrow_back),
+        ),
         title: Text(
           _text('Chọn vai trò đăng nhập', 'Choose login role', 'Choisir le role'),
         ),
