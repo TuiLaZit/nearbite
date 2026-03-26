@@ -693,16 +693,9 @@ def register_user_routes(app):
             user_lat = data.get("user_lat")
             user_lng = data.get("user_lng")
             
-            # Bước 1: Lọc quán (Filter)
-            query = Restaurant.query.filter_by(is_active=True)
-            
-            if selected_tag_ids:
-                # Lọc quán có ít nhất 1 tag trong danh sách
-                query = query.filter(
-                    Restaurant.tags.any(Tag.id.in_(selected_tag_ids))
-                )
-            
-            restaurants = query.all()
+            # Bước 1: Lấy toàn bộ quán active (không loại cứng theo tag).
+            # Tag preference sẽ được xử lý bằng heuristic scoring ở bước sau.
+            restaurants = Restaurant.query.filter_by(is_active=True).all()
             
             if not restaurants:
                 return jsonify({
@@ -742,9 +735,9 @@ def register_user_routes(app):
             for restaurant in restaurants:
                 score = 0
                 
-                # Match preference: số lượng tags khớp
+                # Match preference: số lượng tags khớp (boost mạnh nhưng không loại quán không khớp)
                 matching_tags = len([tag for tag in restaurant.tags if tag.id in selected_tag_ids])
-                score += matching_tags * 10
+                score += matching_tags * 25
                 
                 # Price fit: dùng giá trung bình của toàn bộ menu quán.
                 avg_price = avg_price_by_restaurant.get(restaurant.id, global_avg_price)
