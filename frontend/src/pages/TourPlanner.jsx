@@ -205,6 +205,7 @@ function TourPlanner() {
           .tour-planner-title {
             grid-area: title;
             flex: none !important;
+            min-width: 0;
             margin-top: 0;
             font-size: clamp(18px, 4.8vw, 24px);
             white-space: nowrap;
