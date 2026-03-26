@@ -392,7 +392,7 @@ function LocationTracker() {
       headerObserver?.disconnect()
       panelObserver?.disconnect()
     }
-  }, [currentNarration, isPanelCollapsed, isCustomerAuthenticated])
+  }, [currentNarration, isPanelCollapsed, customerAuthStatus])
 
   // When running as PWA and offline, load restaurants from local cache only.
   useEffect(() => {
