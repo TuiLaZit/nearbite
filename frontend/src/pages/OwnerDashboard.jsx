@@ -414,6 +414,14 @@ function OwnerDashboard() {
           background: rgba(234, 244, 255, 0.78);
         }
 
+        .owner-menu-card-list {
+          display: none;
+        }
+
+        .owner-menu-table-wrap {
+          display: block;
+        }
+
         .owner-topbar-nav-btn {
           margin: 0;
           border: 1px solid rgba(146, 178, 214, 0.42);
@@ -524,6 +532,16 @@ function OwnerDashboard() {
           .owner-image-form {
             grid-template-columns: 1fr !important;
           }
+
+          .owner-menu-table-wrap {
+            display: none;
+          }
+
+          .owner-menu-card-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
         }
 
         @media (max-width: 520px) {
@@ -608,28 +626,45 @@ function OwnerDashboard() {
               )}
             </form>
 
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
+            <div className="owner-menu-table-wrap" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '0 -10px', padding: '0 10px' }}>
               <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th>Tên món</th>
-                  <th>Giá</th>
-                  <th>Hành động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {menuItems.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.name}</td>
-                    <td>{item.price.toLocaleString()}đ</td>
-                    <td>
-                      <button onClick={() => handleEditMenu(item)}>✏️ Sửa</button>
-                      <button onClick={() => handleDeleteMenu(item.id)}>🗑️ Xóa</button>
-                    </td>
+                <thead>
+                  <tr>
+                    <th>Tên món</th>
+                    <th>Giá</th>
+                    <th>Hành động</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {menuItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.name}</td>
+                      <td>{item.price.toLocaleString()}đ</td>
+                      <td>
+                        <div style={styles.compactActionGroup}>
+                          <button type="button" style={styles.compactActionButton} title="Sửa" aria-label="Sửa" onClick={() => handleEditMenu(item)}>✏️</button>
+                          <button type="button" style={styles.compactActionButtonDanger} title="Xóa" aria-label="Xóa" onClick={() => handleDeleteMenu(item.id)}>🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="owner-menu-card-list">
+              {menuItems.map((item) => (
+                <div key={item.id} style={styles.menuCard}>
+                  <div style={styles.menuCardHeaderRow}>
+                    <div style={styles.menuCardName}>{item.name}</div>
+                    <div style={styles.menuCardPrice}>{item.price.toLocaleString()}đ</div>
+                  </div>
+                  <div style={styles.menuCardActions}>
+                    <button type="button" style={styles.compactActionButton} title="Sửa" aria-label="Sửa" onClick={() => handleEditMenu(item)}>✏️</button>
+                    <button type="button" style={styles.compactActionButtonDanger} title="Xóa" aria-label="Xóa" onClick={() => handleDeleteMenu(item.id)}>🗑️</button>
+                  </div>
+                </div>
+              ))}
             </div>
             </div>
           )}
@@ -826,6 +861,67 @@ const styles = {
     border: '1px solid #c6daf4',
     boxShadow: '0 8px 20px rgba(20, 50, 92, 0.1)',
     fontSize: '14px'
+  },
+  compactActionGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  compactActionButton: {
+    width: '34px',
+    minWidth: '34px',
+    height: '34px',
+    padding: 0,
+    borderRadius: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    lineHeight: 1
+  },
+  compactActionButtonDanger: {
+    width: '34px',
+    minWidth: '34px',
+    height: '34px',
+    padding: 0,
+    borderRadius: '10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    lineHeight: 1,
+    background: 'linear-gradient(135deg, #bb2e2e 0%, #df3f3f 100%)',
+    borderColor: 'rgba(255, 185, 185, 0.65)',
+    boxShadow: '0 10px 18px rgba(138, 23, 23, 0.3)'
+  },
+  menuCard: {
+    borderRadius: '12px',
+    border: '1px solid #c9dcf2',
+    background: 'linear-gradient(180deg, #fafdff 0%, #eef6ff 100%)',
+    padding: '12px',
+    boxShadow: '0 10px 18px rgba(18, 41, 76, 0.12)'
+  },
+  menuCardHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  menuCardName: {
+    fontWeight: '700',
+    color: '#163454',
+    fontSize: '15px'
+  },
+  menuCardPrice: {
+    color: '#1f3f62',
+    fontWeight: '700',
+    fontSize: '14px'
+  },
+  menuCardActions: {
+    marginTop: '10px',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px'
   },
   imageForm: {
     display: 'grid',
