@@ -307,15 +307,25 @@ class BackendApi {
     required bool isPrimary,
     required int displayOrder,
   }) async {
-    final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath),
-    });
-
     Response<dynamic>? uploadResponse;
     DioException? lastDioError;
     for (var attempt = 0; attempt < 3; attempt += 1) {
       try {
-        uploadResponse = await _dio.post('/admin/upload-image', data: formData);
+        final formData = FormData.fromMap({
+          'file': await MultipartFile.fromFile(
+            filePath,
+            filename: filePath.split(RegExp(r'[\\/]')).last,
+          ),
+        });
+        uploadResponse = await _dio.post(
+          '/admin/upload-image',
+          data: formData,
+          options: Options(
+            contentType: 'multipart/form-data',
+            sendTimeout: const Duration(seconds: 60),
+            receiveTimeout: const Duration(seconds: 60),
+          ),
+        );
         break;
       } on DioException catch (e) {
         lastDioError = e;
