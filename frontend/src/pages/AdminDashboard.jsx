@@ -802,12 +802,15 @@ const styles = {
     boxShadow: '0 14px 28px rgba(12, 23, 43, 0.28)'
   },
   topbarMobile: {
-    height: 'auto',
-    padding: '10px 10px 8px',
-    alignItems: 'stretch',
-    gap: '8px',
-    flexDirection: 'column'
-  },
+      height: 'auto',
+      padding: '14px 16px 14px',
+      alignItems: 'stretch',
+      gap: '12px',
+      flexDirection: 'column',
+      borderBottomLeftRadius: '24px',
+      borderBottomRightRadius: '24px',
+      boxShadow: '0 8px 24px rgba(12, 23, 43, 0.4)'
+    },
   topbarHeadMobile: {
     display: 'flex',
     alignItems: 'center',
@@ -857,21 +860,22 @@ const styles = {
     justifyContent: 'center'
   },
   topNavMobile: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    rowGap: '7px',
-    columnGap: '7px',
-    width: '100%',
-    paddingBottom: '2px'
-  },
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '8px',
+      justifyContent: 'center',
+      width: '100%',
+      paddingBottom: '2px'
+    },
   topNavButton: {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '650'
   },
   topNavButtonMobile: {
-    width: '100%'
-  },
+      width: 'auto',
+      minWidth: '80px'
+    },
   topbarLogout: {
     border: '1px solid rgba(132, 160, 195, 0.42)',
     background: 'rgba(20, 55, 99, 0.88)',
@@ -1100,3 +1104,5 @@ const styles = {
 }
 
 export default AdminDashboard
+
+
