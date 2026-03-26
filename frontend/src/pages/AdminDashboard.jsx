@@ -162,6 +162,11 @@ function AdminDashboard({ role = 'admin' }) {
   const [tileProviderIndex, setTileProviderIndex] = useState(0)
   const [tileLoaded, setTileLoaded] = useState(false)
   const tileErrorCountRef = useRef(0)
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280))
+
+  const isMobile = viewportWidth <= 768
+  const isTablet = viewportWidth <= 1024
+  const mapHeight = isMobile ? 340 : isTablet ? 420 : MAP_HEIGHT_PX
 
   const restaurantsWithCoords = restaurants
     .map(restaurant => ({
@@ -349,6 +354,17 @@ function AdminDashboard({ role = 'admin' }) {
     }
   }, [activeTab, tileLoaded, tileProviderIndex])
 
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
   const handleLogout = () => {
     fetch(`${BASE_URL}${authBase}/logout`, {
       method: 'POST',
@@ -478,9 +494,9 @@ function AdminDashboard({ role = 'admin' }) {
               <div style={styles.dashboardContent}>
                 <div style={styles.dashboardLayout}>
                   <div style={styles.mapContainer}>
-                    <div style={styles.mapHeaderRow}>
-                      <h3 style={styles.mapTitle}>📍 Bản đồ Quán ăn & Heatmap User</h3>
-                      <div style={styles.mapSourceBadge}>
+                    <div style={{ ...styles.mapHeaderRow, ...(isMobile ? styles.mapHeaderRowMobile : {}) }}>
+                      <h3 style={{ ...styles.mapTitle, ...(isMobile ? styles.mapTitleMobile : {}) }}>📍 Bản đồ Quán ăn & Heatmap User</h3>
+                      <div style={{ ...styles.mapSourceBadge, ...(isMobile ? styles.mapSourceBadgeMobile : {}) }}>
                         {tileLoaded ? 'Tile OK' : 'Dang tai tile...'} | {TILE_SOURCES[tileProviderIndex].name}
                       </div>
                     </div>
@@ -489,12 +505,12 @@ function AdminDashboard({ role = 'admin' }) {
                         ℹ️ Chưa có quán ăn nào trong hệ thống.
                       </div>
                     )}
-                    <div style={styles.heatmapContainer}>
+                    <div style={{ ...styles.heatmapContainer, height: `${mapHeight}px`, minHeight: `${mapHeight}px` }}>
                       <div style={styles.mapSurfaceLayer}>
                         <MapContainer
                           center={[10.760426862777551, 106.68198430250096]}
                           zoom={15}
-                          style={{ height: `${MAP_HEIGHT_PX}px`, width: '100%' }}
+                          style={{ height: `${mapHeight}px`, width: '100%' }}
                           zoomControl={true}
                           key={`admin-dashboard-map-${activeTab}-${tileProviderIndex}`}
                         >
@@ -794,7 +810,7 @@ const styles = {
   topTablesContainer: {
     width: '100%',
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '16px',
     alignItems: 'stretch'
   },
@@ -903,6 +919,11 @@ const styles = {
     gap: '12px',
     marginBottom: '8px'
   },
+  mapHeaderRowMobile: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '8px'
+  },
   mapSourceBadge: {
     fontSize: '12px',
     fontWeight: '600',
@@ -912,12 +933,21 @@ const styles = {
     borderRadius: '999px',
     padding: '6px 10px'
   },
+  mapSourceBadgeMobile: {
+    maxWidth: '100%',
+    borderRadius: '10px',
+    wordBreak: 'break-word'
+  },
   mapTitle: {
     fontSize: '18px',
     fontWeight: '700',
     color: '#132745',
     marginBottom: '0',
     marginTop: '0'
+  },
+  mapTitleMobile: {
+    fontSize: '16px',
+    lineHeight: 1.3
   },
   noDataMessage: {
     padding: '12px',
