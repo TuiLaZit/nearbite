@@ -166,14 +166,14 @@ function TourPlanner() {
 
         @media (max-width: 860px) {
           .tour-planner-header {
-            display: grid;
-            grid-template-columns: auto 1fr;
+            display: grid !important;
+            grid-template-columns: auto minmax(0, 1fr) !important;
             grid-template-areas:
               'home title'
-              'language language';
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
+              'language language' !important;
+            align-items: center !important;
+            gap: 10px !important;
+            padding: 10px 12px !important;
           }
 
           .tour-planner-home-btn {
@@ -190,6 +190,7 @@ function TourPlanner() {
 
           .tour-planner-title {
             grid-area: title;
+            flex: none !important;
             margin-top: 0;
             font-size: clamp(18px, 4.8vw, 24px);
             white-space: nowrap;
