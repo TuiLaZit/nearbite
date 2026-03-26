@@ -321,7 +321,6 @@ class BackendApi {
           '/admin/upload-image',
           data: formData,
           options: Options(
-            contentType: 'multipart/form-data',
             sendTimeout: const Duration(seconds: 60),
             receiveTimeout: const Duration(seconds: 60),
           ),
