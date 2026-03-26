@@ -422,22 +422,37 @@ function AdminDashboard({ role = 'admin' }) {
           background: linear-gradient(135deg, #a61b2d 0%, #d62f46 100%) !important;
           box-shadow: 0 12px 22px rgba(85, 9, 24, 0.42), inset 0 0 0 1px rgba(255, 211, 211, 0.26);
         }
+
+        @media (max-width: 768px) {
+          .topbar-nav-btn {
+            height: 36px;
+            padding: 0 12px;
+            font-size: 13px;
+            white-space: nowrap;
+            flex: 0 0 auto;
+          }
+
+          .topbar-logout-btn {
+            height: 36px;
+            width: 100%;
+          }
+        }
       `}</style>
       <div style={styles.container}>
-        <header style={styles.topbar}>
-          <div style={styles.topbarBrand}>
+        <header style={{ ...styles.topbar, ...(isMobile ? styles.topbarMobile : {}) }}>
+          <div style={{ ...styles.topbarBrand, ...(isMobile ? styles.topbarBrandMobile : {}) }}>
             <div style={styles.brandDot} />
             <div>
               <div style={styles.topbarTitle}>{isOwner ? 'Owner Command' : 'Admin Command Center'}</div>
-              <div style={styles.topbarSub}>{isOwner ? 'Restaurant Operations' : 'NearBite Control Suite'}</div>
+              <div style={{ ...styles.topbarSub, ...(isMobile ? styles.topbarSubMobile : {}) }}>{isOwner ? 'Restaurant Operations' : 'NearBite Control Suite'}</div>
             </div>
           </div>
 
-          <nav style={styles.topNav}>
+          <nav style={{ ...styles.topNav, ...(isMobile ? styles.topNavMobile : {}) }}>
             {!isOwner && (
               <button
                 className={`topbar-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-                style={styles.topNavButton}
+                style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
                 onClick={() => {
                   setActiveTab('dashboard')
                   loadHeatmapData()
@@ -448,7 +463,7 @@ function AdminDashboard({ role = 'admin' }) {
             )}
             <button
               className={`topbar-nav-btn ${activeTab === 'restaurants' ? 'active' : ''}`}
-              style={styles.topNavButton}
+              style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
               onClick={() => setActiveTab('restaurants')}
             >
               Quản lý quán
@@ -456,7 +471,7 @@ function AdminDashboard({ role = 'admin' }) {
             {!isOwner && (
               <button
                 className={`topbar-nav-btn ${activeTab === 'hidden' ? 'active' : ''}`}
-                style={styles.topNavButton}
+                style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
                 onClick={() => setActiveTab('hidden')}
               >
                 Quán đã ẩn
@@ -465,7 +480,7 @@ function AdminDashboard({ role = 'admin' }) {
             {!isOwner && (
               <button
                 className={`topbar-nav-btn ${activeTab === 'tags' ? 'active' : ''}`}
-                style={styles.topNavButton}
+                style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
                 onClick={() => setActiveTab('tags')}
               >
                 Quản lý tags
@@ -474,7 +489,7 @@ function AdminDashboard({ role = 'admin' }) {
             {!isOwner && (
               <button
                 className={`topbar-nav-btn ${activeTab === 'adminAccounts' ? 'active' : ''}`}
-                style={styles.topNavButton}
+                style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
                 onClick={() => setActiveTab('adminAccounts')}
               >
                 Tài khoản admin
@@ -482,7 +497,7 @@ function AdminDashboard({ role = 'admin' }) {
             )}
           </nav>
 
-          <button className="topbar-logout-btn" style={styles.topbarLogout} onClick={handleLogout}>
+          <button className="topbar-logout-btn" style={{ ...styles.topbarLogout, ...(isMobile ? styles.topbarLogoutMobile : {}) }} onClick={handleLogout}>
             Đăng xuất
           </button>
         </header>
@@ -721,11 +736,21 @@ const styles = {
     background: 'linear-gradient(145deg, #0b1b33 0%, #102847 52%, #113850 100%)',
     boxShadow: '0 14px 28px rgba(12, 23, 43, 0.28)'
   },
+  topbarMobile: {
+    height: 'auto',
+    padding: '12px 12px 10px',
+    alignItems: 'stretch',
+    gap: '10px',
+    flexDirection: 'column'
+  },
   topbarBrand: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     minWidth: '250px'
+  },
+  topbarBrandMobile: {
+    minWidth: 0
   },
   brandDot: {
     width: '12px',
@@ -747,6 +772,9 @@ const styles = {
     textTransform: 'uppercase',
     marginTop: '2px'
   },
+  topbarSubMobile: {
+    fontSize: '11px'
+  },
   topNav: {
     display: 'flex',
     alignItems: 'center',
@@ -754,10 +782,21 @@ const styles = {
     flexWrap: 'wrap',
     justifyContent: 'center'
   },
+  topNavMobile: {
+    justifyContent: 'flex-start',
+    flexWrap: 'nowrap',
+    overflowX: 'auto',
+    paddingBottom: '2px',
+    width: '100%',
+    scrollbarWidth: 'thin'
+  },
   topNavButton: {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '650'
+  },
+  topNavButtonMobile: {
+    flex: '0 0 auto'
   },
   topbarLogout: {
     border: '1px solid rgba(132, 160, 195, 0.42)',
@@ -766,6 +805,9 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '700'
+  },
+  topbarLogoutMobile: {
+    width: '100%'
   },
   mainContent: {
     flex: 1,
