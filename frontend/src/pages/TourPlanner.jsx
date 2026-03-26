@@ -164,6 +164,20 @@ function TourPlanner() {
           box-shadow: 0 0 0 3px rgba(47, 126, 143, 0.16);
         }
 
+        .tour-planner-settings-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .tour-planner-tour-grid {
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+        }
+
+        .tour-planner-field-card,
+        .tour-planner-field-block {
+          width: 100%;
+          min-width: 0;
+        }
+
         @media (max-width: 860px) {
           .tour-planner-header {
             display: grid !important;
@@ -198,12 +212,23 @@ function TourPlanner() {
             text-overflow: ellipsis;
           }
 
-          .tour-planner-settings-grid {
+          .tour-planner-form-heading {
+            display: grid !important;
             grid-template-columns: 1fr;
+            gap: 8px;
+            align-items: start;
+          }
+
+          .tour-planner-form-badge {
+            justify-self: start;
+          }
+
+          .tour-planner-settings-grid {
+            grid-template-columns: 1fr !important;
           }
 
           .tour-planner-tour-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr !important;
           }
         }
 
@@ -245,13 +270,13 @@ function TourPlanner() {
 
         <main style={plannerStyles.content}>
           <section style={plannerStyles.formCard}>
-            <div style={plannerStyles.formHeadingWrap}>
+            <div className="tour-planner-form-heading" style={plannerStyles.formHeadingWrap}>
               <h2 style={plannerStyles.formHeading}>📝 {t('tourInfo')}</h2>
-              <span style={plannerStyles.formBadge}>{tours.length > 0 ? `${tours.length} ${t('tour')}` : t('tourPlanning')}</span>
+              <span className="tour-planner-form-badge" style={plannerStyles.formBadge}>{tours.length > 0 ? `${tours.length} ${t('tour')}` : t('tourPlanning')}</span>
             </div>
 
             <div className="tour-planner-settings-grid" style={plannerStyles.settingsGrid}>
-              <div style={plannerStyles.fieldCard}>
+              <div className="tour-planner-field-card" style={plannerStyles.fieldCard}>
                 <label style={plannerStyles.label}>⏱️ {t('totalTime')} ({t('minutes')})</label>
                 <input
                   type="number"
@@ -264,7 +289,7 @@ function TourPlanner() {
                 <small style={plannerStyles.hint}>{t('timeRangeHint')}</small>
               </div>
 
-              <div style={plannerStyles.fieldCard}>
+              <div className="tour-planner-field-card" style={plannerStyles.fieldCard}>
                 <label style={plannerStyles.label}>💰 {t('budget')}</label>
                 <input
                   type="number"
@@ -278,7 +303,7 @@ function TourPlanner() {
               </div>
             </div>
 
-            <div style={plannerStyles.fieldBlock}>
+            <div className="tour-planner-field-block" style={plannerStyles.fieldBlock}>
               <label style={plannerStyles.label}>🏷️ {t('selectTags')}</label>
               <div style={plannerStyles.tagWrap}>
                 {tags && tags.length > 0 ? tags.map(tag => {
