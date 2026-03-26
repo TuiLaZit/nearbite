@@ -166,14 +166,32 @@ function TourPlanner() {
 
         @media (max-width: 860px) {
           .tour-planner-header {
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-template-areas:
+              'home language'
+              'title title';
+            align-items: center;
             gap: 10px;
+            padding: 10px 12px;
+          }
+
+          .tour-planner-home-btn {
+            grid-area: home;
+          }
+
+          .tour-planner-language {
+            grid-area: language;
+            justify-self: end;
+            width: 100%;
+            max-width: 190px;
+            min-width: 130px;
           }
 
           .tour-planner-title {
-            width: 100%;
-            order: 3;
-            margin-top: 6px;
+            grid-area: title;
+            margin-top: 2px;
+            font-size: clamp(20px, 5.2vw, 28px);
           }
 
           .tour-planner-settings-grid {
@@ -184,15 +202,34 @@ function TourPlanner() {
             grid-template-columns: 1fr;
           }
         }
+
+        @media (max-width: 420px) {
+          .tour-planner-header {
+            gap: 8px;
+          }
+
+          .tour-planner-home-btn {
+            width: 42px !important;
+            height: 42px !important;
+            min-width: 42px !important;
+            font-size: 18px !important;
+          }
+
+          .tour-planner-language {
+            max-width: 170px;
+            font-size: 12px !important;
+            padding: 10px 11px !important;
+          }
+        }
       `}</style>
 
       <div className="tour-planner-root" style={plannerStyles.shell}>
         <header className="tour-planner-header" style={plannerStyles.header}>
-          <button onClick={() => navigate('/customer')} style={plannerStyles.backButton} title="NearBite Home">
+          <button className="tour-planner-home-btn" onClick={() => navigate('/customer')} style={plannerStyles.backButton} title="NearBite Home">
             🍜
           </button>
           <h1 className="tour-planner-title" style={plannerStyles.title}>🗺️ {t('tourPlanning')}</h1>
-          <select value={language} onChange={(e) => setLanguage(e.target.value)} style={plannerStyles.languageSelect}>
+          <select className="tour-planner-language" value={language} onChange={(e) => setLanguage(e.target.value)} style={plannerStyles.languageSelect}>
             {languages.map(lang => (
               <option key={lang.code} value={lang.code}>{lang.label}</option>
             ))}
