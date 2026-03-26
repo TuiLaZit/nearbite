@@ -95,6 +95,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   double _poiPanelMeasuredHeight = 0;
   DateTime? _manualPlaybackUntil;
   int _selectedLoadRequestId = 0;
+  int _locationCycleRequestId = 0;
   final Map<int, DateTime> _playedRestaurants = <int, DateTime>{};
 
   static const Duration _poiDebounceDuration = Duration(seconds: 2);
@@ -199,7 +200,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     bool allowNetworkTranslation = false,
     bool suppressAutoPlay = false,
   }) async {
+    final requestId = ++_locationCycleRequestId;
     final currentPos = position ?? await _locationService.getCurrentPosition();
+    if (!_isLatestLocationCycle(requestId)) {
+      return;
+    }
+
     setState(() {
       _position = currentPos;
     });
@@ -257,6 +263,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
         );
       }
 
+      if (!_isLatestLocationCycle(requestId)) {
+        return;
+      }
+
       if (_isTracking && !widget.guestMode) {
         try {
           await _api.trackLocation(
@@ -311,6 +321,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
       final inCooldown = _isAutoPlayInCooldown(location.nearestPlace.id);
       final audioBusyOrPlaying = _isPoiAudioPlaying || _audioStartAt != null || _isAudioPreparing;
 
+      if (!_isLatestLocationCycle(requestId)) {
+        return;
+      }
+
       if (inPoiRange &&
           debouncePassed &&
           !manualPlaybackLocked &&
@@ -354,11 +368,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
         _lastPlayedAudioUrl = null;
       }
     } catch (e) {
+      if (!_isLatestLocationCycle(requestId)) {
+        return;
+      }
       setState(() {
         _error = 'GPS updated, but server sync failed: $e';
       });
     }
   }
+
+  bool _isLatestLocationCycle(int requestId) => requestId == _locationCycleRequestId;
 
   Future<String> _deviceId() async {
     return DeviceIdService.getOrCreate();

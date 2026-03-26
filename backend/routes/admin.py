@@ -13,6 +13,7 @@ import re
 import secrets
 import string
 import unicodedata
+import time
 from sqlalchemy import func, text
 from werkzeug.security import generate_password_hash
 
@@ -945,9 +946,25 @@ def register_admin_routes(app):
             
             # Read file bytes
             file_bytes = file.read()
+
+            request_mime = (file.mimetype or "").strip().lower()
+            content_type = request_mime if request_mime.startswith("image/") else f"image/{file_ext}"
             
-            # Upload to Supabase
-            public_url = upload_image(file_bytes, filename)
+            # Upload to Supabase with retry for transient storage/network errors.
+            last_error = None
+            public_url = None
+            for attempt in range(3):
+                try:
+                    public_url = upload_image(file_bytes, filename, content_type=content_type)
+                    break
+                except Exception as upload_error:
+                    last_error = upload_error
+                    if attempt == 2:
+                        raise
+                    time.sleep(0.4 * (attempt + 1))
+
+            if not public_url:
+                raise Exception(str(last_error or "Upload failed"))
             
             return jsonify({
                 "status": "success",

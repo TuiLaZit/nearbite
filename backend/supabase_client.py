@@ -107,7 +107,7 @@ def get_signed_url_for_path(path, bucket_name="restaurant-images", expires_in=36
     return None
 
 
-def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
+def upload_image(file_bytes, filename, bucket_name="restaurant-images", content_type="image/jpeg"):
     """
     Upload image to Supabase Storage
     
@@ -129,7 +129,7 @@ def upload_image(file_bytes, filename, bucket_name="restaurant-images"):
         response = supabase_client.storage.from_(bucket_name).upload(
             filename,
             file_bytes,
-            {"content-type": "image/jpeg"}  # Adjust based on actual file type
+            {"content-type": content_type}
         )
         
         # Get public URL
