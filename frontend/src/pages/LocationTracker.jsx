@@ -55,6 +55,8 @@ const activeRestaurantIcon = new L.Icon({
 const POI_DEBOUNCE_MS = 2000
 const BATTERY_SAVER_KEY = 'nearbiteBatterySaverEnabled'
 const DEVICE_PROFILE_OVERRIDE_KEY = 'nearbiteDeviceProfileOverride'
+const PWA_AUDIO_INDEX_KEY = 'nearbitePwaAudioIndexV1'
+const PWA_CACHED_RESTAURANTS_KEY = 'nearbitePwaCachedRestaurantsV1'
 
 const GPS_INTERVAL_BY_MODE_MS = {
   normal: 3000,
@@ -70,6 +72,39 @@ const MODE_LABEL_BY_KEY = {
   weakBattery: 'May yeu + tiet kiem pin'
 }
 
+const isRunningAsPwa = () => {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator?.standalone === true
+}
+
+const readJsonObject = (key) => {
+  try {
+    if (typeof localStorage === 'undefined') return {}
+    const raw = localStorage.getItem(key)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeJsonObject = (key, value) => {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Ignore storage write failures in private mode/quota exceeded.
+  }
+}
+
+const readCachedRestaurantIds = () => Object.keys(readJsonObject(PWA_AUDIO_INDEX_KEY))
+
+const readCachedRestaurants = () => {
+  const map = readJsonObject(PWA_CACHED_RESTAURANTS_KEY)
+  return Object.values(map).filter(Boolean)
+}
+
 const isLikelyWeakDevice = () => {
   if (typeof navigator === 'undefined') return false
 
@@ -82,14 +117,33 @@ const isLikelyWeakDevice = () => {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
   const effectiveType = connection?.effectiveType || ''
   const saveData = Boolean(connection?.saveData)
+  const userAgent = typeof navigator.userAgent === 'string' ? navigator.userAgent : ''
+  const isAppleMobile = /iPhone|iPad|iPod/i.test(userAgent)
 
-  // Heuristic: low memory/cores or constrained network => weak profile.
-  return Boolean(
-    saveData ||
-    (memory !== null && memory <= 4) ||
-    (cores !== null && cores <= 4) ||
-    /(^2g$|^slow-2g$|^3g$)/i.test(effectiveType)
-  )
+  const isVeryLowMemory = memory !== null && memory <= 2
+  const isVeryLowCpu = cores !== null && cores <= 2
+  const isLowMemory = memory !== null && memory <= 3
+  const isLowCpu = cores !== null && cores <= 4
+  const isSlowNetwork = /(^2g$|^slow-2g$)/i.test(effectiveType)
+  const isConstrainedNetwork = /^3g$/i.test(effectiveType)
+
+  // iOS often reports limited hardware hints; avoid false positives for modern iPhones/iPads.
+  if (isAppleMobile && !saveData && !isSlowNetwork && cores !== null && cores >= 4) {
+    return false
+  }
+
+  // Score-based heuristic to avoid over-detecting weak devices.
+  // A single mild signal (e.g. 3g or 4 CPU cores) is not enough to classify as weak.
+  let weakScore = 0
+  if (saveData) weakScore += 2
+  if (isVeryLowMemory) weakScore += 2
+  else if (isLowMemory) weakScore += 1
+  if (isVeryLowCpu) weakScore += 2
+  else if (isLowCpu) weakScore += 1
+  if (isSlowNetwork) weakScore += 2
+  else if (isConstrainedNetwork) weakScore += 1
+
+  return isVeryLowMemory || isVeryLowCpu || weakScore >= 3
 }
 
 const getPerformanceModeKey = (weakDevice, batterySaverEnabled) => {
@@ -130,6 +184,12 @@ function LocationTracker() {
     const saved = localStorage.getItem('narrationPanelCollapsed')
     return saved === 'true'
   })
+  const [isPwaRuntime, setIsPwaRuntime] = useState(() => isRunningAsPwa())
+  const [isOfflineMode, setIsOfflineMode] = useState(() => {
+    if (typeof navigator === 'undefined') return false
+    return isRunningAsPwa() && !navigator.onLine
+  })
+  const [cachedRestaurantIds, setCachedRestaurantIds] = useState(() => readCachedRestaurantIds())
   const [isWeakDevice, setIsWeakDevice] = useState(() => isLikelyWeakDevice())
   const [isBatterySaverEnabled, setIsBatterySaverEnabled] = useState(() => {
     return localStorage.getItem(BATTERY_SAVER_KEY) === 'true'
@@ -160,6 +220,42 @@ function LocationTracker() {
   const weakDeviceNote = isBatterySaverEnabled
     ? 'Thiết bị đang chạy chế độ tối ưu cho cấu hình yếu và giảm tải.'
     : 'Thiết bị đang chạy chế độ tối ưu cho cấu hình yếu.'
+  const cachedRestaurantIdSet = new Set(cachedRestaurantIds.map(String))
+  const visibleRestaurants = (isPwaRuntime && isOfflineMode)
+    ? restaurants.filter((restaurant) => cachedRestaurantIdSet.has(String(restaurant.id)))
+    : restaurants
+
+  const rememberCachedRestaurant = (restaurant) => {
+    if (!restaurant?.id) return
+    const cacheMap = readJsonObject(PWA_CACHED_RESTAURANTS_KEY)
+    cacheMap[String(restaurant.id)] = restaurant
+    writeJsonObject(PWA_CACHED_RESTAURANTS_KEY, cacheMap)
+  }
+
+  const cacheNarrationForOffline = async ({ restaurant, audioUrl }) => {
+    if (!isPwaRuntime || !restaurant?.id || !audioUrl) return
+
+    const resolvedAudioUrl = resolveAudioUrl(audioUrl)
+    if (!resolvedAudioUrl) return
+
+    const index = readJsonObject(PWA_AUDIO_INDEX_KEY)
+    index[String(restaurant.id)] = {
+      audioUrl: resolvedAudioUrl,
+      updatedAt: Date.now()
+    }
+    writeJsonObject(PWA_AUDIO_INDEX_KEY, index)
+    rememberCachedRestaurant(restaurant)
+    setCachedRestaurantIds(Object.keys(index))
+
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        // Trigger SW/audio cache warm-up; opaque response is still cacheable.
+        await fetch(resolvedAudioUrl, { mode: 'no-cors' })
+      } catch {
+        // Ignore warm-up failures; playback can still use network when online.
+      }
+    }
+  }
 
   // Cập nhật languageRef mỗi khi language thay đổi
   useEffect(() => {
@@ -175,6 +271,38 @@ function LocationTracker() {
   useEffect(() => {
     setIsWeakDevice(isLikelyWeakDevice())
   }, [])
+
+  // Track PWA runtime + connectivity for offline-only behavior.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return
+
+    const syncRuntime = () => {
+      const pwa = isRunningAsPwa()
+      setIsPwaRuntime(pwa)
+      setIsOfflineMode(pwa && !navigator.onLine)
+    }
+
+    const handleOnline = () => setIsOfflineMode(isRunningAsPwa() && !navigator.onLine)
+    const handleOffline = () => setIsOfflineMode(isRunningAsPwa() && !navigator.onLine)
+
+    syncRuntime()
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener('focus', syncRuntime)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('focus', syncRuntime)
+    }
+  }, [])
+
+  // When running as PWA and offline, load restaurants from local cache only.
+  useEffect(() => {
+    if (isPwaRuntime && isOfflineMode) {
+      setRestaurants(readCachedRestaurants())
+    }
+  }, [isPwaRuntime, isOfflineMode])
 
   // Persist user-controlled battery saver mode.
   useEffect(() => {
@@ -219,16 +347,40 @@ function LocationTracker() {
 
   // Fetch danh sách quán theo ngôn ngữ hiện tại
   useEffect(() => {
+    if (isPwaRuntime && isOfflineMode) {
+      setRestaurants(readCachedRestaurants())
+      return
+    }
+
     fetch(`${BASE_URL}/restaurants?lang=${encodeURIComponent(language)}`)
       .then(res => {
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
         return res.json()
       })
       .then(data => {
-        setRestaurants(Array.isArray(data.restaurants) ? data.restaurants : [])
+        const list = Array.isArray(data.restaurants) ? data.restaurants : []
+        setRestaurants(list)
+
+        if (isPwaRuntime) {
+          const cachedIds = new Set(readCachedRestaurantIds())
+          if (cachedIds.size) {
+            const cacheMap = readJsonObject(PWA_CACHED_RESTAURANTS_KEY)
+            for (const restaurant of list) {
+              if (cachedIds.has(String(restaurant.id))) {
+                cacheMap[String(restaurant.id)] = restaurant
+              }
+            }
+            writeJsonObject(PWA_CACHED_RESTAURANTS_KEY, cacheMap)
+          }
+        }
       })
-      .catch(err => console.error('Error fetching restaurants:', err))
-  }, [language])
+      .catch(err => {
+        console.error('Error fetching restaurants:', err)
+        if (isPwaRuntime) {
+          setRestaurants(readCachedRestaurants())
+        }
+      })
+  }, [language, isPwaRuntime, isOfflineMode])
 
   // Track location visit khi user ở gần quán
   const trackLocationVisit = (lat, lng, durationSeconds, restaurantId = null) => {
@@ -466,6 +618,11 @@ function LocationTracker() {
             })
             setCurrentDistance(distance)
 
+            cacheNarrationForOffline({
+              restaurant: data.nearest_place,
+              audioUrl: data.audio_url
+            })
+
             // Kiểm tra cooldown 5 phút
             const lastPlayedTime = playedRestaurantsRef.current.get(newId)
             const now = Date.now()
@@ -547,6 +704,11 @@ function LocationTracker() {
               menu: data.nearest_place.menu || []
             })
             setCurrentDistance(distance)
+
+            cacheNarrationForOffline({
+              restaurant: data.nearest_place,
+              audioUrl: data.audio_url
+            })
 
             // Kiểm tra cooldown 5 phút
             const lastPlayedTime = playedRestaurantsRef.current.get(newId)
@@ -666,8 +828,8 @@ function LocationTracker() {
     audioStartTimeRef.current = Date.now()
 
     
-    // Thêm timestamp để tránh cache browser
-    const audioUrl = url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`
+    // Keep stable URL so SW/Cache can serve audio when offline.
+    const audioUrl = url
     
     const audio = new Audio(audioUrl)
     audioRef.current = audio
@@ -928,6 +1090,11 @@ function LocationTracker() {
             loading: false
           }
           setSelectedRestaurant(newData)
+
+          cacheNarrationForOffline({
+            restaurant: { ...restaurant, ...selectedPlace },
+            audioUrl: data.audio_url
+          })
         })
         .catch(err => {
           if (err?.name === 'AbortError') {
@@ -989,6 +1156,11 @@ function LocationTracker() {
             narration: data.narration,
             audioUrl: data.audio_url,
             loading: false
+          })
+
+          cacheNarrationForOffline({
+            restaurant: { ...restaurant, ...selectedPlace },
+            audioUrl: data.audio_url
           })
         })
         .catch(err => {
@@ -1228,6 +1400,27 @@ function LocationTracker() {
           </div>
         )}
 
+        {isPwaRuntime && isOfflineMode && (
+          <div
+            style={{
+              position: 'absolute',
+              top: showWeakDeviceNote ? '42px' : '8px',
+              left: '8px',
+              zIndex: 1200,
+              padding: '4px 8px',
+              borderRadius: '999px',
+              fontSize: '11px',
+              color: '#1f2937',
+              background: 'rgba(254, 243, 199, 0.95)',
+              border: '1px solid #f59e0b',
+              boxShadow: '0 1px 5px rgba(15, 23, 42, 0.12)'
+            }}
+            title='Offline mode: chi hien thi quan da cache'
+          >
+            Offline mode
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => setIsBatterySaverEnabled(prev => !prev)}
@@ -1279,7 +1472,7 @@ function LocationTracker() {
           )}
 
           {/* Marker các quán */}
-          {restaurants.map(restaurant => {
+          {visibleRestaurants.map(restaurant => {
             const popupRestaurant = selectedRestaurant?.id === restaurant.id ? selectedRestaurant : restaurant
             return (
             <Marker

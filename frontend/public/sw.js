@@ -1,4 +1,5 @@
-const CACHE_NAME = 'food-street-v13';
+const CACHE_NAME = 'food-street-v14';
+const AUDIO_CACHE_NAME = 'food-street-audio-v1';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -23,14 +24,53 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Không can thiệp request cross-origin (API backend, CDN...) để tránh lỗi opaque/network.
   const reqUrl = new URL(event.request.url);
-  if (reqUrl.origin !== self.location.origin) {
+  const isCrossOrigin = reqUrl.origin !== self.location.origin;
+  const isAudioRequest =
+    event.request.destination === 'audio' ||
+    /\.(mp3|m4a|aac|ogg|wav)(\?.*)?$/i.test(reqUrl.pathname);
+
+  // Chỉ cho phép cross-origin với audio để hỗ trợ nghe offline trong PWA.
+  if (isCrossOrigin && !isAudioRequest) {
     return;
   }
 
   // Never cache API responses; auth/session endpoints must always hit network.
   if (reqUrl.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  if (isAudioRequest) {
+    event.respondWith(
+      caches.open(AUDIO_CACHE_NAME).then(async (cache) => {
+        const cachedResponse = await cache.match(event.request);
+
+        const networkPromise = fetch(event.request)
+          .then((response) => {
+            if (response && (response.ok || response.type === 'opaque')) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => null);
+
+        if (cachedResponse) {
+          // Return cached immediately, refresh in background when possible.
+          networkPromise.catch(() => {});
+          return cachedResponse;
+        }
+
+        const networkResponse = await networkPromise;
+        if (networkResponse) {
+          return networkResponse;
+        }
+
+        return new Response('Offline audio unavailable', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })
+    );
     return;
   }
 
@@ -85,7 +125,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName !== CACHE_NAME && cacheName !== AUDIO_CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
