@@ -56,7 +56,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey _poiPanelKey = GlobalKey();
 
-  Timer? _trackingTimer;
+  StreamSubscription<Position>? _trackingSubscription;
   HeartbeatService? _heartbeatService;
   bool _isTracking = false;
   bool _autoTrackEnabled = true;
@@ -209,25 +209,25 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     );
 
     try {
-      final bestCandidate = _pickBestPoiForPosition(currentPos);
+      final nearestCandidate = _pickNearestPoiForPosition(currentPos);
 
       LocationResult location;
-      if (bestCandidate != null) {
+      if (nearestCandidate != null) {
         final candidateResult = await _api.postLocation(
-          lat: bestCandidate.restaurant.lat,
-          lng: bestCandidate.restaurant.lng,
+          lat: nearestCandidate.restaurant.lat,
+          lng: nearestCandidate.restaurant.lng,
           language: _apiLanguageCode(_language),
           allowNetworkTranslation: allowNetworkTranslation,
         );
 
         final mergedRestaurant = _mergeRestaurant(
-          bestCandidate.restaurant,
+          nearestCandidate.restaurant,
           candidateResult.nearestPlace,
         );
 
         location = LocationResult(
           narration: candidateResult.narration,
-          distanceKm: bestCandidate.distanceKm,
+          distanceKm: nearestCandidate.distanceKm,
           poiRadiusKm: mergedRestaurant.poiRadiusKm,
           nearestPlace: mergedRestaurant,
           audioUrl: candidateResult.audioUrl,
@@ -415,18 +415,24 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   }
 
   void _startTracking() {
-    _trackingTimer?.cancel();
+    _trackingSubscription?.cancel();
     _isTracking = true;
 
-    final interval = _batterySaverEnabled
-        ? const Duration(seconds: 10)
-        : const Duration(seconds: 3);
+    final locationSettings = LocationSettings(
+      accuracy: _batterySaverEnabled ? LocationAccuracy.medium : LocationAccuracy.high,
+      distanceFilter: _batterySaverEnabled ? 12 : 3,
+    );
 
-    _trackingTimer = Timer.periodic(interval, (_) async {
-      try {
-        await _runLocationCycle();
-      } catch (_) {}
-    });
+    _trackingSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen(
+      (position) {
+        unawaited(_runLocationCycle(position: position));
+      },
+      onError: (_) {},
+    );
+
+    unawaited(_runLocationCycle());
 
     if (!widget.guestMode) {
       _heartbeatService?.start(
@@ -439,7 +445,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   }
 
   void _stopTracking() {
-    _trackingTimer?.cancel();
+    _trackingSubscription?.cancel();
+    _trackingSubscription = null;
     _heartbeatService?.stop();
     _isTracking = false;
     setState(() {});
@@ -1147,7 +1154,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _trackingTimer?.cancel();
+    _trackingSubscription?.cancel();
     _heartbeatService?.stop();
     _sessionExpiredSub?.cancel();
     _playerStateSub?.cancel();
@@ -1592,7 +1599,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     return options.first.code;
   }
 
-  _PoiCandidate? _pickBestPoiForPosition(Position position) {
+  _PoiCandidate? _pickNearestPoiForPosition(Position position) {
     if (_restaurants.isEmpty) {
       return null;
     }
@@ -1600,21 +1607,19 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     final userPoint = LatLng(position.latitude, position.longitude);
     final distance = const Distance();
 
-    final inRange = <_PoiCandidate>[];
+    final candidates = <_PoiCandidate>[];
     for (final restaurant in _restaurants) {
       final restaurantPoint = LatLng(restaurant.lat, restaurant.lng);
       final distanceKm = distance.as(LengthUnit.Kilometer, userPoint, restaurantPoint);
-      if (distanceKm <= restaurant.poiRadiusKm) {
-        inRange.add(_PoiCandidate(restaurant: restaurant, distanceKm: distanceKm));
-      }
+      candidates.add(_PoiCandidate(restaurant: restaurant, distanceKm: distanceKm));
     }
 
-    if (inRange.isEmpty) {
+    if (candidates.isEmpty) {
       return null;
     }
 
-    inRange.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    return inRange.first;
+    candidates.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+    return candidates.first;
   }
 
   RestaurantModel _mergeRestaurant(RestaurantModel base, RestaurantModel enriched) {
