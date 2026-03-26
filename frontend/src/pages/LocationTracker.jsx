@@ -314,6 +314,33 @@ function LocationTracker() {
     }
   }, [])
 
+  // Keep a viewport-height CSS variable in sync to handle mobile browser UI bars.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+    const root = document.documentElement
+    const visualViewport = window.visualViewport
+
+    const syncViewportHeight = () => {
+      const viewportHeight = visualViewport?.height || window.innerHeight
+      root.style.setProperty('--nb-vvh', `${viewportHeight}px`)
+    }
+
+    syncViewportHeight()
+    window.addEventListener('resize', syncViewportHeight)
+    window.addEventListener('orientationchange', syncViewportHeight)
+    visualViewport?.addEventListener('resize', syncViewportHeight)
+    visualViewport?.addEventListener('scroll', syncViewportHeight)
+
+    return () => {
+      window.removeEventListener('resize', syncViewportHeight)
+      window.removeEventListener('orientationchange', syncViewportHeight)
+      visualViewport?.removeEventListener('resize', syncViewportHeight)
+      visualViewport?.removeEventListener('scroll', syncViewportHeight)
+      root.style.removeProperty('--nb-vvh')
+    }
+  }, [])
+
   // When running as PWA and offline, load restaurants from local cache only.
   useEffect(() => {
     if (isPwaRuntime && isOfflineMode) {
@@ -1338,7 +1365,8 @@ function LocationTracker() {
 
   return (
     <div className="tracker-root" style={{
-      height: '100vh',
+      height: '100dvh',
+      minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
       background: 'radial-gradient(1000px 380px at 8% -12%, rgba(60, 136, 165, 0.2), transparent 70%), radial-gradient(900px 360px at 88% 0%, rgba(34, 132, 104, 0.14), transparent 72%), linear-gradient(160deg, #e9f1fb 0%, #e2ecf8 100%)'
@@ -1384,9 +1412,9 @@ function LocationTracker() {
 
           .tracker-root .tracker-map-section {
             flex: none;
-            height: 52vh;
-            min-height: 300px;
-            max-height: 520px;
+            height: clamp(320px, min(62dvh, calc(var(--nb-vvh, 100vh) * 0.62)), 680px);
+            min-height: clamp(300px, 46svh, 360px);
+            max-height: 680px;
             padding: 8px 8px 0;
           }
 
@@ -1397,8 +1425,8 @@ function LocationTracker() {
 
         @media (max-width: 420px) {
           .tracker-root .tracker-map-section {
-            height: 48vh;
-            min-height: 260px;
+            height: clamp(300px, min(58dvh, calc(var(--nb-vvh, 100vh) * 0.58)), 620px);
+            min-height: clamp(280px, 44svh, 330px);
           }
         }
       `}</style>
