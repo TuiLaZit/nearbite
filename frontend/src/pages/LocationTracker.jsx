@@ -1381,7 +1381,14 @@ function LocationTracker() {
           color: '#f0f8ff',
           letterSpacing: '-0.01em'
         }}>
-          🍜 <span style={{ fontSize: '20px' }}>NearBite</span>
+          <img
+            src="/icon-72x72.png"
+            alt="NearBite logo"
+            width={28}
+            height={28}
+            style={{ borderRadius: '6px', objectFit: 'cover' }}
+          />
+          <span style={{ fontSize: '20px' }}>NearBite</span>
         </div>
         
         {isCustomerAuthenticated && (
