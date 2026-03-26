@@ -416,29 +416,32 @@ function OwnerDashboard() {
 
         .owner-topbar-nav-btn {
           margin: 0;
-          border: 1px solid rgba(120, 148, 181, 0.34);
-          background: rgba(14, 33, 61, 0.5);
-          color: #d9e7f8;
-          border-radius: 12px;
+          border: 1px solid rgba(146, 178, 214, 0.42);
+          background: linear-gradient(145deg, rgba(17, 42, 73, 0.82) 0%, rgba(21, 64, 96, 0.74) 100%);
+          color: #e6f2ff;
+          border-radius: 999px;
           height: 40px;
-          padding: 0 14px;
+          padding: 0 16px;
           transition: all 0.22s ease;
           white-space: nowrap;
+          font-weight: 650;
+          letter-spacing: 0.1px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
         }
 
         .owner-topbar-nav-btn:hover {
-          border: 1px solid rgba(158, 193, 234, 0.68);
-          background: linear-gradient(128deg, rgba(42, 88, 156, 0.85), rgba(34, 119, 136, 0.72));
-          color: #f5fbff;
+          border: 1px solid rgba(181, 214, 248, 0.86);
+          background: linear-gradient(128deg, rgba(54, 111, 190, 0.9), rgba(41, 139, 160, 0.8));
+          color: #ffffff;
           transform: translateY(-1px);
-          box-shadow: 0 10px 18px rgba(6, 18, 40, 0.24);
+          box-shadow: 0 10px 20px rgba(7, 23, 48, 0.28), 0 0 16px rgba(117, 188, 245, 0.28);
         }
 
         .owner-topbar-nav-btn.active {
-          border: 1px solid rgba(196, 227, 255, 0.94);
-          background: linear-gradient(128deg, rgba(74, 145, 235, 0.94), rgba(72, 200, 220, 0.86));
+          border: 1px solid rgba(205, 232, 255, 0.98);
+          background: linear-gradient(130deg, rgba(84, 162, 252, 0.98), rgba(78, 211, 230, 0.92));
           color: #ffffff;
-          box-shadow: 0 12px 22px rgba(8, 24, 50, 0.3), 0 0 20px rgba(130, 207, 255, 0.35);
+          box-shadow: 0 12px 22px rgba(8, 24, 50, 0.34), 0 0 24px rgba(130, 207, 255, 0.45);
         }
 
         .owner-topbar-logout-btn {
@@ -485,7 +488,7 @@ function OwnerDashboard() {
             height: 34px;
             padding: 0 10px;
             font-size: 12px;
-            border-radius: 10px;
+            border-radius: 999px;
             flex: 0 0 auto;
           }
 
