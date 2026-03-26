@@ -944,26 +944,29 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
     tour = []
     total_time = 0
     total_cost = 0
-    avg_eat_time = 30  # Giả sử mỗi quán ăn 30 phút
+    default_eat_time = 30  # fallback khi quán chưa có avg_eat_time
     
     for item in scored_restaurants:
         restaurant = item["restaurant"]
         avg_price = item["avg_price"]
+        eat_time = restaurant.avg_eat_time or default_eat_time
         
         # Kiểm tra constraints
-        if total_time + avg_eat_time <= time_limit and total_cost + avg_price <= budget:
+        if total_time + eat_time <= time_limit and total_cost + avg_price <= budget:
             tour.append({
                 "id": restaurant.id,
                 "name": restaurant.name,
+                "description": restaurant.description,
                 "lat": restaurant.lat,
                 "lng": restaurant.lng,
+                "avg_eat_time": eat_time,
                 "avg_price": round(avg_price),
                 "score": item["score"],
                 "matching_tags": item["matching_tags"],
                 "tags": [{"id": tag.id, "name": tag.name, "icon": tag.icon, "color": tag.color} for tag in restaurant.tags],
                 "images": [{"image_url": img.image_url, "is_primary": img.is_primary} for img in restaurant.images[:2]]  # Chỉ lấy 2 ảnh đầu
             })
-            total_time += avg_eat_time
+            total_time += eat_time
             total_cost += avg_price
             
             # Giới hạn tour tối đa 5 quán

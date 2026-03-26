@@ -185,11 +185,93 @@ class _LoginScreenState extends State<LoginScreen>
     return e.message ?? 'Request failed';
   }
 
+  String _t({
+    required String vi,
+    required String en,
+    required String fr,
+  }) {
+    switch (_language) {
+      case 'en':
+        return en;
+      case 'fr':
+        return fr;
+      default:
+        return vi;
+    }
+  }
+
+  String _flagForLanguage(String code) {
+    final normalized = code.toLowerCase();
+    switch (normalized) {
+      case 'vi':
+        return '🇻🇳';
+      case 'en':
+      case 'en-us':
+      case 'en-gb':
+        return '🇺🇸';
+      case 'fr':
+      case 'fr-fr':
+        return '🇫🇷';
+      case 'de':
+      case 'de-de':
+        return '🇩🇪';
+      case 'es':
+      case 'es-es':
+        return '🇪🇸';
+      case 'it':
+      case 'it-it':
+        return '🇮🇹';
+      case 'ru':
+      case 'ru-ru':
+        return '🇷🇺';
+      case 'ja':
+      case 'ja-jp':
+        return '🇯🇵';
+      case 'ko':
+      case 'ko-kr':
+        return '🇰🇷';
+      case 'zh':
+      case 'zh-cn':
+        return '🇨🇳';
+      case 'th':
+      case 'th-th':
+        return '🇹🇭';
+      case 'id':
+      case 'id-id':
+        return '🇮🇩';
+      case 'ms':
+      case 'ms-my':
+        return '🇲🇾';
+      default:
+        return '🌐';
+    }
+  }
+
+  String _languageLabel(String code, String fallback) {
+    switch (code.toLowerCase()) {
+      case 'vi':
+        return 'Tiếng Việt';
+      case 'en':
+        return 'English';
+      case 'fr':
+        return 'Français';
+      case 'ja':
+        return '日本語';
+      case 'ko':
+        return '한국어';
+      case 'zh':
+      case 'zh-cn':
+        return '中文';
+      default:
+        return fallback;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NearBite Login'),
+        title: Text(_t(vi: 'Đăng nhập NearBite', en: 'NearBite Login', fr: 'Connexion NearBite')),
         actions: [
           if (_languages.isNotEmpty)
             Padding(
@@ -201,10 +283,15 @@ class _LoginScreenState extends State<LoginScreen>
                       .map(
                         (l) => DropdownMenuItem<String>(
                           value: l.code,
-                          child: Text(l.label),
+                          child: _CountryBall(flag: _flagForLanguage(l.code)),
                         ),
                       )
                       .toList(),
+                  selectedItemBuilder: (context) {
+                    return _languages
+                        .map((l) => Center(child: _CountryBall(flag: _flagForLanguage(l.code))))
+                        .toList();
+                  },
                   onChanged: (value) {
                     if (value == null) return;
                     setState(() {
@@ -218,9 +305,9 @@ class _LoginScreenState extends State<LoginScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Customer OTP'),
-            Tab(text: 'Owner Login'),
+          tabs: [
+            Tab(text: _t(vi: 'OTP khách hàng', en: 'Customer OTP', fr: 'OTP client')),
+            Tab(text: _t(vi: 'Đăng nhập chủ quán', en: 'Owner Login', fr: 'Connexion gerant')),
           ],
         ),
       ),
@@ -254,12 +341,14 @@ class _LoginScreenState extends State<LoginScreen>
         TextField(
           controller: _customerEmailController,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Email'),
+            decoration: InputDecoration(labelText: _t(vi: 'Email', en: 'Email', fr: 'Email')),
         ),
         const SizedBox(height: 12),
         FilledButton(
           onPressed: _loading ? null : _requestOtp,
-          child: Text(_loading ? 'Sending...' : 'Send OTP'),
+            child: Text(_loading
+              ? _t(vi: 'Đang gửi...', en: 'Sending...', fr: 'Envoi...')
+              : _t(vi: 'Gửi OTP', en: 'Send OTP', fr: 'Envoyer OTP')),
         ),
         if (_otpSent) ...[
           const SizedBox(height: 20),
@@ -267,11 +356,13 @@ class _LoginScreenState extends State<LoginScreen>
             controller: _customerOtpController,
             keyboardType: TextInputType.number,
             maxLength: 6,
-            decoration: const InputDecoration(labelText: 'OTP Code'),
+              decoration: InputDecoration(labelText: _t(vi: 'Ma OTP', en: 'OTP Code', fr: 'Code OTP')),
           ),
           FilledButton(
             onPressed: _loading ? null : _verifyOtp,
-            child: Text(_loading ? 'Verifying...' : 'Verify OTP'),
+              child: Text(_loading
+                  ? _t(vi: 'Đang xác minh...', en: 'Verifying...', fr: 'Verification...')
+                  : _t(vi: 'Xác minh OTP', en: 'Verify OTP', fr: 'Verifier OTP')),
           ),
         ],
       ],
@@ -283,20 +374,43 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         TextField(
           controller: _ownerUsernameController,
-          decoration: const InputDecoration(labelText: 'Username'),
+          decoration: InputDecoration(labelText: _t(vi: 'Tên đăng nhập', en: 'Username', fr: 'Nom utilisateur')),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _ownerPasswordController,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Password'),
+          decoration: InputDecoration(labelText: _t(vi: 'Mật khẩu', en: 'Password', fr: 'Mot de passe')),
         ),
         const SizedBox(height: 12),
         FilledButton(
           onPressed: _loading ? null : _ownerLogin,
-          child: Text(_loading ? 'Signing in...' : 'Login as Owner'),
+          child: Text(_loading
+              ? _t(vi: 'Đang đăng nhập...', en: 'Signing in...', fr: 'Connexion...')
+              : _t(vi: 'Đăng nhập chủ quán', en: 'Login as Owner', fr: 'Connexion gerant')),
         ),
       ],
+    );
+  }
+}
+
+class _CountryBall extends StatelessWidget {
+  const _CountryBall({required this.flag});
+
+  final String flag;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Text(flag, style: const TextStyle(fontSize: 15)),
     );
   }
 }
