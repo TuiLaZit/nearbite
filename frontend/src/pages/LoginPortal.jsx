@@ -321,203 +321,188 @@ const styles = {
     justifyContent: 'center',
     padding: '24px',
     overflow: 'hidden',
-    background: '#0a0f1d'
+    background: '#0f172a'
   },
   gradient: {
     position: 'absolute',
     inset: 0,
-    background: 'radial-gradient(1000px 600px at 10% 10%, rgba(197, 156, 84, 0.15), transparent 50%), radial-gradient(900px 500px at 90% 90%, rgba(22, 77, 76, 0.15), transparent 50%), linear-gradient(135deg, #050a11 0%, #0a0f1d 50%, #0a111a 100%)'
+    background: 'radial-gradient(900px 520px at 8% 12%, rgba(197, 156, 84, 0.2), transparent 60%), radial-gradient(820px 480px at 92% 88%, rgba(22, 77, 76, 0.16), transparent 65%), linear-gradient(135deg, #071217 0%, #0f172a 46%, #152238 100%)'
   },
   grid: {
     position: 'relative',
     zIndex: 1,
     width: '100%',
-    maxWidth: '520px',
+    maxWidth: '620px',
     display: 'block',
     borderRadius: '24px',
     overflow: 'hidden',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
-    background: '#ffffff'
+    border: '1px solid rgba(223, 232, 244, 0.22)',
+    boxShadow: '0 34px 70px rgba(2, 7, 20, 0.5)',
+    backdropFilter: 'blur(16px)',
+    background: '#f6f9ff'
   },
   gridMobile: {
-    maxWidth: '100%',
-    borderRadius: '20px',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+    maxWidth: '580px',
+    borderRadius: '18px'
   },
   panel: {
-    padding: '40px 40px',
-    background: '#ffffff'
+    padding: '48px 42px',
+    background: 'linear-gradient(170deg, #ffffff 0%, #eef4ff 100%)'
   },
   panelMobile: {
-    padding: '30px 24px'
+    padding: '22px 18px'
   },
   topBar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: '12px',
-    marginBottom: '24px'
+    marginBottom: '18px'
   },
   topBarMobile: {
-    marginBottom: '20px'
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    marginBottom: '14px'
   },
   backButton: {
-    border: 'none',
+    border: '1px solid rgba(172, 194, 220, 0.9)',
     borderRadius: '12px',
-    padding: '10px 16px',
+    padding: '10px 14px',
     cursor: 'pointer',
-    background: '#f1f5f9',
-    fontWeight: '600',
-    color: '#475569',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    transition: 'all 0.2s',
-    gap: '6px'
+    background: 'linear-gradient(180deg, #ffffff 0%, #f0f6ff 100%)',
+    fontWeight: '700',
+    color: '#183a5d',
+    fontSize: '13px',
+    letterSpacing: '0.1px',
+    boxShadow: '0 6px 14px rgba(22, 52, 84, 0.1)'
   },
   backButtonMobile: {
-    padding: '10px 14px'
+    width: '100%'
   },
   languageSelect: {
-    padding: '10px 16px',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
-    fontSize: '14px',
+    padding: '10px 12px',
+    borderRadius: '10px',
+    border: '1px solid #cad6e3',
+    fontSize: '13px',
     cursor: 'pointer',
     background: 'white',
     minWidth: '110px',
-    color: '#334155',
-    fontWeight: '500',
-    outline: 'none',
-    transition: 'border-color 0.2s'
+    color: '#183a5d',
+    fontWeight: '600'
   },
   languageSelectMobile: {
-    padding: '10px 14px'
+    width: '100%'
   },
   title: {
     marginTop: 0,
-    marginBottom: '8px',
-    fontSize: '32px',
+    marginBottom: '18px',
+    fontSize: '30px',
     color: '#0f172a',
-    fontWeight: '800',
-    letterSpacing: '-1px',
-    textAlign: 'center'
+    fontWeight: '750',
+    letterSpacing: '-0.02em',
+    textAlign: 'left'
   },
   titleMobile: {
-    fontSize: '28px'
+    fontSize: '24px'
   },
   roleTabs: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '32px',
-    marginTop: '24px',
-    background: '#f1f5f9',
-    padding: '6px',
-    borderRadius: '14px'
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '8px',
+    marginBottom: '18px'
   },
   roleTab: {
-    flex: 1,
-    border: 'none',
+    border: '1px solid #cbd5e1',
     borderRadius: '10px',
-    background: 'transparent',
-    padding: '12px',
+    background: '#f8fbff',
+    padding: '10px 12px',
     fontWeight: '600',
-    fontSize: '15px',
     cursor: 'pointer',
-    color: '#64748b',
-    transition: 'all 0.2s',
+    color: '#1b3452',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px'
   },
   roleTabActive: {
-    background: '#ffffff',
-    color: '#0f172a',
-    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)'
+    borderColor: '#2563eb',
+    background: '#dbeafe',
+    color: '#0f2f52'
   },
   sectionTitle: {
-    display: 'none' // Hide old section titles
+    marginTop: 0,
+    marginBottom: '14px',
+    color: '#10243f'
   },
   label: {
     display: 'block',
     marginBottom: '8px',
     fontWeight: '600',
-    color: '#334155',
-    fontSize: '14px'
+    color: '#24405d',
+    fontSize: '13px'
   },
   input: {
     width: '100%',
-    padding: '14px 16px',
-    borderRadius: '12px',
-    border: '1px solid #cbd5e1',
-    marginBottom: '20px',
-    color: '#0f172a',
-    background: '#ffffff',
+    padding: '12px 13px',
+    borderRadius: '10px',
+    border: '1px solid #cad6e3',
+    marginBottom: '10px',
+    color: '#12263f',
+    background: 'rgba(255, 255, 255, 0.98)',
     fontSize: '15px',
-    transition: 'border-color 0.2s',
-    outline: 'none',
     boxSizing: 'border-box'
   },
   submitButton: {
     width: '100%',
     border: 'none',
     borderRadius: '12px',
-    padding: '14px',
-    background: '#0ea5e9', // Professional blue
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: '16px',
+    padding: '14px 16px',
+    background: 'linear-gradient(140deg, #0f5d5c 0%, #164d66 100%)',
+    color: '#f5fbff',
+    fontWeight: '700',
+    fontSize: '15px',
     cursor: 'pointer',
-    transition: 'background 0.2s',
+    letterSpacing: '0.2px',
+    boxShadow: '0 14px 22px rgba(15, 73, 88, 0.32)',
     marginTop: '8px'
   },
   otpBox: {
-    marginTop: '24px',
-    padding: '24px',
-    border: '1px solid #e2e8f0',
-    background: '#f8fafc',
-    borderRadius: '16px'
+    marginTop: '18px',
+    padding: '14px',
+    border: '1px solid #dbeafe',
+    background: '#eff6ff',
+    borderRadius: '8px'
   },
   inlineActions: {
     display: 'flex',
-    gap: '12px',
-    marginTop: '16px',
-    flexDirection: 'column'
+    gap: '8px',
+    marginTop: '10px',
+    flexWrap: 'wrap'
   },
   inlineActionsMobile: {
+    display: 'grid',
+    gridTemplateColumns: '1fr'
   },
   secondaryButton: {
-    border: '1px solid #cbd5e1',
-    borderRadius: '12px',
-    padding: '12px',
-    background: 'transparent',
+    border: '1px solid #c7d7eb',
+    borderRadius: '10px',
+    padding: '10px 12px',
+    background: 'white',
     cursor: 'pointer',
-    color: '#475569',
-    fontWeight: '600',
-    fontSize: '15px',
-    transition: 'all 0.2s',
-    width: '100%'
+    color: '#1e3c5b',
+    fontWeight: '700'
   },
   adminButton: {
-    background: 'transparent',
-    color: '#64748b',
-    border: 'none',
-    borderRadius: '12px',
-    padding: '12px',
-    marginTop: '16px',
+    background: '#1e293b',
+    color: '#fff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '10px',
+    padding: '10px 14px',
     cursor: 'pointer',
-    fontWeight: '500',
-    fontSize: '14px',
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    textDecoration: 'underline'
+    fontWeight: '700'
   },
   adminButtonMobile: {
+    width: '100%'
   }
 }
 
