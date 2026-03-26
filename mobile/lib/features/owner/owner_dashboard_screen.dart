@@ -41,10 +41,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
   final _poiRadiusController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  final _menuNameController = TextEditingController();
-  final _menuPriceController = TextEditingController();
-  int? _editingMenuId;
-
   final _imageCaptionController = TextEditingController();
   bool _imagePrimary = false;
   XFile? _pickedImage;
@@ -73,8 +69,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     _avgEatController.dispose();
     _poiRadiusController.dispose();
     _descriptionController.dispose();
-    _menuNameController.dispose();
-    _menuPriceController.dispose();
     _imageCaptionController.dispose();
     _tabController.dispose();
     _sessionExpiredSub?.cancel();
@@ -179,7 +173,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     }
   }
 
-  Future<void> _saveMenuItem() async {
+  Future<void> _saveMenuItem({
+    required String name,
+    required int price,
+    int? menuId,
+  }) async {
     final r = _restaurant;
     if (r == null) return;
 
@@ -189,24 +187,79 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     });
 
     try {
-      final name = _menuNameController.text.trim();
-      final price = int.parse(_menuPriceController.text.trim());
-
-      if (_editingMenuId == null) {
+      if (menuId == null) {
         await _api.createMenuItem(restaurantId: r.id, name: name, price: price);
       } else {
-        await _api.updateMenuItem(menuId: _editingMenuId!, name: name, price: price);
+        await _api.updateMenuItem(menuId: menuId, name: name, price: price);
       }
-
-      _menuNameController.clear();
-      _menuPriceController.clear();
-      _editingMenuId = null;
       await _bootstrap();
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
       setState(() => _saving = false);
     }
+  }
+
+  Future<void> _openMenuItemDialog({MenuItemModel? item}) async {
+    final nameController = TextEditingController(text: item?.name ?? '');
+    final priceController = TextEditingController(
+      text: item != null ? item.price.toString() : '',
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(item == null ? 'Thêm món mới' : 'Sửa món'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: 'Tên món'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(labelText: 'Giá (VND)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                final rawPrice = priceController.text.trim();
+                final price = int.tryParse(rawPrice);
+
+                if (name.isEmpty || price == null || price <= 0) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('Vui lòng nhập tên món và giá hợp lệ.')),
+                  );
+                  return;
+                }
+
+                Navigator.of(context).pop();
+                await _saveMenuItem(name: name, price: price, menuId: item?.id);
+              },
+              child: Text(item == null ? 'Thêm món' : 'Lưu thay đổi'),
+            ),
+          ],
+        );
+      },
+    );
+
+    nameController.dispose();
+    priceController.dispose();
   }
 
   Future<void> _deleteMenuItem(MenuItemModel item) async {
@@ -356,7 +409,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
             child: AnimatedBuilder(
               animation: _tabController,
               builder: (context, _) {
-                return _tabContentByIndex(r, _tabController.index);
+                return IndexedStack(
+                  index: _tabController.index,
+                  children: [
+                    _overviewTab(r),
+                    _menuTab(r),
+                    _tagsTab(r),
+                    _imagesTab(r),
+                  ],
+                );
               },
             ),
           ),
@@ -368,20 +429,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
         ],
       ),
     );
-  }
-
-  Widget _tabContentByIndex(RestaurantModel r, int index) {
-    switch (index) {
-      case 1:
-        return _menuTab(r);
-      case 2:
-        return _tagsTab(r);
-      case 3:
-        return _imagesTab(r);
-      case 0:
-      default:
-        return _overviewTab(r);
-    }
   }
 
   Widget _overviewTab(RestaurantModel r) {
@@ -420,41 +467,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        FilledButton.icon(
+          onPressed: _saving ? null : () => _openMenuItemDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Thêm món mới'),
+        ),
+        const SizedBox(height: 14),
         Text(
-          'Manage menu items',
+          'Danh sách món',
           style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _menuNameController,
-          decoration: const InputDecoration(labelText: 'Menu item name'),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _menuPriceController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Price'),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            FilledButton(
-              onPressed: _saving ? null : _saveMenuItem,
-              child: Text(_editingMenuId == null ? 'Add item' : 'Update item'),
-            ),
-            const SizedBox(width: 8),
-            if (_editingMenuId != null)
-              OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _editingMenuId = null;
-                    _menuNameController.clear();
-                    _menuPriceController.clear();
-                  });
-                },
-                child: const Text('Cancel edit'),
-              ),
-          ],
         ),
         const SizedBox(height: 16),
         if (r.menu.isEmpty)
@@ -468,27 +489,30 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen>
             child: const Text('No menu items yet. Add your first item above.'),
           ),
         ...r.menu.map(
-          (m) => ListTile(
-            title: Text(m.name),
-            subtitle: Text('${m.price} VND'),
-            trailing: Wrap(
-              spacing: 8,
-              children: [
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _editingMenuId = m.id;
-                      _menuNameController.text = m.name;
-                      _menuPriceController.text = m.price.toString();
-                    });
-                  },
-                  icon: const Icon(Icons.edit),
-                ),
-                IconButton(
-                  onPressed: _saving ? null : () => _deleteMenuItem(m),
-                  icon: const Icon(Icons.delete),
-                ),
-              ],
+          (m) => Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              title: Text(
+                m.name,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text('${m.price} VND'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Sửa món',
+                    onPressed: _saving ? null : () => _openMenuItemDialog(item: m),
+                    icon: const Icon(Icons.edit),
+                  ),
+                  IconButton(
+                    tooltip: 'Xóa món',
+                    onPressed: _saving ? null : () => _deleteMenuItem(m),
+                    icon: const Icon(Icons.delete),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
