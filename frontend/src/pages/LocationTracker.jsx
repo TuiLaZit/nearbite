@@ -73,19 +73,26 @@ const MODE_LABEL_BY_KEY = {
   weakBattery: 'May yeu + tiet kiem pin'
 }
 
-const LANGUAGE_FLAG_BY_CODE = {
-  vi: '🇻🇳',
-  en: '🇺🇸',
-  fr: '🇫🇷',
-  de: '🇩🇪',
-  es: '🇪🇸',
-  it: '🇮🇹',
-  pt: '🇵🇹',
-  ru: '🇷🇺',
-  ja: '🇯🇵',
-  ko: '🇰🇷',
-  zh: '🇨🇳',
-  th: '🇹🇭'
+const LANGUAGE_COUNTRY_BY_CODE = {
+  vi: 'vn',
+  en: 'us',
+  fr: 'fr',
+  de: 'de',
+  es: 'es',
+  it: 'it',
+  pt: 'pt',
+  ru: 'ru',
+  ja: 'jp',
+  ko: 'kr',
+  zh: 'cn',
+  th: 'th'
+}
+
+const getLanguageFlagUrl = (langCode) => {
+  const normalized = String(langCode || '').toLowerCase()
+  const countryCode = LANGUAGE_COUNTRY_BY_CODE[normalized]
+  if (!countryCode) return null
+  return `https://flagcdn.com/w40/${countryCode}.png`
 }
 
 const isRunningAsPwa = () => {
@@ -217,6 +224,7 @@ function LocationTracker() {
     return localStorage.getItem(BATTERY_SAVER_KEY) === 'true'
   })
   const [mobileMapHeight, setMobileMapHeight] = useState(null)
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false)
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
@@ -237,6 +245,7 @@ function LocationTracker() {
   const selectedRestaurantRequestSeqRef = useRef(0)
   const headerRef = useRef(null)
   const controlPanelRef = useRef(null)
+  const languageMenuRef = useRef(null)
 
   const performanceModeKey = getPerformanceModeKey(isWeakDevice, isBatterySaverEnabled)
   const gpsIntervalMs = GPS_INTERVAL_BY_MODE_MS[performanceModeKey]
@@ -249,6 +258,29 @@ function LocationTracker() {
   const visibleRestaurants = (isPwaRuntime && isOfflineMode)
     ? restaurants.filter((restaurant) => cachedRestaurantIdSet.has(String(restaurant.id)))
     : restaurants
+  const selectedLanguageOption = languages.find((lang) => lang.code === language)
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!languageMenuRef.current?.contains(event.target)) {
+        setIsLanguageMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsLanguageMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [])
 
   const rememberCachedRestaurant = (restaurant) => {
     if (!restaurant?.id) return
@@ -1090,8 +1122,14 @@ function LocationTracker() {
   }
 
   // Xử lý thay đổi ngôn ngữ
-  const handleLanguageChange = (e) => {
-    const newLang = e.target.value
+  const handleLanguageChange = (eventOrCode) => {
+    const newLang = typeof eventOrCode === 'string' ? eventOrCode : eventOrCode?.target?.value
+    if (!newLang || newLang === language) {
+      setIsLanguageMenuOpen(false)
+      return
+    }
+
+    setIsLanguageMenuOpen(false)
 
 
     
@@ -1481,6 +1519,91 @@ function LocationTracker() {
           background: #f8fcff;
         }
 
+        .tracker-root .tracker-language-dropdown {
+          position: relative;
+        }
+
+        .tracker-root .tracker-language-btn {
+          margin: 0;
+          width: 100%;
+          height: 40px;
+          min-width: 156px;
+          max-width: 180px;
+          padding: 0 10px;
+          border-radius: 10px;
+          border: 1px solid rgba(181, 209, 235, 0.72);
+          font-size: 13px;
+          font-weight: 600;
+          color: #18324b;
+          cursor: pointer;
+          background: #f8fcff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .tracker-root .tracker-language-current {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .tracker-root .tracker-language-menu {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 6px);
+          width: 220px;
+          max-height: 280px;
+          overflow: auto;
+          padding: 6px;
+          border-radius: 12px;
+          background: #ffffff;
+          border: 1px solid rgba(167, 196, 228, 0.58);
+          box-shadow: 0 12px 28px rgba(6, 18, 36, 0.22);
+          z-index: 1100;
+        }
+
+        .tracker-root .tracker-language-item {
+          width: 100%;
+          margin: 0;
+          border: 0;
+          background: transparent;
+          color: #15324f;
+          border-radius: 8px;
+          padding: 8px 10px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .tracker-root .tracker-language-item:hover {
+          background: #eef5ff;
+          transform: none;
+        }
+
+        .tracker-root .tracker-language-item.active {
+          background: #e4f2ff;
+          color: #0d3e67;
+        }
+
+        .tracker-root .tracker-flag-icon {
+          width: 20px;
+          height: 14px;
+          border-radius: 2px;
+          border: 1px solid rgba(0, 0, 0, 0.18);
+          object-fit: cover;
+          flex-shrink: 0;
+        }
+
         .tracker-root .tracker-map-section {
           flex: 1;
           position: relative;
@@ -1504,13 +1627,20 @@ function LocationTracker() {
             grid-column: 1;
           }
 
-          .tracker-root .tracker-language-select {
+          .tracker-root .tracker-language-dropdown {
             grid-column: 2;
             grid-row: 1;
+          }
+
+          .tracker-root .tracker-language-btn {
             min-width: 120px;
             max-width: 138px;
-            padding: 9px 12px !important;
+            padding: 0 10px !important;
             font-size: 12px !important;
+          }
+
+          .tracker-root .tracker-language-menu {
+            width: 190px;
           }
 
           .tracker-root .tracker-actions {
@@ -1579,19 +1709,62 @@ function LocationTracker() {
         <div />
 
         {/* Language selector */}
-        <select 
-          className="tracker-language-select"
-          value={language} 
-          onChange={handleLanguageChange}
-        >
-          {languages.map(lang => {
-            const langCode = String(lang.code || '').toLowerCase()
-            const flag = LANGUAGE_FLAG_BY_CODE[langCode] || '🌐'
-            return (
-              <option key={lang.code} value={lang.code}>{`${flag} ${lang.label}`}</option>
-            )
-          })}
-        </select>
+        <div ref={languageMenuRef} className="tracker-language-dropdown tracker-language-select">
+          <button
+            type="button"
+            className="tracker-language-btn"
+            onClick={() => setIsLanguageMenuOpen((prev) => !prev)}
+            aria-haspopup="listbox"
+            aria-expanded={isLanguageMenuOpen}
+          >
+            <span className="tracker-language-current">
+              {selectedLanguageOption && getLanguageFlagUrl(selectedLanguageOption.code) ? (
+                <img
+                  className="tracker-flag-icon"
+                  src={getLanguageFlagUrl(selectedLanguageOption.code)}
+                  alt=""
+                  loading="lazy"
+                />
+              ) : (
+                <span>🌐</span>
+              )}
+              <span>{selectedLanguageOption?.label || language.toUpperCase()}</span>
+            </span>
+            <span>{isLanguageMenuOpen ? '▴' : '▾'}</span>
+          </button>
+
+          {isLanguageMenuOpen && (
+            <div className="tracker-language-menu" role="listbox" aria-label="Language selection">
+              {languages.map((lang) => {
+                const flagUrl = getLanguageFlagUrl(lang.code)
+                const isActive = lang.code === language
+
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    className={`tracker-language-item${isActive ? ' active' : ''}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onClick={() => handleLanguageChange(lang.code)}
+                  >
+                    {flagUrl ? (
+                      <img
+                        className="tracker-flag-icon"
+                        src={flagUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span>🌐</span>
+                    )}
+                    <span>{lang.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         <div className="tracker-actions">
           {isCustomerAuthenticated && (
