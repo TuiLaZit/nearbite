@@ -1432,6 +1432,40 @@ function LocationTracker() {
           gap: 10px;
         }
 
+        .tracker-root .tracker-actions {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .tracker-root .tracker-action-btn {
+          margin: 0;
+          min-width: 128px;
+          height: 40px;
+          padding: 10px 14px;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+
+        .tracker-root .tracker-language-select {
+          margin: 0;
+          height: 40px;
+          min-width: 156px;
+          max-width: 180px;
+          padding: 0 12px;
+          border-radius: 10px;
+          border: 1px solid rgba(181, 209, 235, 0.72);
+          font-size: 13px;
+          cursor: pointer;
+          background: #f8fcff;
+        }
+
         .tracker-root .tracker-map-section {
           flex: 1;
           position: relative;
@@ -1447,7 +1481,7 @@ function LocationTracker() {
 
         @media (max-width: 900px) {
           .tracker-root .tracker-header {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr auto;
             gap: 8px;
           }
 
@@ -1455,12 +1489,27 @@ function LocationTracker() {
             grid-column: 1;
           }
 
-          .tracker-root .tracker-logout-btn {
+          .tracker-root .tracker-language-select {
             grid-column: 2;
             grid-row: 1;
-            justify-self: end;
+            min-width: 120px;
+            max-width: 138px;
             padding: 9px 12px !important;
             font-size: 12px !important;
+          }
+
+          .tracker-root .tracker-actions {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            justify-self: end;
+            width: auto;
+          }
+
+          .tracker-root .tracker-action-btn {
+            min-width: 112px;
+            height: 36px;
+            padding: 8px 12px;
+            font-size: 12px;
           }
 
           .tracker-root .tracker-map-section {
@@ -1511,83 +1560,65 @@ function LocationTracker() {
           />
           <span style={{ fontSize: '20px' }}>NearBite</span>
         </div>
-        
-        {isCustomerAuthenticated && (
-          <button
-            onClick={() => navigate('/customer/tour-planner')}
-            style={{
-              margin: 0,
-              padding: '10px 14px',
-              background: 'linear-gradient(135deg, #cf7b14 0%, #e39b1d 100%)',
-              color: '#fff',
-              border: '1px solid rgba(255, 221, 171, 0.68)',
-              borderRadius: '10px',
-              fontSize: '13px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            🗺️ {t('planTour')}
-          </button>
-        )}
+
+        <div />
 
         {/* Language selector */}
         <select 
+          className="tracker-language-select"
           value={language} 
           onChange={handleLanguageChange}
-          style={{
-            margin: 0,
-            padding: '10px 12px',
-            borderRadius: '10px',
-            border: '1px solid rgba(181, 209, 235, 0.72)',
-            fontSize: '13px',
-            cursor: 'pointer',
-            background: '#f8fcff',
-            minWidth: '100px'
-          }}
         >
           {languages.map(lang => (
             <option key={lang.code} value={lang.code}>{lang.label}</option>
           ))}
         </select>
 
-        {isCustomerAuthenticated ? (
-          <button
-            className="tracker-logout-btn"
-            onClick={handleCustomerLogout}
-            style={{
-              margin: 0,
-              padding: '10px 14px',
-              background: 'linear-gradient(135deg, #b72f3f 0%, #d84353 100%)',
-              color: '#fff',
-              border: '1px solid rgba(255, 196, 202, 0.68)',
-              borderRadius: '10px',
-              fontSize: '13px',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
-          >
-            🚪 {t('logout')}
-          </button>
-        ) : (
-          <button
-            onClick={() => navigate('/login')}
-            style={{
-              margin: 0,
-              padding: '10px 14px',
-              background: 'linear-gradient(135deg, #2255c9 0%, #2f7ae0 100%)',
-              color: '#fff',
-              border: '1px solid rgba(186, 214, 255, 0.7)',
-              borderRadius: '10px',
-              fontSize: '13px',
-              fontWeight: '700',
-              cursor: 'pointer'
-            }}
-          >
-            🔐 {t('login')}
-          </button>
-        )}
+        <div className="tracker-actions">
+          {isCustomerAuthenticated && (
+            <button
+              className="tracker-action-btn"
+              onClick={() => navigate('/customer/tour-planner')}
+              style={{
+                background: 'linear-gradient(135deg, #cf7b14 0%, #e39b1d 100%)',
+                color: '#fff',
+                border: '1px solid rgba(255, 221, 171, 0.68)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🗺️ {t('planTour')}
+            </button>
+          )}
+
+          {isCustomerAuthenticated ? (
+            <button
+              className="tracker-action-btn tracker-logout-btn"
+              onClick={handleCustomerLogout}
+              style={{
+                background: 'linear-gradient(135deg, #b72f3f 0%, #d84353 100%)',
+                color: '#fff',
+                border: '1px solid rgba(255, 196, 202, 0.68)',
+                cursor: 'pointer'
+              }}
+            >
+              🚪 {t('logout')}
+            </button>
+          ) : (
+            <button
+              className="tracker-action-btn"
+              onClick={() => navigate('/login')}
+              style={{
+                background: 'linear-gradient(135deg, #2255c9 0%, #2f7ae0 100%)',
+                color: '#fff',
+                border: '1px solid rgba(186, 214, 255, 0.7)',
+                cursor: 'pointer'
+              }}
+            >
+              🔐 {t('login')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Leaflet Map */}
