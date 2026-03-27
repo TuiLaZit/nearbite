@@ -12,8 +12,6 @@ Nền tảng tìm quán ăn theo vị trí thời gian thực, có thuyết minh
 
 <p align="center">
   <img src="mobile/assets/brand/logo-1024.png" alt="NearBite Logo" width="160" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="backend/static/uploads/20260326_144524_70ea9ab0.jpg" alt="NearBite Demo" width="320" />
 </p>
 
 ## Portfolio Snapshot
