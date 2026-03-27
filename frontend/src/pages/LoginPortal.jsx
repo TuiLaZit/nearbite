@@ -187,17 +187,25 @@ function LoginPortal() {
       <div style={styles.gradient} />
       <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : {}) }}>
         <div style={{ ...styles.panel, ...(isMobile ? styles.panelMobile : {}) }}>
-          <div style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
+          <div
+            style={{
+              ...styles.topBar,
+              ...(isMobile ? styles.topBarMobile : {}),
+              ...(activeRole === 'owner' ? { justifyContent: 'flex-start' } : {})
+            }}
+          >
             <button onClick={() => navigate('/')} style={{ ...styles.backButton, ...(isMobile ? styles.backButtonMobile : {}) }}>
               ← {t('back')}
             </button>
-            <LanguageFlagDropdown
-              value={language}
-              onChange={setLanguage}
-              languages={languages}
-              containerStyle={{ minWidth: isMobile ? '100%' : '110px', width: isMobile ? '100%' : 'auto' }}
-              triggerStyle={{ ...styles.languageSelect, ...(isMobile ? styles.languageSelectMobile : {}) }}
-            />
+            {activeRole !== 'owner' && (
+              <LanguageFlagDropdown
+                value={language}
+                onChange={setLanguage}
+                languages={languages}
+                containerStyle={{ minWidth: isMobile ? '100%' : '110px', width: isMobile ? '100%' : 'auto' }}
+                triggerStyle={{ ...styles.languageSelect, ...(isMobile ? styles.languageSelectMobile : {}) }}
+              />
+            )}
           </div>
 
           <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>NearBite Login</h1>
