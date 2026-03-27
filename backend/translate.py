@@ -447,6 +447,7 @@ def _cache_set(target_lang, text, translated, cache_scope_id=None, cache_note=No
         cache_logical_key=cache_logical_key,
     )
 
+#Translation functions of Google translate API
 
 def _translate_single_google(text, mapped_lang):
     return GoogleTranslator(source="auto", target=mapped_lang).translate(text)
