@@ -91,20 +91,32 @@ const LANGUAGE_COUNTRY_BY_CODE = {
   zh: 'cn',
   'zh-cn': 'cn',
   'zh-tw': 'tw',
-  th: 'th'
+  th: 'th',
+  id: 'id',
+  'id-id': 'id',
+  ms: 'my',
+  'ms-my': 'my'
 }
 
-const getLanguageFlagUrl = (langCode, countryCodeOverride = null) => {
+const resolveCountryCodeForLanguage = (langCode, countryCodeOverride = null, languageLabel = '') => {
   const normalized = String(langCode || '').trim().toLowerCase().replace('_', '-')
   const override = String(countryCodeOverride || '').trim().toLowerCase()
+  const normalizedLabel = String(languageLabel || '').trim().toLowerCase()
   const [baseCode, regionCode] = normalized.split('-')
 
   const countryCode =
     LANGUAGE_COUNTRY_BY_CODE[normalized] ||
     LANGUAGE_COUNTRY_BY_CODE[baseCode] ||
+    (normalizedLabel.includes('indonesia') ? 'id' : null) ||
+    (normalizedLabel.includes('melayu') || normalizedLabel.includes('malay') ? 'my' : null) ||
     (override && /^[a-z]{2}$/.test(override) ? override : null) ||
     (regionCode && /^[a-z]{2}$/.test(regionCode) ? regionCode : null)
 
+  return countryCode || null
+}
+
+const getLanguageFlagUrl = (langCode, countryCodeOverride = null, languageLabel = '') => {
+  const countryCode = resolveCountryCodeForLanguage(langCode, countryCodeOverride, languageLabel)
   if (!countryCode) return null
   return `https://flagcdn.com/w40/${countryCode}.png`
 }
@@ -1527,6 +1539,8 @@ function LocationTracker() {
         }
 
         .tracker-root .tracker-language-btn {
+          all: unset;
+          box-sizing: border-box;
           margin: 0;
           width: 100%;
           height: 40px;
@@ -1544,6 +1558,19 @@ function LocationTracker() {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
+          overflow: hidden;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .tracker-root .tracker-language-btn:hover {
+          background: #f1f8ff;
+          border-color: rgba(150, 189, 221, 0.85);
+          transform: none;
+        }
+
+        .tracker-root .tracker-language-btn:focus-visible {
+          border-color: rgba(84, 146, 204, 0.95);
+          box-shadow: 0 0 0 2px rgba(84, 146, 204, 0.22);
         }
 
         .tracker-root .tracker-language-current {
@@ -1572,9 +1599,10 @@ function LocationTracker() {
         }
 
         .tracker-root .tracker-language-item {
+          all: unset;
+          box-sizing: border-box;
           width: 100%;
           margin: 0;
-          border: 0;
           background: transparent;
           color: #15324f;
           border-radius: 8px;
@@ -1593,6 +1621,11 @@ function LocationTracker() {
           transform: none;
         }
 
+        .tracker-root .tracker-language-item:focus-visible {
+          background: #e9f3ff;
+          outline: 1px solid rgba(84, 146, 204, 0.8);
+        }
+
         .tracker-root .tracker-language-item.active {
           background: #e4f2ff;
           color: #0d3e67;
@@ -1605,6 +1638,15 @@ function LocationTracker() {
           border: 1px solid rgba(0, 0, 0, 0.18);
           object-fit: cover;
           flex-shrink: 0;
+          background: #ffffff;
+        }
+
+        .tracker-root .tracker-language-caret {
+          min-width: 14px;
+          text-align: center;
+          color: #2f4f71;
+          font-size: 12px;
+          line-height: 1;
         }
 
         .tracker-root .tracker-map-section {
@@ -1721,10 +1763,10 @@ function LocationTracker() {
             aria-expanded={isLanguageMenuOpen}
           >
             <span className="tracker-language-current">
-              {selectedLanguageOption && getLanguageFlagUrl(selectedLanguageOption.code, selectedLanguageOption.country_code) ? (
+              {selectedLanguageOption && getLanguageFlagUrl(selectedLanguageOption.code, selectedLanguageOption.country_code, selectedLanguageOption.label) ? (
                 <img
                   className="tracker-flag-icon"
-                  src={getLanguageFlagUrl(selectedLanguageOption.code, selectedLanguageOption.country_code)}
+                  src={getLanguageFlagUrl(selectedLanguageOption.code, selectedLanguageOption.country_code, selectedLanguageOption.label)}
                   alt=""
                   loading="lazy"
                 />
@@ -1733,13 +1775,13 @@ function LocationTracker() {
               )}
               <span>{selectedLanguageOption?.label || language.toUpperCase()}</span>
             </span>
-            <span>{isLanguageMenuOpen ? '▴' : '▾'}</span>
+            <span className="tracker-language-caret">{isLanguageMenuOpen ? '▴' : '▾'}</span>
           </button>
 
           {isLanguageMenuOpen && (
             <div className="tracker-language-menu" role="listbox" aria-label="Language selection">
               {languages.map((lang) => {
-                const flagUrl = getLanguageFlagUrl(lang.code, lang.country_code)
+                const flagUrl = getLanguageFlagUrl(lang.code, lang.country_code, lang.label)
                 const isActive = lang.code === language
 
                 return (
