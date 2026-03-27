@@ -1662,6 +1662,167 @@ function LocationTracker() {
           box-shadow: 0 18px 36px rgba(17, 35, 61, 0.2);
         }
 
+        .tracker-root .tracker-poi-popup-shell .leaflet-popup-content-wrapper {
+          border-radius: 16px;
+          padding: 0;
+          background: linear-gradient(170deg, #ffffff 0%, #f6fbff 100%);
+          box-shadow: 0 16px 32px rgba(15, 34, 58, 0.22);
+          border: 1px solid #d8e5f3;
+        }
+
+        .tracker-root .tracker-poi-popup-shell .leaflet-popup-content {
+          margin: 0;
+          width: min(340px, calc(100vw - 64px)) !important;
+        }
+
+        .tracker-root .tracker-poi-popup {
+          padding: 12px;
+          max-height: 500px;
+          overflow-y: auto;
+          color: #1c304b;
+        }
+
+        .tracker-root .tracker-poi-title {
+          margin: 0 0 10px 0;
+          font-size: 24px;
+          line-height: 1.3;
+          font-weight: 800;
+          color: #1b2f49;
+          letter-spacing: -0.01em;
+        }
+
+        .tracker-root .tracker-poi-media {
+          margin-bottom: 10px;
+        }
+
+        .tracker-root .tracker-poi-main-image {
+          width: 100%;
+          height: 154px;
+          object-fit: cover;
+          border-radius: 10px;
+          margin-bottom: 8px;
+          border: 1px solid #d6e4f4;
+          background: #f2f7fc;
+        }
+
+        .tracker-root .tracker-poi-thumb-strip {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+
+        .tracker-root .tracker-poi-thumb {
+          width: 56px;
+          height: 56px;
+          object-fit: cover;
+          border-radius: 8px;
+          border: 1px solid #d6e3f3;
+          flex-shrink: 0;
+        }
+
+        .tracker-root .tracker-poi-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+
+        .tracker-root .tracker-poi-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 5px 9px;
+          color: #fff;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+        }
+
+        .tracker-root .tracker-poi-description {
+          margin: 4px 0 8px;
+          font-size: 13px;
+          line-height: 1.45;
+          color: #33475f;
+        }
+
+        .tracker-root .tracker-poi-loading,
+        .tracker-root .tracker-poi-error {
+          margin: 10px 0;
+          padding: 10px;
+          border-radius: 10px;
+          border: 1px solid #d7e4f3;
+          background: #f6fbff;
+        }
+
+        .tracker-root .tracker-poi-loading {
+          text-align: center;
+          color: #425b78;
+          font-size: 13px;
+        }
+
+        .tracker-root .tracker-poi-loading-icon {
+          font-size: 22px;
+          margin-bottom: 6px;
+          display: block;
+        }
+
+        .tracker-root .tracker-poi-error {
+          border-color: #f4c9cf;
+          background: #fff4f6;
+          color: #b42c3f;
+          font-size: 13px;
+        }
+
+        .tracker-root .tracker-poi-distance {
+          margin: 2px 0 8px;
+          font-size: 12px;
+          color: #647994;
+        }
+
+        .tracker-root .tracker-poi-narration {
+          margin: 0;
+          padding: 10px;
+          border-radius: 10px;
+          border: 1px solid #d9e6f5;
+          background: #f8fcff;
+          color: #3c4f67;
+          font-size: 13px;
+          line-height: 1.46;
+          font-style: italic;
+        }
+
+        .tracker-root .tracker-poi-actions {
+          margin-top: 10px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .tracker-root .tracker-poi-action-btn {
+          margin: 0;
+          height: 42px;
+          border: none;
+          border-radius: 10px;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+
+        .tracker-root .tracker-poi-audio-btn {
+          background: linear-gradient(135deg, #3b7fe6 0%, #4f8ff0 100%);
+        }
+
+        .tracker-root .tracker-poi-direction-btn {
+          background: linear-gradient(135deg, #2f9d50 0%, #38b559 100%);
+        }
+
         @media (max-width: 900px) {
           .tracker-root .tracker-header {
             grid-template-columns: 1fr auto;
@@ -1967,26 +2128,20 @@ function LocationTracker() {
                 click: () => handleRestaurantClick(restaurant)
               }}
             >
-              <Popup maxWidth={350}>
-                  <div style={{ padding: '5px', maxHeight: '500px', overflowY: 'auto' }}>
-                    <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>{popupRestaurant.name}</h3>
+              <Popup maxWidth={360} className="tracker-poi-popup-shell">
+                  <div className="tracker-poi-popup">
+                    <h3 className="tracker-poi-title">{popupRestaurant.name}</h3>
                     
                     {/* Hiển thị ảnh chính */}
                     {popupRestaurant.images && popupRestaurant.images.length > 0 && (
-                      <div style={{ marginBottom: '10px' }}>
+                      <div className="tracker-poi-media">
                         {(() => {
                           const primaryImage = popupRestaurant.images.find(img => img.is_primary) || popupRestaurant.images[0]
                           return (
                             <img 
                               src={primaryImage.image_url} 
                               alt={primaryImage.caption || popupRestaurant.name}
-                              style={{ 
-                                width: '100%', 
-                                height: '150px', 
-                                objectFit: 'cover', 
-                                borderRadius: '8px',
-                                marginBottom: '8px'
-                              }}
+                              className="tracker-poi-main-image"
                               onError={(e) => {
                                 e.target.style.display = 'none'
                               }}
@@ -1994,19 +2149,13 @@ function LocationTracker() {
                           )
                         })()}
                         {popupRestaurant.images.length > 1 && (
-                          <div style={{ display: 'flex', gap: '5px', overflowX: 'auto' }}>
+                          <div className="tracker-poi-thumb-strip">
                             {popupRestaurant.images.slice(0, 4).map((img, idx) => (
                               <img 
                                 key={idx}
                                 src={img.image_url} 
                                 alt={img.caption || `Image ${idx+1}`}
-                                style={{ 
-                                  width: '60px', 
-                                  height: '60px', 
-                                  objectFit: 'cover', 
-                                  borderRadius: '5px',
-                                  cursor: 'pointer'
-                                }}
+                                className="tracker-poi-thumb"
                                 onError={(e) => {
                                   e.target.style.display = 'none'
                                 }}
@@ -2019,21 +2168,12 @@ function LocationTracker() {
                     
                     {/* Hiển thị tags */}
                     {popupRestaurant.tags && popupRestaurant.tags.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                      <div className="tracker-poi-tags">
                         {popupRestaurant.tags.map(tag => (
                           <span
                             key={tag.id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '4px 8px',
-                              backgroundColor: tag.color || '#3498db',
-                              color: '#fff',
-                              borderRadius: '12px',
-                              fontSize: '11px',
-                              fontWeight: '500'
-                            }}
+                            className="tracker-poi-tag"
+                            style={{ backgroundColor: tag.color || '#3498db' }}
                           >
                             {tag.icon && <span>{tag.icon}</span>}
                             <span>{tag.name}</span>
@@ -2043,65 +2183,45 @@ function LocationTracker() {
                     )}
                     
                     {popupRestaurant.description && (
-                      <p style={{ margin: '5px 0', fontSize: '13px', color: '#333' }}>{popupRestaurant.description}</p>
+                      <p className="tracker-poi-description">{popupRestaurant.description}</p>
                     )}
                     {selectedRestaurant?.id === restaurant.id && (
                       <>
                         {selectedRestaurant.loading ? (
-                          <div style={{ margin: '10px 0', textAlign: 'center', padding: '15px' }}>
-                            <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
-                            <p style={{ fontSize: '13px', color: '#666' }}>{t('loadingRestaurantInfo')}</p>
+                          <div className="tracker-poi-loading">
+                            <span className="tracker-poi-loading-icon">⏳</span>
+                            <p>{t('loadingRestaurantInfo')}</p>
                           </div>
                         ) : selectedRestaurant.error ? (
-                          <div style={{ margin: '10px 0', padding: '10px', background: '#ffebee', borderRadius: '5px' }}>
-                            <p style={{ fontSize: '13px', color: '#c62828', margin: 0 }}>
+                          <div className="tracker-poi-error">
+                            <p style={{ margin: 0 }}>
                               ⚠️ {t('loadRestaurantInfoFailed')}
                             </p>
                           </div>
                         ) : (
                           <>
                             {selectedRestaurant.distance !== undefined && (
-                              <p style={{ margin: '5px 0', fontSize: '12px', color: '#666' }}>
+                              <p className="tracker-poi-distance">
                                 📍 {t('yourDistance')}: {selectedRestaurant.distance.toFixed(3)} {t('km')}
                               </p>
                             )}
                             {selectedRestaurant.narration && (
-                              <p style={{ margin: '10px 0', fontSize: '13px', fontStyle: 'italic' }}>
+                              <p className="tracker-poi-narration">
                                 {selectedRestaurant.narration}
                               </p>
                             )}
-                            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <div className="tracker-poi-actions">
                               {selectedRestaurant.audioUrl && (
                                 <button 
                                   onClick={() => handleToggleAudio(selectedRestaurant.audioUrl)}
-                                  style={{
-                                    padding: '8px 12px',
-                                    background: '#4285F4',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '5px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    flex: '1',
-                                    minWidth: '100px'
-                                  }}
+                                  className="tracker-poi-action-btn tracker-poi-audio-btn"
                                 >
                                   {isAudioPlaying ? '🔇' : '🔊'}
                                 </button>
                               )}
                               <button
                                 onClick={() => openDirections(selectedRestaurant)}
-                                style={{
-                                  padding: '8px 12px',
-                                  background: '#34A853',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '5px',
-                                  cursor: 'pointer',
-                                  fontSize: '14px',
-                                  flex: '1',
-                                  minWidth: '100px'
-                                }}
+                                className="tracker-poi-action-btn tracker-poi-direction-btn"
                               >
                                 🧭 {t('directionButton')}
                               </button>
