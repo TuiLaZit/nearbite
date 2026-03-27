@@ -73,6 +73,21 @@ const MODE_LABEL_BY_KEY = {
   weakBattery: 'May yeu + tiet kiem pin'
 }
 
+const LANGUAGE_FLAG_BY_CODE = {
+  vi: '🇻🇳',
+  en: '🇺🇸',
+  fr: '🇫🇷',
+  de: '🇩🇪',
+  es: '🇪🇸',
+  it: '🇮🇹',
+  pt: '🇵🇹',
+  ru: '🇷🇺',
+  ja: '🇯🇵',
+  ko: '🇰🇷',
+  zh: '🇨🇳',
+  th: '🇹🇭'
+}
+
 const isRunningAsPwa = () => {
   if (typeof window === 'undefined') return false
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator?.standalone === true
@@ -1569,9 +1584,13 @@ function LocationTracker() {
           value={language} 
           onChange={handleLanguageChange}
         >
-          {languages.map(lang => (
-            <option key={lang.code} value={lang.code}>{lang.label}</option>
-          ))}
+          {languages.map(lang => {
+            const langCode = String(lang.code || '').toLowerCase()
+            const flag = LANGUAGE_FLAG_BY_CODE[langCode] || '🌐'
+            return (
+              <option key={lang.code} value={lang.code}>{`${flag} ${lang.label}`}</option>
+            )
+          })}
         </select>
 
         <div className="tracker-actions">
