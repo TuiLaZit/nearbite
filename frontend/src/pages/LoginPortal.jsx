@@ -4,6 +4,7 @@ import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
 import { setAuthUserIdFromPayload } from '../utils/authUser'
+import LanguageFlagDropdown from '../components/LanguageFlagDropdown'
 
 function LoginPortal() {
   const navigate = useNavigate()
@@ -190,15 +191,13 @@ function LoginPortal() {
             <button onClick={() => navigate('/')} style={{ ...styles.backButton, ...(isMobile ? styles.backButtonMobile : {}) }}>
               ← {t('back')}
             </button>
-            <select
+            <LanguageFlagDropdown
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              style={{ ...styles.languageSelect, ...(isMobile ? styles.languageSelectMobile : {}) }}
-            >
-              {languages.map((lang) => (
-                <option key={lang.code} value={lang.code}>{lang.label}</option>
-              ))}
-            </select>
+              onChange={setLanguage}
+              languages={languages}
+              containerStyle={{ minWidth: isMobile ? '100%' : '110px', width: isMobile ? '100%' : 'auto' }}
+              triggerStyle={{ ...styles.languageSelect, ...(isMobile ? styles.languageSelectMobile : {}) }}
+            />
           </div>
 
           <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>NearBite Login</h1>
