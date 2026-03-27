@@ -3,6 +3,7 @@ import { BASE_URL } from '../config'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
+import LanguageFlagDropdown from '../components/LanguageFlagDropdown'
 
 function TourPlanner() {
   const navigate = useNavigate()
@@ -203,6 +204,10 @@ function TourPlanner() {
             display: block;
           }
 
+          .tour-planner-language .nb-language-trigger {
+            width: 100% !important;
+          }
+
           .tour-planner-title {
             grid-area: title;
             flex: none !important;
@@ -246,7 +251,7 @@ function TourPlanner() {
             font-size: 18px !important;
           }
 
-          .tour-planner-language {
+          .tour-planner-language .nb-language-trigger {
             font-size: 12px !important;
             padding: 10px 11px !important;
           }
@@ -263,11 +268,13 @@ function TourPlanner() {
             🍜
           </button>
           <h1 className="tour-planner-title" style={plannerStyles.title}>🗺️ {t('tourPlanning')}</h1>
-          <select className="tour-planner-language" value={language} onChange={(e) => setLanguage(e.target.value)} style={plannerStyles.languageSelect}>
-            {languages.map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.label}</option>
-            ))}
-          </select>
+          <LanguageFlagDropdown
+            className="tour-planner-language"
+            value={language}
+            onChange={setLanguage}
+            languages={languages}
+            triggerStyle={plannerStyles.languageSelect}
+          />
         </header>
 
         <main style={plannerStyles.content}>

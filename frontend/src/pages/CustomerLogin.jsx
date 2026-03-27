@@ -4,6 +4,7 @@ import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
 import { setAuthUserIdFromPayload } from '../utils/authUser'
+import LanguageFlagDropdown from '../components/LanguageFlagDropdown'
 
 function CustomerLogin() {
   const navigate = useNavigate()
@@ -82,23 +83,20 @@ function CustomerLogin() {
   return (
     <div className="container" style={{ maxWidth: '460px', paddingTop: '48px', color: '#000' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-        <select
+        <LanguageFlagDropdown
           value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{
-            padding: '10px 12px',
+          onChange={setLanguage}
+          languages={languages}
+          containerStyle={{ minWidth: '110px' }}
+          triggerStyle={{
+            minWidth: '110px',
+            padding: '0 12px',
             borderRadius: '8px',
             border: '2px solid #ddd',
-            fontSize: '13px',
-            cursor: 'pointer',
-            background: 'white',
-            minWidth: '110px'
+            background: '#ffffff',
+            fontSize: '13px'
           }}
-        >
-          {languages.map((lang) => (
-            <option key={lang.code} value={lang.code}>{lang.label}</option>
-          ))}
-        </select>
+        />
       </div>
 
       <button onClick={() => navigate('/')} style={{ marginBottom: '16px', color: '#000' }}>

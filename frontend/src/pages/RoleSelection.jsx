@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BASE_URL } from '../config'
 import { useTranslation } from '../hooks/useTranslation'
 import { useAppLanguage } from '../hooks/useAppLanguage'
+import LanguageFlagDropdown from '../components/LanguageFlagDropdown'
 
 function RoleSelection() {
   const navigate = useNavigate()
@@ -35,15 +36,13 @@ function RoleSelection() {
       <div style={styles.gradient} />
       <div style={styles.panel}>
         <div style={styles.topBar}>
-          <select
+          <LanguageFlagDropdown
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            style={styles.languageSelect}
-          >
-            {languages.map((lang) => (
-              <option key={lang.code} value={lang.code}>{lang.label}</option>
-            ))}
-          </select>
+            onChange={setLanguage}
+            languages={languages}
+            containerStyle={{ minWidth: '110px' }}
+            triggerStyle={styles.languageSelect}
+          />
         </div>
 
         <h1 style={styles.title}>{t('portalTitle')}</h1>
