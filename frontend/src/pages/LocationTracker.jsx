@@ -1687,7 +1687,7 @@ function LocationTracker() {
           font-size: 24px;
           line-height: 1.3;
           font-weight: 800;
-          font-family: 'Cormorant Garamond', 'Times New Roman', serif;
+          font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
           color: #1b2f49;
           letter-spacing: -0.01em;
         }
@@ -2260,9 +2260,7 @@ function LocationTracker() {
             borderRadius: '12px',
             fontSize: '16px',
             fontWeight: '800',
-            fontFamily: isTracking
-              ? "'Plus Jakarta Sans', 'Segoe UI', sans-serif"
-              : "'Cormorant Garamond', 'Times New Roman', serif",
+            fontFamily: "'Plus Jakarta Sans', 'Segoe UI', sans-serif",
             cursor: 'pointer',
             marginBottom: '12px',
             boxShadow: '0 10px 20px rgba(19, 46, 78, 0.22)'
