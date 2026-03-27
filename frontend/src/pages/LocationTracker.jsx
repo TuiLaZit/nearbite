@@ -76,21 +76,35 @@ const MODE_LABEL_BY_KEY = {
 const LANGUAGE_COUNTRY_BY_CODE = {
   vi: 'vn',
   en: 'us',
+  'en-us': 'us',
+  'en-gb': 'gb',
   fr: 'fr',
   de: 'de',
   es: 'es',
   it: 'it',
   pt: 'pt',
+  'pt-br': 'br',
   ru: 'ru',
   ja: 'jp',
   ko: 'kr',
+  'ko-kr': 'kr',
   zh: 'cn',
+  'zh-cn': 'cn',
+  'zh-tw': 'tw',
   th: 'th'
 }
 
-const getLanguageFlagUrl = (langCode) => {
-  const normalized = String(langCode || '').toLowerCase()
-  const countryCode = LANGUAGE_COUNTRY_BY_CODE[normalized]
+const getLanguageFlagUrl = (langCode, countryCodeOverride = null) => {
+  const normalized = String(langCode || '').trim().toLowerCase().replace('_', '-')
+  const override = String(countryCodeOverride || '').trim().toLowerCase()
+  const [baseCode, regionCode] = normalized.split('-')
+
+  const countryCode =
+    LANGUAGE_COUNTRY_BY_CODE[normalized] ||
+    LANGUAGE_COUNTRY_BY_CODE[baseCode] ||
+    (override && /^[a-z]{2}$/.test(override) ? override : null) ||
+    (regionCode && /^[a-z]{2}$/.test(regionCode) ? regionCode : null)
+
   if (!countryCode) return null
   return `https://flagcdn.com/w40/${countryCode}.png`
 }
@@ -1506,21 +1520,10 @@ function LocationTracker() {
           white-space: nowrap;
         }
 
-        .tracker-root .tracker-language-select {
-          margin: 0;
-          height: 40px;
-          min-width: 156px;
-          max-width: 180px;
-          padding: 0 12px;
-          border-radius: 10px;
-          border: 1px solid rgba(181, 209, 235, 0.72);
-          font-size: 13px;
-          cursor: pointer;
-          background: #f8fcff;
-        }
-
         .tracker-root .tracker-language-dropdown {
           position: relative;
+          min-width: 156px;
+          max-width: 180px;
         }
 
         .tracker-root .tracker-language-btn {
@@ -1709,7 +1712,7 @@ function LocationTracker() {
         <div />
 
         {/* Language selector */}
-        <div ref={languageMenuRef} className="tracker-language-dropdown tracker-language-select">
+        <div ref={languageMenuRef} className="tracker-language-dropdown">
           <button
             type="button"
             className="tracker-language-btn"
@@ -1718,10 +1721,10 @@ function LocationTracker() {
             aria-expanded={isLanguageMenuOpen}
           >
             <span className="tracker-language-current">
-              {selectedLanguageOption && getLanguageFlagUrl(selectedLanguageOption.code) ? (
+              {selectedLanguageOption && getLanguageFlagUrl(selectedLanguageOption.code, selectedLanguageOption.country_code) ? (
                 <img
                   className="tracker-flag-icon"
-                  src={getLanguageFlagUrl(selectedLanguageOption.code)}
+                  src={getLanguageFlagUrl(selectedLanguageOption.code, selectedLanguageOption.country_code)}
                   alt=""
                   loading="lazy"
                 />
@@ -1736,7 +1739,7 @@ function LocationTracker() {
           {isLanguageMenuOpen && (
             <div className="tracker-language-menu" role="listbox" aria-label="Language selection">
               {languages.map((lang) => {
-                const flagUrl = getLanguageFlagUrl(lang.code)
+                const flagUrl = getLanguageFlagUrl(lang.code, lang.country_code)
                 const isActive = lang.code === language
 
                 return (
