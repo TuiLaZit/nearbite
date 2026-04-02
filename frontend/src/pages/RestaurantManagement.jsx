@@ -12,7 +12,8 @@ L.Icon.Default.mergeOptions({
 })
 
 const DEFAULT_LOCATION = [10.7769, 106.7009]
-const GEOCODE_RESULTS_LIMIT = 5
+const GEOCODE_RESULTS_LIMIT = 3
+const GEOCODE_DEBOUNCE_MS = 350
 
 function MapViewSync({ center }) {
   const map = useMap()
@@ -211,6 +212,47 @@ function RestaurantManagement({
     })
   }
 
+  useEffect(() => {
+    if (!showModal) {
+      return undefined
+    }
+
+    const trimmedQuery = addressQuery.trim()
+
+    if (trimmedQuery.length < 3) {
+      setGeocodeResults([])
+      setGeocodeError('')
+      setGeocoding(false)
+      return undefined
+    }
+
+    setGeocoding(true)
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`${BASE_URL}/admin/geocode?q=${encodeURIComponent(trimmedQuery)}`, {
+          credentials: 'include'
+        })
+
+        if (!response.ok) {
+          throw new Error('Không thể tìm địa chỉ')
+        }
+
+        const data = await response.json()
+        const results = Array.isArray(data.results) ? data.results : []
+        setGeocodeResults(results.slice(0, GEOCODE_RESULTS_LIMIT))
+        setGeocodeError(results.length === 0 ? 'Không tìm thấy kết quả phù hợp' : '')
+      } catch (error) {
+        console.error('Error geocoding address suggestions:', error)
+        setGeocodeResults([])
+        setGeocodeError(error.message || 'Không thể tìm địa chỉ')
+      } finally {
+        setGeocoding(false)
+      }
+    }, GEOCODE_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [addressQuery, showModal])
+
   const updateLocation = (lat, lng) => {
     const nextLat = Number(lat)
     const nextLng = Number(lng)
@@ -227,50 +269,8 @@ function RestaurantManagement({
   }
 
   const handleGeocodeAddress = async () => {
-    const trimmedQuery = addressQuery.trim()
-
-    if (!trimmedQuery) {
-      setGeocodeError('Vui lòng nhập địa chỉ để tìm vị trí')
-      setGeocodeResults([])
-      return
-    }
-
-    setGeocoding(true)
-    setGeocodeError('')
-
-    try {
-      const response = await fetch(`${BASE_URL}/admin/geocode?q=${encodeURIComponent(trimmedQuery)}`, {
-        credentials: 'include'
-      })
-
-      if (!response.ok) {
-        let backendMessage = 'Không thể tìm địa chỉ'
-        try {
-          const errorBody = await response.json()
-          backendMessage = errorBody.error || backendMessage
-        } catch {
-          // Keep the generic fallback when the backend does not return JSON.
-        }
-        throw new Error(backendMessage)
-      }
-
-      const data = await response.json()
-      const results = Array.isArray(data.results) ? data.results : []
-
-      if (results.length === 0) {
-        setGeocodeResults([])
-        setGeocodeError('Không tìm thấy kết quả phù hợp')
-        return
-      }
-
-      setGeocodeResults(results.slice(0, GEOCODE_RESULTS_LIMIT))
-      updateLocation(results[0].lat, results[0].lng)
-    } catch (error) {
-      console.error('Error geocoding address:', error)
-      setGeocodeResults([])
-      setGeocodeError(error.message || 'Không thể tìm địa chỉ')
-    } finally {
-      setGeocoding(false)
+    if (geocodeResults.length > 0) {
+      handlePickGeocodeResult(geocodeResults[0])
     }
   }
 
@@ -874,38 +874,48 @@ function RestaurantManagement({
               <div style={styles.formGroup}>
                 <label style={styles.label}>Địa chỉ:</label>
                 <div style={styles.addressSearchRow}>
-                  <input
-                    value={addressQuery}
-                    onChange={(e) => setAddressQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleGeocodeAddress()
-                      }
-                    }}
-                    placeholder="Nhập tên đường, quận, địa điểm..."
-                    style={{ ...styles.input, ...styles.addressInput }}
-                  />
-                  <button type="button" style={styles.btnGeocode} onClick={handleGeocodeAddress} disabled={geocoding}>
-                    {geocoding ? 'Đang tìm...' : 'Tìm vị trí'}
-                  </button>
+                  <div style={styles.addressInputWrap}>
+                    <input
+                      value={addressQuery}
+                      onChange={(e) => setAddressQuery(e.target.value)}
+                      onFocus={() => {
+                        if (addressQuery.trim().length >= 3 && geocodeResults.length === 0) {
+                          handleGeocodeAddress()
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (geocodeResults.length > 0) {
+                            handlePickGeocodeResult(geocodeResults[0])
+                          } else {
+                            handleGeocodeAddress()
+                          }
+                        }
+                      }}
+                      placeholder="Nhập tên đường, quận, địa điểm..."
+                      style={{ ...styles.input, ...styles.addressInput }}
+                      autoComplete="off"
+                    />
+                    {showModal && geocoding && <div style={styles.searchingHint}>Đang gợi ý vị trí...</div>}
+                    {geocodeResults.length > 0 && (
+                      <div style={styles.suggestionDropdown}>
+                        {geocodeResults.map((result, index) => (
+                          <button
+                            key={`${result.lat}-${result.lng}-${index}`}
+                            type="button"
+                            style={styles.suggestionItem}
+                            onClick={() => handlePickGeocodeResult(result)}
+                          >
+                            <div style={styles.suggestionTitle}>Gợi ý {index + 1}</div>
+                            <div style={styles.suggestionText}>{result.display_name}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {geocodeError && <div style={styles.geocodeError}>{geocodeError}</div>}
-                {geocodeResults.length > 0 && (
-                  <div style={styles.geocodeResults}>
-                    {geocodeResults.map((result, index) => (
-                      <button
-                        key={`${result.lat}-${result.lng}-${index}`}
-                        type="button"
-                        style={styles.geocodeResultItem}
-                        onClick={() => handlePickGeocodeResult(result)}
-                      >
-                        <div style={styles.geocodeResultTitle}>Kết quả {index + 1}</div>
-                        <div style={styles.geocodeResultText}>{result.display_name}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
               <div style={styles.formGroup}>
                 <label style={styles.label}>Chọn vị trí trên bản đồ:</label>
@@ -921,8 +931,8 @@ function RestaurantManagement({
                     <MapViewSync center={mapPosition} />
                     <MapClickHandler onSelect={updateLocation} />
                     <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                      url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
                     />
                     <Marker
                       position={mapPosition}
@@ -1485,49 +1495,58 @@ const styles = {
     alignItems: 'stretch',
     flexWrap: 'wrap'
   },
-  addressInput: {
-    flex: '1 1 320px',
-    margin: 0
+  addressInputWrap: {
+    position: 'relative',
+    flex: '1 1 320px'
   },
-  btnGeocode: {
-    padding: '10px 16px',
-    border: 'none',
-    borderRadius: '6px',
-    backgroundColor: '#155f6e',
-    color: 'white',
-    fontWeight: '700',
-    cursor: 'pointer',
-    minWidth: '132px'
+  addressInput: {
+    margin: 0
   },
   geocodeError: {
     marginTop: '8px',
     color: '#b42318',
     fontSize: '13px'
   },
-  geocodeResults: {
-    display: 'grid',
-    gap: '8px',
-    marginTop: '10px'
+  searchingHint: {
+    marginTop: '8px',
+    fontSize: '12px',
+    color: '#64748b'
   },
-  geocodeResultItem: {
+  suggestionDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: 0,
+    right: 0,
+    zIndex: 40,
+    display: 'grid',
+    gap: '6px',
+    maxHeight: '280px',
+    overflowY: 'auto',
+    padding: '10px',
+    border: '1px solid #cfdcf0',
+    borderRadius: '14px',
+    background: 'rgba(255,255,255,0.98)',
+    boxShadow: '0 18px 34px rgba(15, 23, 42, 0.12)'
+  },
+  suggestionItem: {
     textAlign: 'left',
     border: '1px solid #d7e2f0',
     background: '#f8fbff',
     color: '#1b2a41',
-    borderRadius: '10px',
-    padding: '12px 14px'
+    borderRadius: '12px',
+    padding: '10px 12px'
   },
-  geocodeResultTitle: {
-    fontSize: '12px',
+  suggestionTitle: {
+    fontSize: '11px',
     fontWeight: '800',
     color: '#155f6e',
-    marginBottom: '4px',
+    marginBottom: '3px',
     textTransform: 'uppercase',
     letterSpacing: '0.04em'
   },
-  geocodeResultText: {
+  suggestionText: {
     fontSize: '13px',
-    lineHeight: '1.45',
+    lineHeight: '1.4',
     color: '#334155'
   },
   formRow: {
