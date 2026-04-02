@@ -1,6 +1,40 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import L from 'leaflet'
 import { BASE_URL } from '../config'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
+})
+
+const DEFAULT_LOCATION = [10.7769, 106.7009]
+const GEOCODE_RESULTS_LIMIT = 5
+
+function MapViewSync({ center }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (Array.isArray(center) && center.length === 2) {
+      map.setView(center, Math.max(map.getZoom(), 15), { animate: true })
+    }
+  }, [center, map])
+
+  return null
+}
+
+function MapClickHandler({ onSelect }) {
+  useMapEvents({
+    click: (event) => {
+      onSelect(event.latlng.lat, event.latlng.lng)
+    }
+  })
+
+  return null
+}
 
 function RestaurantManagement({
   isHidden = false,
@@ -22,6 +56,10 @@ function RestaurantManagement({
   const [savingTags, setSavingTags] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [addressQuery, setAddressQuery] = useState('')
+  const [geocodeResults, setGeocodeResults] = useState([])
+  const [geocoding, setGeocoding] = useState(false)
+  const [geocodeError, setGeocodeError] = useState('')
   const [pagination, setPagination] = useState({
     page: 1,
     perPage: 50,
@@ -153,6 +191,84 @@ function RestaurantManagement({
     })
   }
 
+  const updateLocation = (lat, lng) => {
+    const nextLat = Number(lat)
+    const nextLng = Number(lng)
+
+    if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) {
+      return
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      lat: nextLat.toFixed(6),
+      lng: nextLng.toFixed(6)
+    }))
+  }
+
+  const handleGeocodeAddress = async () => {
+    const trimmedQuery = addressQuery.trim()
+
+    if (!trimmedQuery) {
+      setGeocodeError('Vui lòng nhập địa chỉ để tìm vị trí')
+      setGeocodeResults([])
+      return
+    }
+
+    setGeocoding(true)
+    setGeocodeError('')
+
+    try {
+      const response = await fetch(`${BASE_URL}/admin/geocode?q=${encodeURIComponent(trimmedQuery)}`, {
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        let backendMessage = 'Không thể tìm địa chỉ'
+        try {
+          const errorBody = await response.json()
+          backendMessage = errorBody.error || backendMessage
+        } catch {
+          // Keep the generic fallback when the backend does not return JSON.
+        }
+        throw new Error(backendMessage)
+      }
+
+      const data = await response.json()
+      const results = Array.isArray(data.results) ? data.results : []
+
+      if (results.length === 0) {
+        setGeocodeResults([])
+        setGeocodeError('Không tìm thấy kết quả phù hợp')
+        return
+      }
+
+      setGeocodeResults(results.slice(0, GEOCODE_RESULTS_LIMIT))
+      updateLocation(results[0].lat, results[0].lng)
+    } catch (error) {
+      console.error('Error geocoding address:', error)
+      setGeocodeResults([])
+      setGeocodeError(error.message || 'Không thể tìm địa chỉ')
+    } finally {
+      setGeocoding(false)
+    }
+  }
+
+  const handlePickGeocodeResult = (result) => {
+    if (!result) return
+
+    setAddressQuery(result.display_name || addressQuery)
+    updateLocation(result.lat, result.lng)
+    setGeocodeResults([])
+    setGeocodeError('')
+  }
+
+  const handleMarkerDragEnd = (event) => {
+    const marker = event.target
+    const { lat, lng } = marker.getLatLng()
+    updateLocation(lat, lng)
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
 
@@ -187,6 +303,9 @@ function RestaurantManagement({
           poi_radius_km: '0.015',
           description: ''
         })
+        setAddressQuery('')
+        setGeocodeResults([])
+        setGeocodeError('')
         loadRestaurants()
       })
       .catch(err => console.error('Error saving restaurant:', err))
@@ -202,6 +321,9 @@ function RestaurantManagement({
       poi_radius_km: '0.015',
       description: ''
     })
+    setAddressQuery('')
+    setGeocodeResults([])
+    setGeocodeError('')
     setShowModal(true)
   }
 
@@ -215,6 +337,9 @@ function RestaurantManagement({
       poi_radius_km: (restaurant.poi_radius_km || 0.015).toString(),
       description: restaurant.description || ''
     })
+    setAddressQuery('')
+    setGeocodeResults([])
+    setGeocodeError('')
     setShowModal(true)
   }
 
@@ -726,30 +851,53 @@ function RestaurantManagement({
                   required
                 />
               </div>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Latitude:</label>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Địa chỉ:</label>
+                <div style={styles.addressSearchRow}>
                   <input
-                    name="lat"
-                    type="number"
-                    step="any"
-                    value={formData.lat}
-                    onChange={handleFormChange}
-                    style={styles.input}
-                    required
+                    value={addressQuery}
+                    onChange={(e) => setAddressQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleGeocodeAddress()
+                      }
+                    }}
+                    placeholder="Nhập tên đường, quận, địa điểm..."
+                    style={{ ...styles.input, ...styles.addressInput }}
                   />
+                  <button type="button" style={styles.btnGeocode} onClick={handleGeocodeAddress} disabled={geocoding}>
+                    {geocoding ? 'Đang tìm...' : 'Tìm vị trí'}
+                  </button>
                 </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Longitude:</label>
-                  <input
-                    name="lng"
-                    type="number"
-                    step="any"
-                    value={formData.lng}
-                    onChange={handleFormChange}
-                    style={styles.input}
-                    required
-                  />
+                {geocodeError && <div style={styles.geocodeError}>{geocodeError}</div>}
+                {geocodeResults.length > 0 && (
+                  <div style={styles.geocodeResults}>
+                    {geocodeResults.map((result, index) => (
+                      <button
+                        key={`${result.lat}-${result.lng}-${index}`}
+                        type="button"
+                        style={styles.geocodeResultItem}
+                        onClick={() => handlePickGeocodeResult(result)}
+                      >
+                        <div style={styles.geocodeResultTitle}>Kết quả {index + 1}</div>
+                        <div style={styles.geocodeResultText}>{result.display_name}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Tọa độ đã chọn:</label>
+                <div style={styles.coordinateSummary}>
+                  <div>
+                    <div style={styles.coordinateLabel}>Latitude</div>
+                    <div style={styles.coordinateValue}>{formData.lat || 'Chưa chọn'}</div>
+                  </div>
+                  <div>
+                    <div style={styles.coordinateLabel}>Longitude</div>
+                    <div style={styles.coordinateValue}>{formData.lng || 'Chưa chọn'}</div>
+                  </div>
                 </div>
               </div>
               <div style={styles.formRow}>
@@ -788,6 +936,42 @@ function RestaurantManagement({
                   style={styles.textarea}
                   rows="4"
                 />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Chọn vị trí trên bản đồ:</label>
+                <div style={styles.mapWrap}>
+                  <MapContainer
+                    center={[
+                      Number.parseFloat(formData.lat) || DEFAULT_LOCATION[0],
+                      Number.parseFloat(formData.lng) || DEFAULT_LOCATION[1]
+                    ]}
+                    zoom={16}
+                    scrollWheelZoom={true}
+                    style={styles.mapContainer}
+                  >
+                    <MapViewSync
+                      center={[
+                        Number.parseFloat(formData.lat) || DEFAULT_LOCATION[0],
+                        Number.parseFloat(formData.lng) || DEFAULT_LOCATION[1]
+                      ]}
+                    />
+                    <MapClickHandler onSelect={updateLocation} />
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                    />
+                    {formData.lat && formData.lng && (
+                      <Marker
+                        position={[Number(formData.lat), Number(formData.lng)]}
+                        draggable={true}
+                        eventHandlers={{ dragend: handleMarkerDragEnd }}
+                      />
+                    )}
+                  </MapContainer>
+                </div>
+                <div style={styles.mapHint}>
+                  Kéo thả pin hoặc click trực tiếp lên bản đồ để cập nhật latitude và longitude.
+                </div>
               </div>
               <div style={styles.modalActions}>
                 <button type="button" style={styles.btnCancel} onClick={() => setShowModal(false)}>
@@ -1283,9 +1467,82 @@ const styles = {
     marginBottom: '20px',
     flex: 1
   },
+  addressSearchRow: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'stretch',
+    flexWrap: 'wrap'
+  },
+  addressInput: {
+    flex: '1 1 320px',
+    margin: 0
+  },
+  btnGeocode: {
+    padding: '10px 16px',
+    border: 'none',
+    borderRadius: '6px',
+    backgroundColor: '#155f6e',
+    color: 'white',
+    fontWeight: '700',
+    cursor: 'pointer',
+    minWidth: '132px'
+  },
+  geocodeError: {
+    marginTop: '8px',
+    color: '#b42318',
+    fontSize: '13px'
+  },
+  geocodeResults: {
+    display: 'grid',
+    gap: '8px',
+    marginTop: '10px'
+  },
+  geocodeResultItem: {
+    textAlign: 'left',
+    border: '1px solid #d7e2f0',
+    background: '#f8fbff',
+    color: '#1b2a41',
+    borderRadius: '10px',
+    padding: '12px 14px'
+  },
+  geocodeResultTitle: {
+    fontSize: '12px',
+    fontWeight: '800',
+    color: '#155f6e',
+    marginBottom: '4px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em'
+  },
+  geocodeResultText: {
+    fontSize: '13px',
+    lineHeight: '1.45',
+    color: '#334155'
+  },
   formRow: {
     display: 'flex',
     gap: '16px'
+  },
+  coordinateSummary: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '12px',
+    padding: '14px',
+    border: '1px solid #d7e2f0',
+    borderRadius: '10px',
+    backgroundColor: '#f8fbff'
+  },
+  coordinateLabel: {
+    fontSize: '12px',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: '#64748b',
+    marginBottom: '4px'
+  },
+  coordinateValue: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#0f172a'
   },
   label: {
     display: 'block',
@@ -1308,6 +1565,21 @@ const styles = {
     borderRadius: '6px',
     fontSize: '14px',
     resize: 'vertical'
+  },
+  mapWrap: {
+    border: '1px solid rgba(143, 167, 202, 0.5)',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), 0 10px 20px rgba(16, 36, 64, 0.08)'
+  },
+  mapContainer: {
+    height: '320px',
+    width: '100%'
+  },
+  mapHint: {
+    marginTop: '8px',
+    fontSize: '12px',
+    color: '#61738c'
   },
   modalActions: {
     display: 'flex',

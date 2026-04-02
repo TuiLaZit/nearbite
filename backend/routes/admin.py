@@ -8,6 +8,7 @@ from translate import invalidate_translation_cache, cleanup_expired_translation_
 from tts import invalidate_tts_cache, cleanup_expired_tts_cache, TTS_BUCKET
 from cache_warmup import schedule_restaurant_rewarm
 import os
+import json
 import uuid
 import re
 import secrets
@@ -17,6 +18,8 @@ import time
 from datetime import datetime
 from sqlalchemy import func, text
 from werkzeug.security import generate_password_hash
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 def register_admin_routes(app):
     online_window_seconds = int((os.getenv("HEARTBEAT_ONLINE_WINDOW_SECONDS") or "45").strip() or "45")
@@ -197,6 +200,62 @@ def register_admin_routes(app):
             "status": "success",
             "restaurant": restaurant.to_dict(include_admin_fields=True)
         })
+
+    @app.route("/admin/geocode", methods=["GET"])
+    @admin_required
+    def geocode_address():
+        admin_only_error = require_admin_only()
+        if admin_only_error:
+            return admin_only_error
+
+        query = (request.args.get("q") or "").strip()
+        if not query:
+            return jsonify({"error": "Thiếu địa chỉ cần tìm"}), 400
+
+        request_url = "https://nominatim.openstreetmap.org/search?" + urlencode({
+            "q": query,
+            "format": "jsonv2",
+            "limit": 5,
+            "addressdetails": 1,
+            "countrycodes": "vn",
+        })
+
+        try:
+            geocode_request = Request(
+                request_url,
+                headers={
+                    "User-Agent": "nearbite-admin-geocoder/1.0",
+                    "Accept-Language": "vi,en;q=0.8",
+                },
+            )
+
+            with urlopen(geocode_request, timeout=12) as response:
+                payload = response.read().decode("utf-8")
+
+            raw_results = json.loads(payload) if payload else []
+            results = []
+            for item in raw_results[:5]:
+                try:
+                    lat = float(item.get("lat"))
+                    lng = float(item.get("lon"))
+                except (TypeError, ValueError):
+                    continue
+
+                results.append({
+                    "display_name": item.get("display_name"),
+                    "lat": lat,
+                    "lng": lng,
+                    "importance": item.get("importance"),
+                    "type": item.get("type"),
+                    "class": item.get("class"),
+                })
+
+            return jsonify({"results": results})
+        except Exception as exc:
+            return jsonify({
+                "error": "Không thể geocode địa chỉ",
+                "detail": str(exc),
+            }), 502
 
     @app.route("/admin/restaurants/<int:id>", methods=["PUT"])
     @admin_required
