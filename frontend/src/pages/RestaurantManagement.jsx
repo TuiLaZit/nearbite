@@ -36,6 +36,22 @@ function MapClickHandler({ onSelect }) {
   return null
 }
 
+function MapSizeFix({ active }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!active) return
+
+    const timer = window.setTimeout(() => {
+      map.invalidateSize()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [active, map])
+
+  return null
+}
+
 function RestaurantManagement({
   isHidden = false,
   loginPath = '/admin/login',
@@ -75,6 +91,10 @@ function RestaurantManagement({
     description: ''
   })
   const [viewportWidth, setViewportWidth] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
+  const mapPosition = [
+    Number.parseFloat(formData.lat) || DEFAULT_LOCATION[0],
+    Number.parseFloat(formData.lng) || DEFAULT_LOCATION[1]
+  ]
 
   useEffect(() => {
     // Check authentication first
@@ -888,6 +908,34 @@ function RestaurantManagement({
                 )}
               </div>
               <div style={styles.formGroup}>
+                <label style={styles.label}>Chọn vị trí trên bản đồ:</label>
+                <div style={styles.mapWrap}>
+                  <MapContainer
+                    center={mapPosition}
+                    zoom={16}
+                    scrollWheelZoom={true}
+                    style={styles.mapContainer}
+                    className="restaurant-location-map"
+                  >
+                    <MapSizeFix active={showModal} />
+                    <MapViewSync center={mapPosition} />
+                    <MapClickHandler onSelect={updateLocation} />
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                    />
+                    <Marker
+                      position={mapPosition}
+                      draggable={true}
+                      eventHandlers={{ dragend: handleMarkerDragEnd }}
+                    />
+                  </MapContainer>
+                </div>
+                <div style={styles.mapHint}>
+                  Kéo thả pin hoặc click trực tiếp lên bản đồ để cập nhật latitude và longitude.
+                </div>
+              </div>
+              <div style={styles.formGroup}>
                 <label style={styles.label}>Tọa độ đã chọn:</label>
                 <div style={styles.coordinateSummary}>
                   <div>
@@ -936,42 +984,6 @@ function RestaurantManagement({
                   style={styles.textarea}
                   rows="4"
                 />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Chọn vị trí trên bản đồ:</label>
-                <div style={styles.mapWrap}>
-                  <MapContainer
-                    center={[
-                      Number.parseFloat(formData.lat) || DEFAULT_LOCATION[0],
-                      Number.parseFloat(formData.lng) || DEFAULT_LOCATION[1]
-                    ]}
-                    zoom={16}
-                    scrollWheelZoom={true}
-                    style={styles.mapContainer}
-                  >
-                    <MapViewSync
-                      center={[
-                        Number.parseFloat(formData.lat) || DEFAULT_LOCATION[0],
-                        Number.parseFloat(formData.lng) || DEFAULT_LOCATION[1]
-                      ]}
-                    />
-                    <MapClickHandler onSelect={updateLocation} />
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                    />
-                    {formData.lat && formData.lng && (
-                      <Marker
-                        position={[Number(formData.lat), Number(formData.lng)]}
-                        draggable={true}
-                        eventHandlers={{ dragend: handleMarkerDragEnd }}
-                      />
-                    )}
-                  </MapContainer>
-                </div>
-                <div style={styles.mapHint}>
-                  Kéo thả pin hoặc click trực tiếp lên bản đồ để cập nhật latitude và longitude.
-                </div>
               </div>
               <div style={styles.modalActions}>
                 <button type="button" style={styles.btnCancel} onClick={() => setShowModal(false)}>
@@ -1570,11 +1582,14 @@ const styles = {
     border: '1px solid rgba(143, 167, 202, 0.5)',
     borderRadius: '16px',
     overflow: 'hidden',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), 0 10px 20px rgba(16, 36, 64, 0.08)'
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), 0 10px 20px rgba(16, 36, 64, 0.08)',
+    minHeight: '320px',
+    width: '100%'
   },
   mapContainer: {
     height: '320px',
-    width: '100%'
+    width: '100%',
+    minHeight: '320px'
   },
   mapHint: {
     marginTop: '8px',
