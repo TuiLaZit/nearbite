@@ -77,6 +77,7 @@ function RestaurantManagement({
   const [geocodeResults, setGeocodeResults] = useState([])
   const [geocoding, setGeocoding] = useState(false)
   const [geocodeError, setGeocodeError] = useState('')
+  const [suggestionsLocked, setSuggestionsLocked] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
     perPage: 50,
@@ -217,6 +218,11 @@ function RestaurantManagement({
       return undefined
     }
 
+    if (suggestionsLocked) {
+      setGeocoding(false)
+      return undefined
+    }
+
     const trimmedQuery = addressQuery.trim()
 
     if (trimmedQuery.length < 3) {
@@ -251,7 +257,7 @@ function RestaurantManagement({
     }, GEOCODE_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
-  }, [addressQuery, showModal])
+  }, [addressQuery, showModal, suggestionsLocked])
 
   const updateLocation = (lat, lng) => {
     const nextLat = Number(lat)
@@ -281,6 +287,7 @@ function RestaurantManagement({
     updateLocation(result.lat, result.lng)
     setGeocodeResults([])
     setGeocodeError('')
+    setSuggestionsLocked(true)
   }
 
   const handleMarkerDragEnd = (event) => {
@@ -326,6 +333,7 @@ function RestaurantManagement({
         setAddressQuery('')
         setGeocodeResults([])
         setGeocodeError('')
+        setSuggestionsLocked(false)
         loadRestaurants()
       })
       .catch(err => console.error('Error saving restaurant:', err))
@@ -344,6 +352,7 @@ function RestaurantManagement({
     setAddressQuery('')
     setGeocodeResults([])
     setGeocodeError('')
+    setSuggestionsLocked(false)
     setShowModal(true)
   }
 
@@ -360,6 +369,7 @@ function RestaurantManagement({
     setAddressQuery('')
     setGeocodeResults([])
     setGeocodeError('')
+    setSuggestionsLocked(false)
     setShowModal(true)
   }
 
@@ -877,9 +887,12 @@ function RestaurantManagement({
                   <div style={styles.addressInputWrap}>
                     <input
                       value={addressQuery}
-                      onChange={(e) => setAddressQuery(e.target.value)}
+                      onChange={(e) => {
+                        setAddressQuery(e.target.value)
+                        setSuggestionsLocked(false)
+                      }}
                       onFocus={() => {
-                        if (addressQuery.trim().length >= 3 && geocodeResults.length === 0) {
+                        if (!suggestionsLocked && addressQuery.trim().length >= 3 && geocodeResults.length === 0) {
                           handleGeocodeAddress()
                         }
                       }}
