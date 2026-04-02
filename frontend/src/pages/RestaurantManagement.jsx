@@ -1517,7 +1517,7 @@ const styles = {
     top: 'calc(100% + 8px)',
     left: 0,
     right: 0,
-    zIndex: 40,
+    zIndex: 1200,
     display: 'grid',
     gap: '6px',
     maxHeight: '280px',
