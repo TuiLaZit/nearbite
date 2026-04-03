@@ -881,83 +881,91 @@ function RestaurantManagement({
                   required
                 />
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Địa chỉ:</label>
-                <div style={styles.addressSearchRow}>
-                  <div style={styles.addressInputWrap}>
-                    <input
-                      value={addressQuery}
-                      onChange={(e) => {
-                        setAddressQuery(e.target.value)
-                        setSuggestionsLocked(false)
-                      }}
-                      onFocus={() => {
-                        if (!suggestionsLocked && addressQuery.trim().length >= 3 && geocodeResults.length === 0) {
-                          handleGeocodeAddress()
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          if (geocodeResults.length > 0) {
-                            handlePickGeocodeResult(geocodeResults[0])
-                          } else {
-                            handleGeocodeAddress()
-                          }
-                        }
-                      }}
-                      placeholder="Nhập tên đường, quận, địa điểm..."
-                      style={{ ...styles.input, ...styles.addressInput }}
-                      autoComplete="off"
-                    />
-                    {showModal && geocoding && <div style={styles.searchingHint}>Đang gợi ý vị trí...</div>}
-                    {geocodeResults.length > 0 && (
-                      <div style={styles.suggestionDropdown}>
-                        {geocodeResults.map((result, index) => (
-                          <button
-                            key={`${result.lat}-${result.lng}-${index}`}
-                            type="button"
-                            style={styles.suggestionItem}
-                            onClick={() => handlePickGeocodeResult(result)}
-                          >
-                            <div style={styles.suggestionTitle}>Gợi ý {index + 1}</div>
-                            <div style={styles.suggestionText}>{result.display_name}</div>
-                          </button>
-                        ))}
+              {!isOwnerView ? (
+                <>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Địa chỉ:</label>
+                    <div style={styles.addressSearchRow}>
+                      <div style={styles.addressInputWrap}>
+                        <input
+                          value={addressQuery}
+                          onChange={(e) => {
+                            setAddressQuery(e.target.value)
+                            setSuggestionsLocked(false)
+                          }}
+                          onFocus={() => {
+                            if (!suggestionsLocked && addressQuery.trim().length >= 3 && geocodeResults.length === 0) {
+                              handleGeocodeAddress()
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              if (geocodeResults.length > 0) {
+                                handlePickGeocodeResult(geocodeResults[0])
+                              } else {
+                                handleGeocodeAddress()
+                              }
+                            }
+                          }}
+                          placeholder="Nhập tên đường, quận, địa điểm..."
+                          style={{ ...styles.input, ...styles.addressInput }}
+                          autoComplete="off"
+                        />
+                        {showModal && geocoding && <div style={styles.searchingHint}>Đang gợi ý vị trí...</div>}
+                        {geocodeResults.length > 0 && (
+                          <div style={styles.suggestionDropdown}>
+                            {geocodeResults.map((result, index) => (
+                              <button
+                                key={`${result.lat}-${result.lng}-${index}`}
+                                type="button"
+                                style={styles.suggestionItem}
+                                onClick={() => handlePickGeocodeResult(result)}
+                              >
+                                <div style={styles.suggestionTitle}>Gợi ý {index + 1}</div>
+                                <div style={styles.suggestionText}>{result.display_name}</div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                    {geocodeError && <div style={styles.geocodeError}>{geocodeError}</div>}
                   </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Chọn vị trí trên bản đồ:</label>
+                    <div style={styles.mapWrap}>
+                      <MapContainer
+                        center={mapPosition}
+                        zoom={16}
+                        scrollWheelZoom={true}
+                        style={styles.mapContainer}
+                        className="restaurant-location-map"
+                      >
+                        <MapSizeFix active={showModal} />
+                        <MapViewSync center={mapPosition} />
+                        <MapClickHandler onSelect={updateLocation} />
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                          url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+                        />
+                        <Marker
+                          position={mapPosition}
+                          draggable={true}
+                          eventHandlers={{ dragend: handleMarkerDragEnd }}
+                        />
+                      </MapContainer>
+                    </div>
+                    <div style={styles.mapHint}>
+                      Kéo thả pin hoặc click trực tiếp lên bản đồ để cập nhật latitude và longitude.
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={styles.ownerLockNotice}>
+                  Chủ quán không được phép chỉnh sửa vị trí hoặc bán kính POI. Nếu cần thay đổi, vui lòng liên hệ admin.
                 </div>
-                {geocodeError && <div style={styles.geocodeError}>{geocodeError}</div>}
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Chọn vị trí trên bản đồ:</label>
-                <div style={styles.mapWrap}>
-                  <MapContainer
-                    center={mapPosition}
-                    zoom={16}
-                    scrollWheelZoom={true}
-                    style={styles.mapContainer}
-                    className="restaurant-location-map"
-                  >
-                    <MapSizeFix active={showModal} />
-                    <MapViewSync center={mapPosition} />
-                    <MapClickHandler onSelect={updateLocation} />
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                      url='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-                    />
-                    <Marker
-                      position={mapPosition}
-                      draggable={true}
-                      eventHandlers={{ dragend: handleMarkerDragEnd }}
-                    />
-                  </MapContainer>
-                </div>
-                <div style={styles.mapHint}>
-                  Kéo thả pin hoặc click trực tiếp lên bản đồ để cập nhật latitude và longitude.
-                </div>
-              </div>
+              )}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Tọa độ đã chọn:</label>
                 <div style={styles.coordinateSummary}>
@@ -994,8 +1002,12 @@ function RestaurantManagement({
                     value={formData.poi_radius_km}
                     onChange={handleFormChange}
                     style={styles.input}
+                    disabled={isOwnerView}
                     required
                   />
+                  {isOwnerView && (
+                    <div style={styles.fieldLockedHint}>Chỉ admin có quyền chỉnh bán kính POI.</div>
+                  )}
                 </div>
               </div>
               <div style={styles.formGroup}>
@@ -1520,6 +1532,17 @@ const styles = {
     color: '#b42318',
     fontSize: '13px'
   },
+  ownerLockNotice: {
+    marginBottom: '18px',
+    padding: '12px 14px',
+    border: '1px solid #f4c7a1',
+    borderRadius: '10px',
+    background: 'linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%)',
+    color: '#9a3412',
+    fontSize: '13px',
+    fontWeight: '600',
+    lineHeight: '1.45'
+  },
   searchingHint: {
     marginTop: '8px',
     fontSize: '12px',
@@ -1627,6 +1650,11 @@ const styles = {
     marginTop: '8px',
     fontSize: '12px',
     color: '#61738c'
+  },
+  fieldLockedHint: {
+    marginTop: '6px',
+    fontSize: '12px',
+    color: '#92400e'
   },
   modalActions: {
     display: 'flex',

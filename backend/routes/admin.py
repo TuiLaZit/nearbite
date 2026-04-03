@@ -266,17 +266,46 @@ def register_admin_routes(app):
 
         restaurant = Restaurant.query.get_or_404(id)
         data = request.get_json()
+        owner_update = is_owner_session() and session.get("owner_restaurant_id") == id
+
+        if owner_update:
+            def _to_float(value):
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    return None
+
+            requested_lat = _to_float(data.get("lat"))
+            requested_lng = _to_float(data.get("lng"))
+            requested_radius = _to_float(data.get("poi_radius_km"))
+
+            location_changed = (
+                requested_lat is not None and abs(requested_lat - float(restaurant.lat)) > 1e-9
+            ) or (
+                requested_lng is not None and abs(requested_lng - float(restaurant.lng)) > 1e-9
+            )
+
+            radius_changed = (
+                requested_radius is not None and abs(requested_radius - float(restaurant.poi_radius_km or 0.0)) > 1e-9
+            )
+
+            if location_changed or radius_changed:
+                return jsonify({
+                    "error": "Chủ quán không được phép chỉnh sửa vị trí hoặc bán kính POI. Vui lòng liên hệ admin."
+                }), 403
 
         error = validate_restaurant(data)
         if error:
             return jsonify({"error": error}), 400
 
         restaurant.name = data.get("name", restaurant.name)
-        restaurant.lat = data.get("lat", restaurant.lat)
-        restaurant.lng = data.get("lng", restaurant.lng)
+        if not owner_update:
+            restaurant.lat = data.get("lat", restaurant.lat)
+            restaurant.lng = data.get("lng", restaurant.lng)
         restaurant.description = data.get("description", restaurant.description)
         restaurant.avg_eat_time = data.get("avg_eat_time", restaurant.avg_eat_time)
-        restaurant.poi_radius_km = data.get("poi_radius_km", restaurant.poi_radius_km)
+        if not owner_update:
+            restaurant.poi_radius_km = data.get("poi_radius_km", restaurant.poi_radius_km)
 
         db.session.commit()
         invalidate_restaurant_content_cache(restaurant.id)
