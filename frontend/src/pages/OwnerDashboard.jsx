@@ -660,13 +660,19 @@ function OwnerDashboard() {
             <form onSubmit={handleUpdateRestaurant} style={styles.card}>
               <h3>Thông tin quán</h3>
               <div className="owner-form-grid" style={styles.formGrid}>
-                <input value={restaurant.name} onChange={(e) => setRestaurant({ ...restaurant, name: e.target.value })} placeholder="Tên quán" required />
-                <input type="number" step="any" value={restaurant.lat} onChange={(e) => setRestaurant({ ...restaurant, lat: e.target.value })} placeholder="Latitude" required />
-                <input type="number" step="any" value={restaurant.lng} onChange={(e) => setRestaurant({ ...restaurant, lng: e.target.value })} placeholder="Longitude" required />
-                <input type="number" value={restaurant.avg_eat_time || ''} onChange={(e) => setRestaurant({ ...restaurant, avg_eat_time: e.target.value })} placeholder="TG ăn trung bình" required />
-                <input type="number" step="0.001" min="0.001" max="1" value={restaurant.poi_radius_km || 0.015} onChange={(e) => setRestaurant({ ...restaurant, poi_radius_km: e.target.value })} placeholder="POI radius" required />
+                <div style={styles.ownerFieldGroup}>
+                  <label style={styles.ownerFieldLabel}>Tên quán</label>
+                  <input value={restaurant.name} onChange={(e) => setRestaurant({ ...restaurant, name: e.target.value })} placeholder="Tên quán" required />
+                </div>
+                <div style={styles.ownerFieldGroup}>
+                  <label style={styles.ownerFieldLabel}>Thời gian ăn trung bình (phút)</label>
+                  <input type="number" value={restaurant.avg_eat_time || ''} onChange={(e) => setRestaurant({ ...restaurant, avg_eat_time: e.target.value })} placeholder="TG ăn trung bình" required />
+                </div>
+                <div style={styles.ownerFieldGroupFull}>
+                  <label style={styles.ownerFieldLabel}>Mô tả</label>
+                  <textarea value={restaurant.description || ''} onChange={(e) => setRestaurant({ ...restaurant, description: e.target.value })} placeholder="Mô tả quán" rows={4} style={{ width: '100%' }} />
+                </div>
               </div>
-              <textarea value={restaurant.description || ''} onChange={(e) => setRestaurant({ ...restaurant, description: e.target.value })} placeholder="Mô tả quán" rows={4} style={{ width: '100%' }} />
               <button type="submit">💾 Cập nhật quán</button>
             </form>
           </>
@@ -1008,6 +1014,22 @@ const styles = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '12px',
     marginBottom: '12px'
+  },
+  ownerFieldGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px'
+  },
+  ownerFieldGroupFull: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    gridColumn: '1 / -1'
+  },
+  ownerFieldLabel: {
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#324b6a'
   },
   inlineForm: {
     display: 'grid',
