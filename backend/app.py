@@ -694,13 +694,34 @@ def _refresh_translation_cache_on_redeploy():
         print(f"[cache-refresh] Redeploy refresh skipped: {exc}")
 
 
-with app.app_context():
-    _ensure_cache_tables()
-    _ensure_translation_cache_catalog_columns()
-    _ensure_user_activity_heatmap_schema()
-    _refresh_translation_cache_on_redeploy()
-    _cleanup_legacy_scoped_translation_cache_rows()
-    _ensure_local_schema_compatibility()
+def _run_startup_db_bootstrap():
+    """
+    Run DB bootstrap tasks with best-effort semantics.
+    Keep failures non-fatal so app can still serve health checks.
+    """
+    try:
+        with app.app_context():
+            _ensure_cache_tables()
+            _ensure_translation_cache_catalog_columns()
+            _ensure_user_activity_heatmap_schema()
+            _refresh_translation_cache_on_redeploy()
+            _cleanup_legacy_scoped_translation_cache_rows()
+            _ensure_local_schema_compatibility()
+    except Exception as exc:
+        print(f"[startup] DB bootstrap skipped: {exc}")
+
+
+def _start_startup_db_bootstrap():
+    # Default async on production to avoid blocking platform health checks.
+    sync_bootstrap = _is_true_env(os.getenv("STARTUP_SCHEMA_SYNC", "false"))
+    if sync_bootstrap:
+        _run_startup_db_bootstrap()
+        return
+
+    threading.Thread(target=_run_startup_db_bootstrap, daemon=True).start()
+
+
+_start_startup_db_bootstrap()
 
 
 @app.route("/healthz")
