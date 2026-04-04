@@ -211,7 +211,6 @@ def register_user_routes(app):
                 user_id_provided = False
                 user_id = None
 
-        def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score", excluded_restaurant_ids=None):
         if user_id and not _user_profile_exists(user_id):
             # Avoid FK violations on user_activity.user_id when client sends unknown UUID.
             user_id = None
@@ -220,13 +219,11 @@ def register_user_routes(app):
         session_identity = _derive_session_user_identity()
         if user_id_provided and user_id:
             user_identity = f"user_profile:{user_id}"
-                excluded_restaurant_ids: Set restaurant ids bị loại để tạo tour khác biệt
         else:
             user_identity = session_identity
 
         try:
             heartbeat_lat = _parse_coordinate(data.get("latitude"), -90.0, 90.0, "latitude")
-            excluded_restaurant_ids = set(excluded_restaurant_ids or [])
             heartbeat_lng = _parse_coordinate(data.get("longitude"), -180.0, 180.0, "longitude")
         except ValueError as coord_error:
             return jsonify({"status": "error", "message": str(coord_error)}), 400
