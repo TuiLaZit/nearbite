@@ -211,6 +211,7 @@ def register_user_routes(app):
                 user_id_provided = False
                 user_id = None
 
+        def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score", excluded_restaurant_ids=None):
         if user_id and not _user_profile_exists(user_id):
             # Avoid FK violations on user_activity.user_id when client sends unknown UUID.
             user_id = None
@@ -219,11 +220,13 @@ def register_user_routes(app):
         session_identity = _derive_session_user_identity()
         if user_id_provided and user_id:
             user_identity = f"user_profile:{user_id}"
+                excluded_restaurant_ids: Set restaurant ids bị loại để tạo tour khác biệt
         else:
             user_identity = session_identity
 
         try:
             heartbeat_lat = _parse_coordinate(data.get("latitude"), -90.0, 90.0, "latitude")
+            excluded_restaurant_ids = set(excluded_restaurant_ids or [])
             heartbeat_lng = _parse_coordinate(data.get("longitude"), -180.0, 180.0, "longitude")
         except ValueError as coord_error:
             return jsonify({"status": "error", "message": str(coord_error)}), 400
@@ -791,36 +794,71 @@ def register_user_routes(app):
             
             # Bước 5: Build 3 tours khác nhau (Greedy)
             tours = []
+
+            def _tour_restaurant_ids(tour_data):
+                if not tour_data:
+                    return set()
+                return {
+                    int(restaurant.get("id"))
+                    for restaurant in (tour_data.get("restaurants") or [])
+                    if restaurant.get("id") is not None
+                }
+
+            def _is_distinct_tour(candidate_tour, existing_tours):
+                # Khác biệt tối thiểu: phải khác ít nhất 1 quán (không trùng nguyên set id).
+                candidate_ids = _tour_restaurant_ids(candidate_tour)
+                if not candidate_ids:
+                    return False
+                for existing in existing_tours:
+                    if candidate_ids == _tour_restaurant_ids(existing):
+                        return False
+                return True
+
+            def _build_distinct_tour(strategy_name, existing_tours):
+                candidate = build_greedy_tour(
+                    scored_restaurants,
+                    time_limit,
+                    budget,
+                    strategy=strategy_name,
+                )
+                if candidate and _is_distinct_tour(candidate, existing_tours):
+                    return candidate
+
+                # Nếu trùng nguyên set, thử loại trừ từng quán từ các tour trước để ép khác tối thiểu 1 quán.
+                excluded_pool = []
+                for existing in existing_tours:
+                    for rid in _tour_restaurant_ids(existing):
+                        if rid not in excluded_pool:
+                            excluded_pool.append(rid)
+
+                for excluded_id in excluded_pool:
+                    retried = build_greedy_tour(
+                        scored_restaurants,
+                        time_limit,
+                        budget,
+                        strategy=strategy_name,
+                        excluded_restaurant_ids={excluded_id},
+                    )
+                    if retried and _is_distinct_tour(retried, existing_tours):
+                        return retried
+
+                # Không thể ép khác thêm do ràng buộc dữ liệu/time/budget.
+                return None
             
             # Tour 1: Ưu tiên điểm cao nhất
-            tour1 = build_greedy_tour(
-                scored_restaurants, 
-                time_limit, 
-                budget,
-                strategy="best_score"
-            )
+            tour1 = _build_distinct_tour("best_score", tours)
             if tour1:
                 tours.append(tour1)
             
             # Tour 2: Ưu tiên quán gần nhất (nếu có vị trí)
             if user_lat and user_lng:
-                tour2 = build_greedy_tour(
-                    scored_restaurants,
-                    time_limit,
-                    budget,
-                    strategy="nearest"
-                )
-                if tour2 and tour2 != tour1:
+                tour2 = _build_distinct_tour("nearest", tours)
+                if tour2 and _is_distinct_tour(tour2, tours):
                     tours.append(tour2)
             
             # Tour 3: Ưu tiên giá rẻ nhất
-            tour3 = build_greedy_tour(
-                scored_restaurants,
-                time_limit,
-                budget,
-                strategy="cheapest"
-            )
-            if tour3 and tour3 not in tours:
+            tour3 = _build_distinct_tour("cheapest", tours)
+            if tour3 and _is_distinct_tour(tour3, tours):
                 tours.append(tour3)
             
             # Không lặp lại tour - trả về đúng số tour có thể tạo
@@ -954,7 +992,7 @@ def register_user_routes(app):
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
 
-def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score"):
+def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_score", excluded_restaurant_ids=None):
     """
     Xây dựng tour bằng thuật toán greedy
     
@@ -971,83 +1009,119 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
     total_time = 0
     total_cost = 0
     default_eat_time = 30  # fallback khi quán chưa có avg_eat_time
+    excluded_restaurant_ids = set(excluded_restaurant_ids or [])
     remaining_candidates = list(scored_restaurants)
 
-    def _candidate_rank_key(item):
+    def _distance_bucket(distance_km):
+        # Nhóm: <500m, [500m-1km), [1km-3km), còn lại.
+        if not math.isfinite(distance_km):
+            return 3
+        if distance_km < 0.5:
+            return 0
+        if distance_km < 1.0:
+            return 1
+        if distance_km < 3.0:
+            return 2
+        return 3
+
+    def _price_bucket(avg_price_value):
+        # Bucket theo % budget: <=15%, <=20%, <=25%, <=30%, ... (step 5%).
+        safe_budget = float(budget) if float(budget) > 0 else 1.0
+        price_ratio_percent = (float(avg_price_value) / safe_budget) * 100.0
+        if price_ratio_percent <= 15.0:
+            return 0
+        return int(math.ceil((price_ratio_percent - 15.0) / 5.0))
+
+    def _bucket_bonus(bucket):
+        # Bucket thấp hơn => phù hợp hơn.
+        return max(0.0, 24.0 - (float(bucket) * 6.0))
+
+    def _candidate_priority(item, last_restaurant):
         """
-        Trả về rank key theo từng strategy theo hướng bias mềm:
-        - nearest: ưu tiên gần, nhưng nếu khoảng cách gần tương đương thì xét score/tags và giá.
-        - cheapest: ưu tiên rẻ, nhưng nếu giá tương đương thì xét score/tags và khoảng cách.
+        Chấm điểm heuristic có bias theo strategy.
+        - Mỗi strategy chỉ bias mạnh hơn 1 tiêu chí (distance hoặc price).
+        - Vẫn giữ score/tags làm nền để tránh chọn "cứng" theo 1 cột.
         """
+        restaurant = item["restaurant"]
         score = float(item.get("score") or 0.0)
         avg_price = float(item.get("avg_price") or 0.0)
         matching_tags = int(item.get("matching_tags") or 0)
+
         distance_from_user = item.get("distance_from_user")
-        distance_value = float(distance_from_user) if distance_from_user is not None else float("inf")
+        user_distance_km = float(distance_from_user) if distance_from_user is not None else float("inf")
+        user_distance_bucket = _distance_bucket(user_distance_km)
+        user_distance_bonus = _bucket_bonus(user_distance_bucket)
+
+        if last_restaurant is not None:
+            leg_distance_km = calculate_distance(
+                last_restaurant.lat,
+                last_restaurant.lng,
+                restaurant.lat,
+                restaurant.lng,
+            )
+        else:
+            leg_distance_km = user_distance_km
+
+        leg_distance_bucket = _distance_bucket(leg_distance_km)
+        leg_distance_bonus = _bucket_bonus(leg_distance_bucket)
+
+        price_bucket = _price_bucket(avg_price)
+        price_bonus = _bucket_bonus(price_bucket)
 
         if strategy == "nearest":
-            # Bucket theo mốc khoảng cách cố định để bias theo "vùng gần" thay vì cứng nhắc tuyệt đối.
-            # Nhóm: <500m, [500m-1km), [1km-3km), còn lại.
-            if not math.isfinite(distance_value):
-                distance_bucket = 3
-            elif distance_value < 0.5:
-                distance_bucket = 0
-            elif distance_value < 1.0:
-                distance_bucket = 1
-            elif distance_value < 3.0:
-                distance_bucket = 2
-            else:
-                distance_bucket = 3
+            utility = (
+                score * 1.15
+                + matching_tags * 2.5
+                + leg_distance_bonus * 2.8
+                + user_distance_bonus * 1.2
+                + price_bonus * 0.5
+            )
             return (
-                distance_bucket,
-                -score,
-                -matching_tags,
-                avg_price,
-                distance_value,
+                utility,
+                -float(leg_distance_km if math.isfinite(leg_distance_km) else 10**9),
+                -avg_price,
+                matching_tags,
+                score,
             )
 
         if strategy == "cheapest":
-            # Bucket theo % budget: <=15%, <=20%, <=25%, <=30%, ... (step 5%).
-            # Cách này giữ bias giá mềm hơn, tránh quán đắt hơn quá nhiều bị ưu tiên chỉ vì score.
-            safe_budget = float(budget) if float(budget) > 0 else 1.0
-            price_ratio_percent = (avg_price / safe_budget) * 100.0
-            if price_ratio_percent <= 15.0:
-                price_bucket = 0
-            else:
-                price_bucket = int(math.ceil((price_ratio_percent - 15.0) / 5.0))
-
-            # Tie-break thêm theo vùng khoảng cách để hạn chế chọn quán quá xa khi giá tương đương.
-            if not math.isfinite(distance_value):
-                distance_bucket = 3
-            elif distance_value < 0.5:
-                distance_bucket = 0
-            elif distance_value < 1.0:
-                distance_bucket = 1
-            elif distance_value < 3.0:
-                distance_bucket = 2
-            else:
-                distance_bucket = 3
+            utility = (
+                score * 1.15
+                + matching_tags * 2.5
+                + price_bonus * 2.8
+                + user_distance_bonus * 0.9
+                + leg_distance_bonus * 0.4
+            )
             return (
-                price_bucket,
-                distance_bucket,
-                -score,
-                -matching_tags,
-                avg_price,
-                distance_value,
+                utility,
+                -avg_price,
+                -float(user_distance_km if math.isfinite(user_distance_km) else 10**9),
+                matching_tags,
+                score,
             )
 
-        # best_score giữ hành vi cũ: ưu tiên score cao nhất.
-        return (
-            -score,
-            avg_price,
-            distance_value,
-            -matching_tags,
+        # best_score: score là chính, distance/price chỉ hỗ trợ nhẹ.
+        utility = (
+            score * 1.7
+            + matching_tags * 2.0
+            + user_distance_bonus * 0.6
+            + price_bonus * 0.6
         )
+        return (
+            utility,
+            matching_tags,
+            -avg_price,
+            -float(user_distance_km if math.isfinite(user_distance_km) else 10**9),
+        )
+
+    last_selected_restaurant = None
 
     while remaining_candidates:
         feasible_candidates = []
         for item in remaining_candidates:
             restaurant = item["restaurant"]
+            if restaurant.id in excluded_restaurant_ids:
+                continue
             avg_price = float(item["avg_price"])
             eat_time = restaurant.avg_eat_time or default_eat_time
 
@@ -1057,7 +1131,7 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
         if not feasible_candidates:
             break
 
-        chosen_item = min(feasible_candidates, key=_candidate_rank_key)
+        chosen_item = max(feasible_candidates, key=lambda candidate: _candidate_priority(candidate, last_selected_restaurant))
         remaining_candidates.remove(chosen_item)
 
         restaurant = chosen_item["restaurant"]
@@ -1079,6 +1153,7 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
         })
         total_time += eat_time
         total_cost += avg_price
+        last_selected_restaurant = restaurant
 
         # Giới hạn tour tối đa 5 quán
         if len(tour) >= 5:
