@@ -804,13 +804,8 @@ def register_user_routes(app):
             
             # Tour 2: Ưu tiên quán gần nhất (nếu có vị trí)
             if user_lat and user_lng:
-                # Sắp xếp lại theo khoảng cách, ưu tiên quán gần user
-                sorted_by_distance = sorted(
-                    scored_restaurants,
-                    key=lambda x: x["distance_from_user"] if x["distance_from_user"] is not None else float('inf')
-                )
                 tour2 = build_greedy_tour(
-                    sorted_by_distance,
+                    scored_restaurants,
                     time_limit,
                     budget,
                     strategy="nearest"
@@ -819,12 +814,8 @@ def register_user_routes(app):
                     tours.append(tour2)
             
             # Tour 3: Ưu tiên giá rẻ nhất
-            sorted_by_price = sorted(
-                scored_restaurants,
-                key=lambda x: x["avg_price"]
-            )
             tour3 = build_greedy_tour(
-                sorted_by_price,
+                scored_restaurants,
                 time_limit,
                 budget,
                 strategy="cheapest"
@@ -980,33 +971,118 @@ def build_greedy_tour(scored_restaurants, time_limit, budget, strategy="best_sco
     total_time = 0
     total_cost = 0
     default_eat_time = 30  # fallback khi quán chưa có avg_eat_time
-    
-    for item in scored_restaurants:
-        restaurant = item["restaurant"]
-        avg_price = item["avg_price"]
+    remaining_candidates = list(scored_restaurants)
+
+    def _candidate_rank_key(item):
+        """
+        Trả về rank key theo từng strategy theo hướng bias mềm:
+        - nearest: ưu tiên gần, nhưng nếu khoảng cách gần tương đương thì xét score/tags và giá.
+        - cheapest: ưu tiên rẻ, nhưng nếu giá tương đương thì xét score/tags và khoảng cách.
+        """
+        score = float(item.get("score") or 0.0)
+        avg_price = float(item.get("avg_price") or 0.0)
+        matching_tags = int(item.get("matching_tags") or 0)
+        distance_from_user = item.get("distance_from_user")
+        distance_value = float(distance_from_user) if distance_from_user is not None else float("inf")
+
+        if strategy == "nearest":
+            # Bucket theo mốc khoảng cách cố định để bias theo "vùng gần" thay vì cứng nhắc tuyệt đối.
+            # Nhóm: <500m, [500m-1km), [1km-3km), còn lại.
+            if not math.isfinite(distance_value):
+                distance_bucket = 3
+            elif distance_value < 0.5:
+                distance_bucket = 0
+            elif distance_value < 1.0:
+                distance_bucket = 1
+            elif distance_value < 3.0:
+                distance_bucket = 2
+            else:
+                distance_bucket = 3
+            return (
+                distance_bucket,
+                -score,
+                -matching_tags,
+                avg_price,
+                distance_value,
+            )
+
+        if strategy == "cheapest":
+            # Bucket theo % budget: <=15%, <=20%, <=25%, <=30%, ... (step 5%).
+            # Cách này giữ bias giá mềm hơn, tránh quán đắt hơn quá nhiều bị ưu tiên chỉ vì score.
+            safe_budget = float(budget) if float(budget) > 0 else 1.0
+            price_ratio_percent = (avg_price / safe_budget) * 100.0
+            if price_ratio_percent <= 15.0:
+                price_bucket = 0
+            else:
+                price_bucket = int(math.ceil((price_ratio_percent - 15.0) / 5.0))
+
+            # Tie-break thêm theo vùng khoảng cách để hạn chế chọn quán quá xa khi giá tương đương.
+            if not math.isfinite(distance_value):
+                distance_bucket = 3
+            elif distance_value < 0.5:
+                distance_bucket = 0
+            elif distance_value < 1.0:
+                distance_bucket = 1
+            elif distance_value < 3.0:
+                distance_bucket = 2
+            else:
+                distance_bucket = 3
+            return (
+                price_bucket,
+                distance_bucket,
+                -score,
+                -matching_tags,
+                avg_price,
+                distance_value,
+            )
+
+        # best_score giữ hành vi cũ: ưu tiên score cao nhất.
+        return (
+            -score,
+            avg_price,
+            distance_value,
+            -matching_tags,
+        )
+
+    while remaining_candidates:
+        feasible_candidates = []
+        for item in remaining_candidates:
+            restaurant = item["restaurant"]
+            avg_price = float(item["avg_price"])
+            eat_time = restaurant.avg_eat_time or default_eat_time
+
+            if total_time + eat_time <= time_limit and total_cost + avg_price <= budget:
+                feasible_candidates.append(item)
+
+        if not feasible_candidates:
+            break
+
+        chosen_item = min(feasible_candidates, key=_candidate_rank_key)
+        remaining_candidates.remove(chosen_item)
+
+        restaurant = chosen_item["restaurant"]
+        avg_price = float(chosen_item["avg_price"])
         eat_time = restaurant.avg_eat_time or default_eat_time
-        
-        # Kiểm tra constraints
-        if total_time + eat_time <= time_limit and total_cost + avg_price <= budget:
-            tour.append({
-                "id": restaurant.id,
-                "name": restaurant.name,
-                "description": restaurant.description,
-                "lat": restaurant.lat,
-                "lng": restaurant.lng,
-                "avg_eat_time": eat_time,
-                "avg_price": round(avg_price),
-                "score": item["score"],
-                "matching_tags": item["matching_tags"],
-                "tags": [{"id": tag.id, "name": tag.name, "icon": tag.icon, "color": tag.color} for tag in restaurant.tags],
-                "images": [{"image_url": img.image_url, "is_primary": img.is_primary} for img in restaurant.images[:2]]  # Chỉ lấy 2 ảnh đầu
-            })
-            total_time += eat_time
-            total_cost += avg_price
-            
-            # Giới hạn tour tối đa 5 quán
-            if len(tour) >= 5:
-                break
+
+        tour.append({
+            "id": restaurant.id,
+            "name": restaurant.name,
+            "description": restaurant.description,
+            "lat": restaurant.lat,
+            "lng": restaurant.lng,
+            "avg_eat_time": eat_time,
+            "avg_price": round(avg_price),
+            "score": chosen_item["score"],
+            "matching_tags": chosen_item["matching_tags"],
+            "tags": [{"id": tag.id, "name": tag.name, "icon": tag.icon, "color": tag.color} for tag in restaurant.tags],
+            "images": [{"image_url": img.image_url, "is_primary": img.is_primary} for img in restaurant.images[:2]]  # Chỉ lấy 2 ảnh đầu
+        })
+        total_time += eat_time
+        total_cost += avg_price
+
+        # Giới hạn tour tối đa 5 quán
+        if len(tour) >= 5:
+            break
     
     if not tour:
         return None
