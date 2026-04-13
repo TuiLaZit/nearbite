@@ -160,42 +160,48 @@ const readCachedRestaurantDetail = (restaurantId) => {
   return map[String(restaurantId)] || null
 }
 
+const collectDeviceSignals = () => {
+  if (typeof navigator === 'undefined') {
+    return {
+      memoryGb: null,
+      cpuCores: null,
+      effectiveType: '',
+      saveData: false,
+      downlinkMbps: null,
+      rttMs: null,
+      userAgent: '',
+      platform: '',
+      language: ''
+    }
+  }
+
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+
+  return {
+    memoryGb: typeof navigator.deviceMemory === 'number' ? navigator.deviceMemory : null,
+    cpuCores: typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : null,
+    effectiveType: connection?.effectiveType || '',
+    saveData: Boolean(connection?.saveData),
+    downlinkMbps: typeof connection?.downlink === 'number' ? connection.downlink : null,
+    rttMs: typeof connection?.rtt === 'number' ? connection.rtt : null,
+    userAgent: typeof navigator.userAgent === 'string' ? navigator.userAgent : '',
+    platform: typeof navigator.platform === 'string' ? navigator.platform : '',
+    language: typeof navigator.language === 'string' ? navigator.language : ''
+  }
+}
+
 const isLikelyWeakDevice = (source = 'runtime') => {
   if (typeof navigator === 'undefined') {
     console.log('[DeviceProfile] Skip check: navigator is undefined (non-browser context)', { source })
     return false
   }
 
-  let forcedProfile = null
-  try {
-    forcedProfile = typeof localStorage !== 'undefined' ? localStorage.getItem(DEVICE_PROFILE_OVERRIDE_KEY) : null
-  } catch {
-    forcedProfile = null
-  }
-
-  if (forcedProfile === 'weak') {
-    console.log('[DeviceProfile] Forced profile override -> weak', {
-      source,
-      overrideKey: DEVICE_PROFILE_OVERRIDE_KEY,
-      forcedProfile
-    })
-    return true
-  }
-  if (forcedProfile === 'normal') {
-    console.log('[DeviceProfile] Forced profile override -> normal', {
-      source,
-      overrideKey: DEVICE_PROFILE_OVERRIDE_KEY,
-      forcedProfile
-    })
-    return false
-  }
-
-  const memory = typeof navigator.deviceMemory === 'number' ? navigator.deviceMemory : null
-  const cores = typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : null
-  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
-  const effectiveType = connection?.effectiveType || ''
-  const saveData = Boolean(connection?.saveData)
-  const userAgent = typeof navigator.userAgent === 'string' ? navigator.userAgent : ''
+  const signalSnapshot = collectDeviceSignals()
+  const memory = signalSnapshot.memoryGb
+  const cores = signalSnapshot.cpuCores
+  const effectiveType = signalSnapshot.effectiveType
+  const saveData = signalSnapshot.saveData
+  const userAgent = signalSnapshot.userAgent
   const isAppleMobile = /iPhone|iPad|iPod/i.test(userAgent)
 
   const isVeryLowMemory = memory !== null && memory <= 2
@@ -212,31 +218,15 @@ const isLikelyWeakDevice = (source = 'runtime') => {
     network: isSlowNetwork ? 2 : (isConstrainedNetwork ? 1 : 0)
   }
 
-  const signalSnapshot = {
-    memoryGb: memory,
-    cpuCores: cores,
-    effectiveType,
-    saveData,
+  const enrichedSignalSnapshot = {
+    ...signalSnapshot,
     isAppleMobile,
-    userAgent,
     isVeryLowMemory,
     isLowMemory,
     isVeryLowCpu,
     isLowCpu,
     isSlowNetwork,
     isConstrainedNetwork
-  }
-
-  // iOS often reports limited hardware hints; avoid false positives for modern iPhones/iPads.
-  if (isAppleMobile && !saveData && !isSlowNetwork && cores !== null && cores >= 4) {
-    console.groupCollapsed('[DeviceProfile] Weak-device check result (iOS early return)')
-    console.log('Source:', source)
-    console.log('Rule matched: iOS + no Save-Data + not 2G + cores >= 4 => normal device')
-    console.log('Signals:', signalSnapshot)
-    console.log('Weak score breakdown:', weakScoreBreakdown)
-    console.log('Final decision:', { isWeakDevice: false, reason: 'iOS false-positive guard' })
-    console.groupEnd()
-    return false
   }
 
   // Score-based heuristic to avoid over-detecting weak devices.
@@ -249,6 +239,52 @@ const isLikelyWeakDevice = (source = 'runtime') => {
   else if (isLowCpu) weakScore += 1
   if (isSlowNetwork) weakScore += 2
   else if (isConstrainedNetwork) weakScore += 1
+
+  const iOSGuardMatch = isAppleMobile && !saveData && !isSlowNetwork && cores !== null && cores >= 4
+  const heuristicIsWeak = isVeryLowMemory || isVeryLowCpu || weakScore >= 3
+  const weakWithoutOverride = iOSGuardMatch ? false : heuristicIsWeak
+
+  let forcedProfile = null
+  try {
+    forcedProfile = typeof localStorage !== 'undefined' ? localStorage.getItem(DEVICE_PROFILE_OVERRIDE_KEY) : null
+  } catch {
+    forcedProfile = null
+  }
+
+  if (forcedProfile === 'weak' || forcedProfile === 'normal') {
+    const overriddenDecision = forcedProfile === 'weak'
+    console.groupCollapsed(`[DeviceProfile] Weak-device check result (OVERRIDDEN -> ${overriddenDecision ? 'WEAK' : 'NORMAL'})`)
+    console.log('Source:', source)
+    console.log('Forced profile override:', {
+      overrideKey: DEVICE_PROFILE_OVERRIDE_KEY,
+      forcedProfile
+    })
+    console.log('Signals:', enrichedSignalSnapshot)
+    console.log('Weak score breakdown:', weakScoreBreakdown)
+    console.log('Weak score total:', weakScore)
+    console.log('Heuristic decision without override:', {
+      iOSGuardMatch,
+      isWeakDevice: weakWithoutOverride
+    })
+    console.log('Final decision:', {
+      isWeakDevice: overriddenDecision,
+      reason: 'localStorage override'
+    })
+    console.groupEnd()
+    return overriddenDecision
+  }
+
+  // iOS often reports limited hardware hints; avoid false positives for modern iPhones/iPads.
+  if (iOSGuardMatch) {
+    console.groupCollapsed('[DeviceProfile] Weak-device check result (iOS early return)')
+    console.log('Source:', source)
+    console.log('Rule matched: iOS + no Save-Data + not 2G + cores >= 4 => normal device')
+    console.log('Signals:', enrichedSignalSnapshot)
+    console.log('Weak score breakdown:', weakScoreBreakdown)
+    console.log('Final decision:', { isWeakDevice: false, reason: 'iOS false-positive guard' })
+    console.groupEnd()
+    return false
+  }
 
   const isWeakDevice = isVeryLowMemory || isVeryLowCpu || weakScore >= 3
   const decisionReasons = []
@@ -263,7 +299,7 @@ const isLikelyWeakDevice = (source = 'runtime') => {
 
   console.groupCollapsed(`[DeviceProfile] Weak-device check result (${isWeakDevice ? 'WEAK' : 'NORMAL'})`)
   console.log('Source:', source)
-  console.log('Signals:', signalSnapshot)
+  console.log('Signals:', enrichedSignalSnapshot)
   console.log('Weak score breakdown:', weakScoreBreakdown)
   console.log('Weak score total:', weakScore)
   console.log('Final decision:', { isWeakDevice, reasons: decisionReasons })
@@ -434,6 +470,25 @@ function LocationTracker() {
   // Re-check profile once mounted; useful when browser exposes hardware/network hints late.
   useEffect(() => {
     setIsWeakDevice(isLikelyWeakDevice('mount-recheck'))
+  }, [])
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return
+
+    const snapshot = collectDeviceSignals()
+    console.groupCollapsed('[DeviceProfile] Raw device metrics snapshot')
+    console.table({
+      memoryGb: snapshot.memoryGb,
+      cpuCores: snapshot.cpuCores,
+      effectiveType: snapshot.effectiveType || '(empty)',
+      saveData: snapshot.saveData,
+      downlinkMbps: snapshot.downlinkMbps,
+      rttMs: snapshot.rttMs,
+      platform: snapshot.platform || '(empty)',
+      language: snapshot.language || '(empty)'
+    })
+    console.log('UserAgent:', snapshot.userAgent)
+    console.groupEnd()
   }, [])
 
   useEffect(() => {
