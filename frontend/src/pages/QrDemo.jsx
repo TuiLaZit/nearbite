@@ -26,7 +26,7 @@ function QrDemo() {
       const response = await fetch(`${BASE_URL}/qr/current`)
       const data = await response.json().catch(() => ({}))
       if (!response.ok || !data.token) {
-        throw new Error(data.message || 'Khong the tai QR hien tai')
+        throw new Error(data.message || data.error || data.detail || 'Khong the tai QR hien tai')
       }
       setToken((prev) => {
         if (prev && prev !== data.token) {
@@ -49,7 +49,7 @@ function QrDemo() {
       const response = await fetch(`${BASE_URL}/qr/force-expire`, { method: 'POST' })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
-        throw new Error(data.message || 'Khong the reset QR')
+        throw new Error(data.message || data.error || data.detail || 'Khong the reset QR')
       }
       await fetchCurrentQr()
     } catch (err) {
