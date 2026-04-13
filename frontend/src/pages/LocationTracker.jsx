@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
@@ -292,7 +292,6 @@ function MapUpdater({ center }) {
 
 function LocationTracker() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [isTracking, setIsTracking] = useState(false)
   const [customerAuthStatus, setCustomerAuthStatus] = useState('checking')
   const { language, setLanguage } = useAppLanguage()
@@ -323,7 +322,6 @@ function LocationTracker() {
   })
   const [mobileMapHeight, setMobileMapHeight] = useState(null)
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false)
-  const [qrNotice, setQrNotice] = useState('')
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
@@ -358,26 +356,6 @@ function LocationTracker() {
     ? restaurants.filter((restaurant) => cachedRestaurantIdSet.has(String(restaurant.id)))
     : restaurants
   const selectedLanguageOption = languages.find((lang) => lang.code === language)
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const qrStatus = params.get('qr')
-    if (!qrStatus) return
-
-    if (qrStatus === 'expired') {
-      setQrNotice('QR bạn đã quét đã hết hạn. Vui lòng quét mã QR mới.')
-    } else {
-      setQrNotice('QR không hợp lệ. Vui lòng quét lại mã mới.')
-    }
-
-    navigate(location.pathname, { replace: true })
-  }, [location.search, location.pathname, navigate])
-
-  useEffect(() => {
-    if (!qrNotice) return
-    const timer = setTimeout(() => setQrNotice(''), 5000)
-    return () => clearTimeout(timer)
-  }, [qrNotice])
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -2122,21 +2100,6 @@ function LocationTracker() {
           )}
         </div>
       </div>
-
-      {qrNotice && (
-        <div style={{
-          margin: '10px 12px 0',
-          padding: '10px 12px',
-          borderRadius: '10px',
-          border: '1px solid #f8b4b4',
-          background: '#fff2f2',
-          color: '#9f1239',
-          fontWeight: 600,
-          fontSize: '14px'
-        }}>
-          {qrNotice}
-        </div>
-      )}
 
       {/* Leaflet Map */}
       <div

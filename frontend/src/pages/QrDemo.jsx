@@ -75,11 +75,11 @@ function QrDemo() {
       <div style={{ maxWidth: '940px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0, fontSize: '34px', letterSpacing: '-0.02em' }}>QR Demo</h1>
-          <Link to="/" style={{ color: '#0f4d85', fontWeight: 700, textDecoration: 'none' }}>Ve trang chinh</Link>
+          <Link to="/" style={{ color: '#0f4d85', fontWeight: 700, textDecoration: 'none' }}>Về trang chính</Link>
         </div>
 
         <p style={{ marginTop: '8px', marginBottom: '16px', color: '#35526f' }}>
-          QR nay chi dung cho 1 token hien tai. Het han sau 2 gio hoac reset bang nut demo.
+          QR này chỉ dùng cho 1 token hiện tại. Hết hạn sau 2 giờ hoặc reset bằng nút demo.
         </p>
 
         {error && (
@@ -109,11 +109,11 @@ function QrDemo() {
             boxShadow: '0 10px 24px rgba(15, 40, 65, 0.12)'
           }}>
             {loading ? (
-              <div style={{ minHeight: '280px', display: 'grid', placeItems: 'center', color: '#64748b' }}>Dang tao QR...</div>
+              <div style={{ minHeight: '280px', display: 'grid', placeItems: 'center', color: '#64748b' }}>Đang tạo QR...</div>
             ) : qrImageUrl ? (
               <img src={qrImageUrl} alt="NearBite dynamic QR" width={280} height={280} style={{ width: '100%', height: 'auto', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
             ) : (
-              <div style={{ minHeight: '280px', display: 'grid', placeItems: 'center', color: '#64748b' }}>Khong co du lieu QR</div>
+              <div style={{ minHeight: '280px', display: 'grid', placeItems: 'center', color: '#64748b' }}>Không có dữ liệu QR</div>
             )}
           </div>
 
@@ -132,14 +132,14 @@ function QrDemo() {
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <strong>Token hien tai:</strong>
+              <strong>Token hiện tại:</strong>
               <div style={{ marginTop: '6px', fontFamily: 'monospace', fontSize: '13px', color: '#1e3a5f', wordBreak: 'break-all' }}>
                 {token || '...'}
               </div>
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <strong>Het han luc:</strong>
+              <strong>Hết hạn lúc:</strong>
               <div style={{ marginTop: '6px', color: '#334155' }}>
                 {expiresAt ? new Date(expiresAt).toLocaleString() : '...'}
               </div>
@@ -162,24 +162,7 @@ function QrDemo() {
                   fontWeight: 700
                 }}
               >
-                {resetting ? 'Dang reset...' : 'Reset QR (Demo)'}
-              </button>
-
-              <button
-                type="button"
-                onClick={fetchCurrentQr}
-                style={{
-                  margin: 0,
-                  border: '1px solid #bfdbfe',
-                  background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-                  color: '#fff',
-                  borderRadius: '10px',
-                  padding: '10px 14px',
-                  cursor: 'pointer',
-                  fontWeight: 700
-                }}
-              >
-                Lam moi
+                {resetting ? 'Đang reset...' : 'Reset QR (Demo)'}
               </button>
             </div>
 
@@ -191,7 +174,7 @@ function QrDemo() {
                 background: '#fff7ed',
                 color: '#9a3412'
               }}>
-                Token cu (de test reject):
+                Token cũ (để test reject):
                 <div style={{ marginTop: '4px', fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all' }}>
                   {previousToken}
                 </div>

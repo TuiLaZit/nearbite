@@ -15,7 +15,7 @@ function EntryGate() {
       setStatus('error')
       setMessage('Thieu token trong QR')
       const timer = setTimeout(() => {
-        navigate('/?qr=expired', { replace: true })
+        navigate('/qr-expired', { replace: true })
       }, 1000)
       return () => clearTimeout(timer)
     }
@@ -40,7 +40,7 @@ function EntryGate() {
         setStatus('error')
         setMessage(data.message || 'QR expired hoặc không hợp lệ')
         setTimeout(() => {
-          navigate('/?qr=expired', { replace: true })
+          navigate('/qr-expired', { replace: true })
         }, 900)
       })
       .catch(() => {
@@ -48,7 +48,7 @@ function EntryGate() {
         setStatus('error')
         setMessage('Khong the ket noi he thong de kiem tra QR')
         setTimeout(() => {
-          navigate('/?qr=expired', { replace: true })
+          navigate('/qr-expired', { replace: true })
         }, 1000)
       })
 

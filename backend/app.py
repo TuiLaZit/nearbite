@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, send_from_directory, request, Response
+from flask import Flask, jsonify, send_from_directory, request, Response, session
 from flask_cors import CORS
 from db import db
 from sqlalchemy import inspect, text
@@ -228,6 +228,17 @@ def _validate_qr_token(candidate_token):
         if not _qr_current_token or _is_qr_expired(_qr_expires_at):
             return False
         return token == _qr_current_token
+
+
+def _has_valid_qr_session_access():
+    with _qr_state_lock:
+        if not _qr_current_token or _is_qr_expired(_qr_expires_at):
+            return False
+
+        session_token = str(session.get("qr_access_token") or "").strip()
+        if not session_token:
+            return False
+        return session_token == _qr_current_token
 
 
 def _run_cache_cleanup(reason="manual"):
@@ -801,6 +812,7 @@ def get_current_qr_token():
 @app.route("/api/qr/force-expire", methods=["POST"])
 def force_expire_qr_token():
     _, expires_at = _force_expire_qr_token()
+    session.pop("qr_access_token", None)
     return jsonify({
         "status": "success",
         "message": "QR token marked as expired",
@@ -813,9 +825,20 @@ def force_expire_qr_token():
 def validate_qr_entry():
     token = request.args.get("token", "")
     if _validate_qr_token(token):
+        session["qr_access_token"] = str(token).strip()
         return jsonify({"status": "success", "message": "Access granted"}), 200
 
     return jsonify({"status": "error", "message": "QR expired hoặc không hợp lệ"}), 401
+
+
+@app.route("/qr/access-check", methods=["GET"])
+@app.route("/api/qr/access-check", methods=["GET"])
+def qr_access_check():
+    if _has_valid_qr_session_access():
+        return jsonify({"status": "success", "message": "QR access granted"}), 200
+
+    session.pop("qr_access_token", None)
+    return jsonify({"status": "error", "message": "QR access required"}), 401
 
 
 @app.route("/map-tiles/<provider>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
