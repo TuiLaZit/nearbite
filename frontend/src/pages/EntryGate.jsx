@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
 function EntryGate() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState('checking')
   const [message, setMessage] = useState('Đang xác thực QR...')
 
   useEffect(() => {
+    let successRedirectTimer = null
     const token = (searchParams.get('token') || '').trim()
 
     if (!token) {
@@ -26,7 +28,10 @@ function EntryGate() {
 
         if (response.ok) {
           setStatus('success')
-          setMessage('QR còn hiệu lực.')
+          setMessage('QR còn hiệu lực. Đang chuyển về trang chính...')
+          successRedirectTimer = window.setTimeout(() => {
+            navigate('/', { replace: true })
+          }, 900)
           return
         }
 
@@ -40,9 +45,12 @@ function EntryGate() {
       })
 
     return () => {
+      if (successRedirectTimer) {
+        window.clearTimeout(successRedirectTimer)
+      }
       isMounted = false
     }
-  }, [searchParams])
+  }, [navigate, searchParams])
 
   const noticeStyle = status === 'success'
     ? {
