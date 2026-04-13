@@ -230,6 +230,10 @@ def _validate_qr_token(candidate_token):
         return token == _qr_current_token
 
 
+def _is_qr_manager_logged_in():
+    return bool(session.get("owner_logged_in") or session.get("admin_logged_in"))
+
+
 def _has_valid_qr_session_access():
     with _qr_state_lock:
         if not _qr_current_token or _is_qr_expired(_qr_expires_at):
@@ -800,6 +804,9 @@ def healthz():
 @app.route("/qr/current", methods=["GET"])
 @app.route("/api/qr/current", methods=["GET"])
 def get_current_qr_token():
+    if not _is_qr_manager_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     token, expires_at = _get_qr_token_state()
     return jsonify({
         "token": token,
@@ -811,6 +818,9 @@ def get_current_qr_token():
 @app.route("/qr/force-expire", methods=["POST"])
 @app.route("/api/qr/force-expire", methods=["POST"])
 def force_expire_qr_token():
+    if not _is_qr_manager_logged_in():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     _, expires_at = _force_expire_qr_token()
     session.pop("qr_access_token", None)
     return jsonify({

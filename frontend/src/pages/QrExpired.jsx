@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom'
-
 function QrExpired() {
   return (
     <div style={{
@@ -21,11 +19,6 @@ function QrExpired() {
         <p style={{ margin: 0, color: '#7f1d1d' }}>
           QR bạn đã quét không còn hiệu lực. Vui lòng quét lại mã QR mới để tiếp tục.
         </p>
-        <div style={{ marginTop: '14px' }}>
-          <Link to="/qr" style={{ color: '#1d4ed8', fontWeight: 700, textDecoration: 'none' }}>
-            Mở trang QR
-          </Link>
-        </div>
       </div>
     </div>
   )

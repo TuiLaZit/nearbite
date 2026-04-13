@@ -21,7 +21,9 @@ function App() {
       <Route element={<QrAccessRoute />}>
         <Route path="/" element={<LocationTracker />} />
       </Route>
-      <Route path="/qr" element={<QrDemo />} />
+      <Route element={<ProtectedRoute authPath="/owner/check" redirectTo="/login?role=owner" />}>
+        <Route path="/qr" element={<QrDemo />} />
+      </Route>
       <Route path="/qr-expired" element={<QrExpired />} />
       <Route path="/entry" element={<EntryGate />} />
       <Route path="/login" element={<LoginPortal />} />
