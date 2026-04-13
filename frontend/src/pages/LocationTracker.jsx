@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { BASE_URL } from '../config'
@@ -160,12 +160,35 @@ const readCachedRestaurantDetail = (restaurantId) => {
   return map[String(restaurantId)] || null
 }
 
-const isLikelyWeakDevice = () => {
-  if (typeof navigator === 'undefined') return false
+const isLikelyWeakDevice = (source = 'runtime') => {
+  if (typeof navigator === 'undefined') {
+    console.log('[DeviceProfile] Skip check: navigator is undefined (non-browser context)', { source })
+    return false
+  }
 
-  const forcedProfile = localStorage.getItem(DEVICE_PROFILE_OVERRIDE_KEY)
-  if (forcedProfile === 'weak') return true
-  if (forcedProfile === 'normal') return false
+  let forcedProfile = null
+  try {
+    forcedProfile = typeof localStorage !== 'undefined' ? localStorage.getItem(DEVICE_PROFILE_OVERRIDE_KEY) : null
+  } catch {
+    forcedProfile = null
+  }
+
+  if (forcedProfile === 'weak') {
+    console.log('[DeviceProfile] Forced profile override -> weak', {
+      source,
+      overrideKey: DEVICE_PROFILE_OVERRIDE_KEY,
+      forcedProfile
+    })
+    return true
+  }
+  if (forcedProfile === 'normal') {
+    console.log('[DeviceProfile] Forced profile override -> normal', {
+      source,
+      overrideKey: DEVICE_PROFILE_OVERRIDE_KEY,
+      forcedProfile
+    })
+    return false
+  }
 
   const memory = typeof navigator.deviceMemory === 'number' ? navigator.deviceMemory : null
   const cores = typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : null
@@ -182,8 +205,37 @@ const isLikelyWeakDevice = () => {
   const isSlowNetwork = /(^2g$|^slow-2g$)/i.test(effectiveType)
   const isConstrainedNetwork = /^3g$/i.test(effectiveType)
 
+  const weakScoreBreakdown = {
+    saveData: saveData ? 2 : 0,
+    memory: isVeryLowMemory ? 2 : (isLowMemory ? 1 : 0),
+    cpu: isVeryLowCpu ? 2 : (isLowCpu ? 1 : 0),
+    network: isSlowNetwork ? 2 : (isConstrainedNetwork ? 1 : 0)
+  }
+
+  const signalSnapshot = {
+    memoryGb: memory,
+    cpuCores: cores,
+    effectiveType,
+    saveData,
+    isAppleMobile,
+    userAgent,
+    isVeryLowMemory,
+    isLowMemory,
+    isVeryLowCpu,
+    isLowCpu,
+    isSlowNetwork,
+    isConstrainedNetwork
+  }
+
   // iOS often reports limited hardware hints; avoid false positives for modern iPhones/iPads.
   if (isAppleMobile && !saveData && !isSlowNetwork && cores !== null && cores >= 4) {
+    console.groupCollapsed('[DeviceProfile] Weak-device check result (iOS early return)')
+    console.log('Source:', source)
+    console.log('Rule matched: iOS + no Save-Data + not 2G + cores >= 4 => normal device')
+    console.log('Signals:', signalSnapshot)
+    console.log('Weak score breakdown:', weakScoreBreakdown)
+    console.log('Final decision:', { isWeakDevice: false, reason: 'iOS false-positive guard' })
+    console.groupEnd()
     return false
   }
 
@@ -198,7 +250,26 @@ const isLikelyWeakDevice = () => {
   if (isSlowNetwork) weakScore += 2
   else if (isConstrainedNetwork) weakScore += 1
 
-  return isVeryLowMemory || isVeryLowCpu || weakScore >= 3
+  const isWeakDevice = isVeryLowMemory || isVeryLowCpu || weakScore >= 3
+  const decisionReasons = []
+  if (isVeryLowMemory) decisionReasons.push('memory <= 2GB (hard weak signal)')
+  if (isVeryLowCpu) decisionReasons.push('cpu cores <= 2 (hard weak signal)')
+  if (!isVeryLowMemory && !isVeryLowCpu && weakScore >= 3) {
+    decisionReasons.push(`score >= 3 (current: ${weakScore})`)
+  }
+  if (!decisionReasons.length) {
+    decisionReasons.push(`score < 3 (current: ${weakScore}) and no hard weak signals`)
+  }
+
+  console.groupCollapsed(`[DeviceProfile] Weak-device check result (${isWeakDevice ? 'WEAK' : 'NORMAL'})`)
+  console.log('Source:', source)
+  console.log('Signals:', signalSnapshot)
+  console.log('Weak score breakdown:', weakScoreBreakdown)
+  console.log('Weak score total:', weakScore)
+  console.log('Final decision:', { isWeakDevice, reasons: decisionReasons })
+  console.groupEnd()
+
+  return isWeakDevice
 }
 
 const getPerformanceModeKey = (weakDevice, batterySaverEnabled) => {
@@ -221,6 +292,7 @@ function MapUpdater({ center }) {
 
 function LocationTracker() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [isTracking, setIsTracking] = useState(false)
   const [customerAuthStatus, setCustomerAuthStatus] = useState('checking')
   const { language, setLanguage } = useAppLanguage()
@@ -245,12 +317,13 @@ function LocationTracker() {
     return isRunningAsPwa() && !navigator.onLine
   })
   const [cachedRestaurantIds, setCachedRestaurantIds] = useState(() => readCachedRestaurantIds())
-  const [isWeakDevice, setIsWeakDevice] = useState(() => isLikelyWeakDevice())
+  const [isWeakDevice, setIsWeakDevice] = useState(() => isLikelyWeakDevice('state-init'))
   const [isBatterySaverEnabled, setIsBatterySaverEnabled] = useState(() => {
     return localStorage.getItem(BATTERY_SAVER_KEY) === 'true'
   })
   const [mobileMapHeight, setMobileMapHeight] = useState(null)
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false)
+  const [qrNotice, setQrNotice] = useState('')
   
   const audioRef = useRef(null)
   const watchTimerRef = useRef(null)
@@ -285,6 +358,26 @@ function LocationTracker() {
     ? restaurants.filter((restaurant) => cachedRestaurantIdSet.has(String(restaurant.id)))
     : restaurants
   const selectedLanguageOption = languages.find((lang) => lang.code === language)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const qrStatus = params.get('qr')
+    if (!qrStatus) return
+
+    if (qrStatus === 'expired') {
+      setQrNotice('QR bạn đã quét đã hết hạn. Vui lòng quét mã QR mới.')
+    } else {
+      setQrNotice('QR không hợp lệ. Vui lòng quét lại mã mới.')
+    }
+
+    navigate(location.pathname, { replace: true })
+  }, [location.search, location.pathname, navigate])
+
+  useEffect(() => {
+    if (!qrNotice) return
+    const timer = setTimeout(() => setQrNotice(''), 5000)
+    return () => clearTimeout(timer)
+  }, [qrNotice])
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -362,8 +455,18 @@ function LocationTracker() {
 
   // Re-check profile once mounted; useful when browser exposes hardware/network hints late.
   useEffect(() => {
-    setIsWeakDevice(isLikelyWeakDevice())
+    setIsWeakDevice(isLikelyWeakDevice('mount-recheck'))
   }, [])
+
+  useEffect(() => {
+    console.log('[DeviceProfile] Runtime mode summary', {
+      isWeakDevice,
+      isBatterySaverEnabled,
+      performanceModeKey,
+      gpsIntervalMs,
+      canAutoPlayAudio
+    })
+  }, [isWeakDevice, isBatterySaverEnabled, performanceModeKey, gpsIntervalMs, canAutoPlayAudio])
 
   // Track PWA runtime + connectivity for offline-only behavior.
   useEffect(() => {
@@ -2019,6 +2122,21 @@ function LocationTracker() {
           )}
         </div>
       </div>
+
+      {qrNotice && (
+        <div style={{
+          margin: '10px 12px 0',
+          padding: '10px 12px',
+          borderRadius: '10px',
+          border: '1px solid #f8b4b4',
+          background: '#fff2f2',
+          color: '#9f1239',
+          fontWeight: 600,
+          fontSize: '14px'
+        }}>
+          {qrNotice}
+        </div>
+      )}
 
       {/* Leaflet Map */}
       <div

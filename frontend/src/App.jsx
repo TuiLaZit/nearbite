@@ -6,6 +6,8 @@ import AdminDashboard from './pages/AdminDashboard'
 import TagManagement from './pages/TagManagement'
 import LoginPortal from './pages/LoginPortal'
 import OwnerDashboard from './pages/OwnerDashboard'
+import QrDemo from './pages/QrDemo'
+import EntryGate from './pages/EntryGate'
 import ProtectedRoute from './components/ProtectedRoute'
 import useHeartbeat from './hooks/useHeartbeat'
 
@@ -15,6 +17,8 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LocationTracker />} />
+      <Route path="/qr" element={<QrDemo />} />
+      <Route path="/entry" element={<EntryGate />} />
       <Route path="/login" element={<LoginPortal />} />
       <Route path="/customer" element={<Navigate to="/" replace />} />
 

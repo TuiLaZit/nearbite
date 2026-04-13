@@ -6,6 +6,8 @@ import os
 import re
 import time
 import threading
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from routes.user import register_user_routes
@@ -171,6 +173,61 @@ MAP_TILE_PROVIDERS = {
     "osm": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     "opentopo": "https://tile.opentopomap.org/{z}/{x}/{y}.png",
 }
+
+
+# Dynamic QR token state (global, on-demand rotation, no DB dependency).
+QR_TOKEN_TTL_HOURS = 2
+_qr_state_lock = threading.Lock()
+_qr_current_token = None
+_qr_expires_at = None
+
+
+def _utc_now():
+    return datetime.now(timezone.utc)
+
+
+def _to_iso8601(value):
+    return value.isoformat().replace("+00:00", "Z") if value else None
+
+
+def _is_qr_expired(expires_at):
+    if not expires_at:
+        return True
+    return _utc_now() >= expires_at
+
+
+def _issue_qr_token_locked():
+    global _qr_current_token, _qr_expires_at
+    _qr_current_token = str(uuid4())
+    _qr_expires_at = _utc_now() + timedelta(hours=QR_TOKEN_TTL_HOURS)
+    return _qr_current_token, _qr_expires_at
+
+
+def _get_qr_token_state():
+    with _qr_state_lock:
+        if not _qr_current_token or _is_qr_expired(_qr_expires_at):
+            return _issue_qr_token_locked()
+        return _qr_current_token, _qr_expires_at
+
+
+def _force_expire_qr_token():
+    global _qr_expires_at
+    with _qr_state_lock:
+        if not _qr_current_token:
+            _issue_qr_token_locked()
+        _qr_expires_at = _utc_now() - timedelta(seconds=1)
+        return _qr_current_token, _qr_expires_at
+
+
+def _validate_qr_token(candidate_token):
+    token = str(candidate_token or "").strip()
+    if not token:
+        return False
+
+    with _qr_state_lock:
+        if not _qr_current_token or _is_qr_expired(_qr_expires_at):
+            return False
+        return token == _qr_current_token
 
 
 def _run_cache_cleanup(reason="manual"):
@@ -727,6 +784,38 @@ _start_startup_db_bootstrap()
 @app.route("/healthz")
 def healthz():
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/qr/current", methods=["GET"])
+@app.route("/api/qr/current", methods=["GET"])
+def get_current_qr_token():
+    token, expires_at = _get_qr_token_state()
+    return jsonify({
+        "token": token,
+        "expires_at": _to_iso8601(expires_at),
+        "ttl_hours": QR_TOKEN_TTL_HOURS,
+    }), 200
+
+
+@app.route("/qr/force-expire", methods=["POST"])
+@app.route("/api/qr/force-expire", methods=["POST"])
+def force_expire_qr_token():
+    _, expires_at = _force_expire_qr_token()
+    return jsonify({
+        "status": "success",
+        "message": "QR token marked as expired",
+        "expires_at": _to_iso8601(expires_at),
+    }), 200
+
+
+@app.route("/qr/entry", methods=["GET"])
+@app.route("/api/qr/entry", methods=["GET"])
+def validate_qr_entry():
+    token = request.args.get("token", "")
+    if _validate_qr_token(token):
+        return jsonify({"status": "success", "message": "Access granted"}), 200
+
+    return jsonify({"status": "error", "message": "QR expired hoặc không hợp lệ"}), 401
 
 
 @app.route("/map-tiles/<provider>/<int:z>/<int:x>/<int:y>.png", methods=["GET"])
