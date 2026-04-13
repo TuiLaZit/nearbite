@@ -9,7 +9,6 @@ import OwnerDashboard from './pages/OwnerDashboard'
 import QrDemo from './pages/QrDemo'
 import EntryGate from './pages/EntryGate'
 import QrExpired from './pages/QrExpired'
-import QrAccessRoute from './components/QrAccessRoute'
 import ProtectedRoute from './components/ProtectedRoute'
 import useHeartbeat from './hooks/useHeartbeat'
 
@@ -18,17 +17,15 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login?mode=staff" replace />} />
-      <Route element={<QrAccessRoute />}>
-        <Route path="/app" element={<LocationTracker />} />
-      </Route>
+      <Route path="/" element={<LocationTracker />} />
+      <Route path="/app" element={<Navigate to="/" replace />} />
       <Route element={<ProtectedRoute authPath={["/owner/check", "/admin/check"]} redirectTo="/login?mode=staff" />}>
         <Route path="/qr" element={<QrDemo />} />
       </Route>
       <Route path="/qr-expired" element={<QrExpired />} />
       <Route path="/entry" element={<EntryGate />} />
       <Route path="/login" element={<LoginPortal />} />
-      <Route path="/customer" element={<Navigate to="/app" replace />} />
+      <Route path="/customer" element={<Navigate to="/" replace />} />
 
       {/* Legacy paths: keep old links working */}
       <Route path="/customer/login" element={<Navigate to="/login?role=customer" replace />} />

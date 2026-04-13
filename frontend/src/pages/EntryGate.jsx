@@ -1,23 +1,19 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { BASE_URL } from '../config'
 
 function EntryGate() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState('checking')
-  const [message, setMessage] = useState('Dang xac thuc QR...')
+  const [message, setMessage] = useState('Đang xác thực QR...')
 
   useEffect(() => {
     const token = (searchParams.get('token') || '').trim()
 
     if (!token) {
       setStatus('error')
-      setMessage('Thieu token trong QR')
-      const timer = setTimeout(() => {
-        navigate('/qr-expired', { replace: true })
-      }, 1000)
-      return () => clearTimeout(timer)
+      setMessage('QR đã hết hạn hoặc không hợp lệ.')
+      return undefined
     }
 
     let isMounted = true
@@ -30,32 +26,41 @@ function EntryGate() {
 
         if (response.ok) {
           setStatus('success')
-          setMessage('Access granted. Dang chuyen vao he thong...')
-          setTimeout(() => {
-            navigate('/app', { replace: true })
-          }, 700)
+          setMessage('QR còn hiệu lực.')
           return
         }
 
         setStatus('error')
-        setMessage(data.message || 'QR expired hoặc không hợp lệ')
-        setTimeout(() => {
-          navigate('/qr-expired', { replace: true })
-        }, 900)
+        setMessage(data.message || 'QR đã hết hạn.')
       })
       .catch(() => {
         if (!isMounted) return
         setStatus('error')
-        setMessage('Khong the ket noi he thong de kiem tra QR')
-        setTimeout(() => {
-          navigate('/qr-expired', { replace: true })
-        }, 1000)
+        setMessage('Không thể kiểm tra QR lúc này.')
       })
 
     return () => {
       isMounted = false
     }
-  }, [navigate, searchParams])
+  }, [searchParams])
+
+  const noticeStyle = status === 'success'
+    ? {
+        border: '1px solid #bbf7d0',
+        background: '#f0fdf4',
+        color: '#166534'
+      }
+    : status === 'error'
+      ? {
+          border: '1px solid #fecaca',
+          background: '#fef2f2',
+          color: '#b91c1c'
+        }
+      : {
+          border: '1px solid #c7d2fe',
+          background: '#eef2ff',
+          color: '#3730a3'
+        }
 
   return (
     <div style={{
@@ -74,7 +79,9 @@ function EntryGate() {
         padding: '22px'
       }}>
         <h2 style={{ marginTop: 0, marginBottom: '8px', color: '#0f375d' }}>NearBite QR Entry</h2>
-        <p style={{ margin: 0, color: status === 'error' ? '#9f1239' : '#334155' }}>{message}</p>
+        <div style={{ ...noticeStyle, borderRadius: '10px', padding: '10px 12px', fontWeight: 700 }}>
+          {message}
+        </div>
       </div>
     </div>
   )
