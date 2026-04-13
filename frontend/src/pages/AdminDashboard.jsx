@@ -534,13 +534,6 @@ function AdminDashboard({ role = 'admin' }) {
           Tài khoản admin
         </button>
       )}
-      <button
-        className="topbar-nav-btn"
-        style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
-        onClick={() => navigate('/qr')}
-      >
-        Trang QR
-      </button>
     </>
   )
 
@@ -584,6 +577,24 @@ function AdminDashboard({ role = 'admin' }) {
           transition: all 0.2s ease;
         }
 
+        .topbar-qr-btn {
+          margin: 0;
+          border-radius: 12px;
+          border: 1px solid rgba(152, 203, 255, 0.56);
+          background: linear-gradient(132deg, rgba(43, 123, 208, 0.9), rgba(42, 163, 187, 0.84));
+          color: #f8fcff;
+          height: 40px;
+          padding: 0 14px;
+          font-weight: 700;
+          transition: all 0.2s ease;
+        }
+
+        .topbar-qr-btn:hover {
+          transform: translateY(-1px);
+          border: 1px solid rgba(214, 236, 255, 0.9);
+          box-shadow: 0 12px 22px rgba(6, 29, 56, 0.34);
+        }
+
         .topbar-logout-btn:hover {
           transform: translateY(-1px);
           border: 1px solid rgba(255, 171, 171, 0.72);
@@ -618,6 +629,12 @@ function AdminDashboard({ role = 'admin' }) {
             height: 36px;
             padding: 0 12px;
           }
+
+          .topbar-qr-btn {
+            height: 36px;
+            padding: 0 12px;
+            font-size: 13px;
+          }
         }
       `}</style>
       <div style={styles.container}>
@@ -633,9 +650,14 @@ function AdminDashboard({ role = 'admin' }) {
                   </div>
                 </div>
 
-                <button className="topbar-logout-btn" style={{ ...styles.topbarLogout, ...styles.topbarLogoutCompactMobile }} onClick={handleLogout}>
-                  Đăng xuất
-                </button>
+                <div style={styles.topbarActionsMobile}>
+                  <button className="topbar-qr-btn" style={{ ...styles.topbarQrButton, ...styles.topbarQrButtonCompactMobile }} onClick={() => navigate('/qr')}>
+                    Quản lý QR
+                  </button>
+                  <button className="topbar-logout-btn" style={{ ...styles.topbarLogout, ...styles.topbarLogoutCompactMobile }} onClick={handleLogout}>
+                    Đăng xuất
+                  </button>
+                </div>
               </div>
 
               <nav style={{ ...styles.topNav, ...styles.topNavMobile }}>
@@ -656,9 +678,14 @@ function AdminDashboard({ role = 'admin' }) {
                 {topNavButtons}
               </nav>
 
-              <button className="topbar-logout-btn" style={styles.topbarLogout} onClick={handleLogout}>
-                Đăng xuất
-              </button>
+              <div style={styles.topbarActionsDesktop}>
+                <button className="topbar-qr-btn" style={styles.topbarQrButton} onClick={() => navigate('/qr')}>
+                  Quản lý QR
+                </button>
+                <button className="topbar-logout-btn" style={styles.topbarLogout} onClick={handleLogout}>
+                  Đăng xuất
+                </button>
+              </div>
             </>
           )}
         </header>
@@ -998,6 +1025,14 @@ const styles = {
     fontSize: '14px',
     fontWeight: '700'
   },
+  topbarQrButton: {
+    border: '1px solid rgba(152, 203, 255, 0.56)',
+    background: 'linear-gradient(132deg, rgba(43, 123, 208, 0.9), rgba(42, 163, 187, 0.84))',
+    color: '#f8fcff',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '700'
+  },
   topbarLogoutMobile: {
     width: '100%'
   },
@@ -1006,6 +1041,22 @@ const styles = {
     minWidth: '102px',
     fontSize: '13px',
     padding: '0 12px'
+  },
+  topbarQrButtonCompactMobile: {
+    width: 'auto',
+    minWidth: '118px',
+    fontSize: '13px',
+    padding: '0 12px'
+  },
+  topbarActionsDesktop: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  topbarActionsMobile: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   },
   mainContent: {
     flex: 1,
