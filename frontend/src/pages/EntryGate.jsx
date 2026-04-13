@@ -32,7 +32,7 @@ function EntryGate() {
           setStatus('success')
           setMessage('Access granted. Dang chuyen vao he thong...')
           setTimeout(() => {
-            navigate('/', { replace: true })
+            navigate('/app', { replace: true })
           }, 700)
           return
         }

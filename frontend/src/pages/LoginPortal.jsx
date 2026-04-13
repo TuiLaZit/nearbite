@@ -10,7 +10,8 @@ function LoginPortal() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedRole = searchParams.get('role')
-  const initialRole = requestedRole === 'owner' ? 'owner' : 'customer'
+  const staffOnly = searchParams.get('mode') === 'staff'
+  const initialRole = staffOnly ? 'owner' : (requestedRole === 'owner' ? 'owner' : 'customer')
 
   const [activeRole, setActiveRole] = useState(initialRole)
   const [loading, setLoading] = useState(false)
@@ -65,6 +66,7 @@ function LoginPortal() {
   }, [])
 
   const switchRole = (role) => {
+    if (staffOnly) return
     setActiveRole(role)
     setSearchParams(role === 'owner' ? { role: 'owner' } : { role: 'customer' })
   }
@@ -194,10 +196,12 @@ function LoginPortal() {
               ...(activeRole === 'owner' ? { justifyContent: 'flex-start' } : {})
             }}
           >
-            <button onClick={() => navigate('/')} style={{ ...styles.backButton, ...(isMobile ? styles.backButtonMobile : {}) }}>
-              ← {t('back')}
-            </button>
-            {activeRole !== 'owner' && (
+            {!staffOnly && (
+              <button onClick={() => navigate('/')} style={{ ...styles.backButton, ...(isMobile ? styles.backButtonMobile : {}) }}>
+                ← {t('back')}
+              </button>
+            )}
+            {activeRole !== 'owner' && !staffOnly && (
               <LanguageFlagDropdown
                 value={language}
                 onChange={setLanguage}
@@ -208,26 +212,30 @@ function LoginPortal() {
             )}
           </div>
 
-          <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>NearBite Login</h1>
+          <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>
+            {staffOnly ? 'NearBite Staff Login' : 'NearBite Login'}
+          </h1>
 
-          <div style={styles.roleTabs}>
-            <button
-              type="button"
-              className="login-portal-role-tab"
-              style={{ ...styles.roleTab, ...(activeRole === 'customer' ? styles.roleTabActive : {}) }}
-              onClick={() => switchRole('customer')}
-            >
-              🍜 {t('customerRole')}
-            </button>
-            <button
-              type="button"
-              className="login-portal-role-tab"
-              style={{ ...styles.roleTab, ...(activeRole === 'owner' ? styles.roleTabActive : {}) }}
-              onClick={() => switchRole('owner')}
-            >
-              🏪 {t('ownerRole')}
-            </button>
-          </div>
+          {!staffOnly && (
+            <div style={styles.roleTabs}>
+              <button
+                type="button"
+                className="login-portal-role-tab"
+                style={{ ...styles.roleTab, ...(activeRole === 'customer' ? styles.roleTabActive : {}) }}
+                onClick={() => switchRole('customer')}
+              >
+                🍜 {t('customerRole')}
+              </button>
+              <button
+                type="button"
+                className="login-portal-role-tab"
+                style={{ ...styles.roleTab, ...(activeRole === 'owner' ? styles.roleTabActive : {}) }}
+                onClick={() => switchRole('owner')}
+              >
+                🏪 {t('ownerRole')}
+              </button>
+            </div>
+          )}
 
           <div style={styles.contentFrame}>
             {activeRole === 'customer' ? (

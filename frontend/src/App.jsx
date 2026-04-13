@@ -18,16 +18,17 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/login?mode=staff" replace />} />
       <Route element={<QrAccessRoute />}>
-        <Route path="/" element={<LocationTracker />} />
+        <Route path="/app" element={<LocationTracker />} />
       </Route>
-      <Route element={<ProtectedRoute authPath="/owner/check" redirectTo="/login?role=owner" />}>
+      <Route element={<ProtectedRoute authPath={["/owner/check", "/admin/check"]} redirectTo="/login?mode=staff" />}>
         <Route path="/qr" element={<QrDemo />} />
       </Route>
       <Route path="/qr-expired" element={<QrExpired />} />
       <Route path="/entry" element={<EntryGate />} />
       <Route path="/login" element={<LoginPortal />} />
-      <Route path="/customer" element={<Navigate to="/" replace />} />
+      <Route path="/customer" element={<Navigate to="/app" replace />} />
 
       {/* Legacy paths: keep old links working */}
       <Route path="/customer/login" element={<Navigate to="/login?role=customer" replace />} />

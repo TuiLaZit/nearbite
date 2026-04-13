@@ -534,6 +534,13 @@ function AdminDashboard({ role = 'admin' }) {
           Tài khoản admin
         </button>
       )}
+      <button
+        className="topbar-nav-btn"
+        style={{ ...styles.topNavButton, ...(isMobile ? styles.topNavButtonMobile : {}) }}
+        onClick={() => navigate('/qr')}
+      >
+        Trang QR
+      </button>
     </>
   )
 

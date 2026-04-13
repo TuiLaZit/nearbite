@@ -8,17 +8,27 @@ function ProtectedRoute({ authPath, redirectTo }) {
   useEffect(() => {
     let isMounted = true
 
-    fetch(`${BASE_URL}${authPath}`, {
-      credentials: 'include'
-    })
-      .then(res => {
-        if (!isMounted) return
-        setStatus(res.ok ? 'ok' : 'unauthorized')
-      })
-      .catch(() => {
-        if (!isMounted) return
-        setStatus('unauthorized')
-      })
+    const checkAuthorization = async () => {
+      const authPaths = Array.isArray(authPath) ? authPath : [authPath]
+
+      for (const path of authPaths) {
+        try {
+          const res = await fetch(`${BASE_URL}${path}`, {
+            credentials: 'include'
+          })
+          if (res.ok) {
+            if (isMounted) setStatus('ok')
+            return
+          }
+        } catch {
+          // Try next auth path.
+        }
+      }
+
+      if (isMounted) setStatus('unauthorized')
+    }
+
+    checkAuthorization()
 
     return () => {
       isMounted = false

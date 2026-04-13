@@ -9,6 +9,7 @@ function QrDemo() {
   const [expiresAt, setExpiresAt] = useState('')
   const [previousToken, setPreviousToken] = useState('')
   const [error, setError] = useState('')
+  const backPath = typeof window !== 'undefined' && window.localStorage.getItem('activeRole') === 'owner' ? '/owner' : '/admin'
 
   const entryUrl = useMemo(() => {
     if (!token || typeof window === 'undefined') return ''
@@ -75,7 +76,7 @@ function QrDemo() {
       <div style={{ maxWidth: '940px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0, fontSize: '34px', letterSpacing: '-0.02em' }}>QR Demo</h1>
-          <Link to="/" style={{ color: '#0f4d85', fontWeight: 700, textDecoration: 'none' }}>Về trang chính</Link>
+          <Link to={backPath} style={{ color: '#0f4d85', fontWeight: 700, textDecoration: 'none' }}>Quay lại trang quản trị</Link>
         </div>
 
         <p style={{ marginTop: '8px', marginBottom: '16px', color: '#35526f' }}>
