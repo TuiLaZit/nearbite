@@ -164,8 +164,12 @@ const collectDeviceSignals = () => {
   if (typeof navigator === 'undefined') {
     return {
       memoryGb: null,
+      memorySupported: false,
       cpuCores: null,
+      cpuSupported: false,
       effectiveType: '',
+      networkStatus: '',
+      networkSupported: false,
       saveData: false,
       downlinkMbps: null,
       rttMs: null,
@@ -176,17 +180,30 @@ const collectDeviceSignals = () => {
   }
 
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
+  const userAgent = typeof navigator.userAgent === 'string' ? navigator.userAgent : ''
+  const isAppleMobile = /iPhone|iPad|iPod/i.test(userAgent)
+  const memorySupported = typeof navigator.deviceMemory === 'number'
+  const cpuSupported = typeof navigator.hardwareConcurrency === 'number'
+  const networkSupported = Boolean(connection?.effectiveType)
+  const networkStatus = networkSupported
+    ? connection.effectiveType
+    : (typeof navigator.onLine === 'boolean' ? (navigator.onLine ? 'online' : 'offline') : 'unknown')
 
   return {
-    memoryGb: typeof navigator.deviceMemory === 'number' ? navigator.deviceMemory : null,
-    cpuCores: typeof navigator.hardwareConcurrency === 'number' ? navigator.hardwareConcurrency : null,
+    memoryGb: memorySupported ? navigator.deviceMemory : null,
+    memorySupported,
+    cpuCores: cpuSupported ? navigator.hardwareConcurrency : null,
+    cpuSupported,
     effectiveType: connection?.effectiveType || '',
+    networkStatus,
+    networkSupported,
     saveData: Boolean(connection?.saveData),
     downlinkMbps: typeof connection?.downlink === 'number' ? connection.downlink : null,
     rttMs: typeof connection?.rtt === 'number' ? connection.rtt : null,
-    userAgent: typeof navigator.userAgent === 'string' ? navigator.userAgent : '',
+    userAgent,
     platform: typeof navigator.platform === 'string' ? navigator.platform : '',
-    language: typeof navigator.language === 'string' ? navigator.language : ''
+    language: typeof navigator.language === 'string' ? navigator.language : '',
+    isAppleMobile
   }
 }
 
@@ -195,7 +212,7 @@ const formatDeviceProfileLabel = (snapshot) => {
 
   const memoryLabel = snapshot.memoryGb === null ? 'n/a' : `${snapshot.memoryGb}GB`
   const cpuLabel = snapshot.cpuCores === null ? 'n/a' : `${snapshot.cpuCores} cores`
-  const networkLabel = snapshot.effectiveType || (snapshot.saveData ? 'save-data' : 'n/a')
+  const networkLabel = snapshot.effectiveType || snapshot.networkStatus || (snapshot.saveData ? 'save-data' : 'n/a')
 
   return `${memoryLabel} · ${cpuLabel} · ${networkLabel}`
 }
@@ -212,7 +229,7 @@ const isLikelyWeakDevice = (source = 'runtime') => {
   const effectiveType = signalSnapshot.effectiveType
   const saveData = signalSnapshot.saveData
   const userAgent = signalSnapshot.userAgent
-  const isAppleMobile = /iPhone|iPad|iPod/i.test(userAgent)
+  const isAppleMobile = signalSnapshot.isAppleMobile || /iPhone|iPad|iPod/i.test(userAgent)
 
   const isVeryLowMemory = memory !== null && memory <= 2
   const isVeryLowCpu = cores !== null && cores <= 2
@@ -2217,12 +2234,35 @@ function LocationTracker() {
             DeviceProfile
           </div>
           <div style={{ display: 'grid', gap: '2px' }}>
-            <div>Memory: {deviceProfileSnapshot.memoryGb === null ? 'n/a' : `${deviceProfileSnapshot.memoryGb} GB`}</div>
-            <div>CPU: {deviceProfileSnapshot.cpuCores === null ? 'n/a' : `${deviceProfileSnapshot.cpuCores} cores`}</div>
-            <div>Network: {deviceProfileSnapshot.effectiveType || (deviceProfileSnapshot.saveData ? 'save-data' : 'n/a')}</div>
+            <div>
+              Memory: {deviceProfileSnapshot.memoryGb === null ? 'n/a' : `${deviceProfileSnapshot.memoryGb} GB`}
+              {' '}
+              <span style={{ opacity: 0.75 }}>
+                ({deviceProfileSnapshot.memorySupported ? 'API' : 'fallback'})
+              </span>
+            </div>
+            <div>
+              CPU: {deviceProfileSnapshot.cpuCores === null ? 'n/a' : `${deviceProfileSnapshot.cpuCores} cores`}
+              {' '}
+              <span style={{ opacity: 0.75 }}>
+                ({deviceProfileSnapshot.cpuSupported ? 'API' : 'fallback'})
+              </span>
+            </div>
+            <div>
+              Network: {deviceProfileSnapshot.effectiveType || deviceProfileSnapshot.networkStatus || (deviceProfileSnapshot.saveData ? 'save-data' : 'n/a')}
+              {' '}
+              <span style={{ opacity: 0.75 }}>
+                ({deviceProfileSnapshot.networkSupported ? 'API' : 'fallback'})
+              </span>
+            </div>
             <div>Save-Data: {deviceProfileSnapshot.saveData ? 'on' : 'off'}</div>
             <div>Profile: {MODE_LABEL_BY_KEY[performanceModeKey]}</div>
             <div style={{ opacity: 0.8 }}>{formatDeviceProfileLabel(deviceProfileSnapshot)}</div>
+            {deviceProfileSnapshot.isAppleMobile && (
+              <div style={{ marginTop: '2px', opacity: 0.85 }}>
+                iOS fallback enabled: browser hạn chế deviceMemory/network
+              </div>
+            )}
           </div>
         </div>
 
