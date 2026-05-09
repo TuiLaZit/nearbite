@@ -190,6 +190,16 @@ const collectDeviceSignals = () => {
   }
 }
 
+const formatDeviceProfileLabel = (snapshot) => {
+  if (!snapshot) return 'DeviceProfile'
+
+  const memoryLabel = snapshot.memoryGb === null ? 'n/a' : `${snapshot.memoryGb}GB`
+  const cpuLabel = snapshot.cpuCores === null ? 'n/a' : `${snapshot.cpuCores} cores`
+  const networkLabel = snapshot.effectiveType || (snapshot.saveData ? 'save-data' : 'n/a')
+
+  return `${memoryLabel} · ${cpuLabel} · ${networkLabel}`
+}
+
 const isLikelyWeakDevice = (source = 'runtime') => {
   if (typeof navigator === 'undefined') {
     console.log('[DeviceProfile] Skip check: navigator is undefined (non-browser context)', { source })
@@ -353,6 +363,7 @@ function LocationTracker() {
   })
   const [cachedRestaurantIds, setCachedRestaurantIds] = useState(() => readCachedRestaurantIds())
   const [isWeakDevice, setIsWeakDevice] = useState(() => isLikelyWeakDevice('state-init'))
+  const [deviceProfileSnapshot, setDeviceProfileSnapshot] = useState(() => collectDeviceSignals())
   const [isBatterySaverEnabled, setIsBatterySaverEnabled] = useState(() => {
     return localStorage.getItem(BATTERY_SAVER_KEY) === 'true'
   })
@@ -476,6 +487,7 @@ function LocationTracker() {
     if (typeof navigator === 'undefined') return
 
     const snapshot = collectDeviceSignals()
+    setDeviceProfileSnapshot(snapshot)
     console.groupCollapsed('[DeviceProfile] Raw device metrics snapshot')
     console.table({
       memoryGb: snapshot.memoryGb,
@@ -2182,11 +2194,43 @@ function LocationTracker() {
           </div>
         )}
 
+        <div
+          style={{
+            position: 'absolute',
+            top: showWeakDeviceNote ? '42px' : '8px',
+            right: '8px',
+            zIndex: 1200,
+            padding: '8px 10px',
+            borderRadius: '12px',
+            background: 'rgba(15, 23, 42, 0.88)',
+            color: '#e2e8f0',
+            border: '1px solid rgba(148, 163, 184, 0.35)',
+            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.2)',
+            backdropFilter: 'blur(8px)',
+            maxWidth: 'min(320px, calc(100vw - 32px))',
+            fontSize: '11px',
+            lineHeight: 1.35
+          }}
+          title="DeviceProfile snapshot"
+        >
+          <div style={{ fontWeight: 800, marginBottom: '4px', color: '#f8fafc' }}>
+            DeviceProfile
+          </div>
+          <div style={{ display: 'grid', gap: '2px' }}>
+            <div>Memory: {deviceProfileSnapshot.memoryGb === null ? 'n/a' : `${deviceProfileSnapshot.memoryGb} GB`}</div>
+            <div>CPU: {deviceProfileSnapshot.cpuCores === null ? 'n/a' : `${deviceProfileSnapshot.cpuCores} cores`}</div>
+            <div>Network: {deviceProfileSnapshot.effectiveType || (deviceProfileSnapshot.saveData ? 'save-data' : 'n/a')}</div>
+            <div>Save-Data: {deviceProfileSnapshot.saveData ? 'on' : 'off'}</div>
+            <div>Profile: {MODE_LABEL_BY_KEY[performanceModeKey]}</div>
+            <div style={{ opacity: 0.8 }}>{formatDeviceProfileLabel(deviceProfileSnapshot)}</div>
+          </div>
+        </div>
+
         {isPwaRuntime && isOfflineMode && (
           <div
             style={{
               position: 'absolute',
-              top: showWeakDeviceNote ? '42px' : '8px',
+              top: showWeakDeviceNote ? '140px' : '106px',
               left: '8px',
               zIndex: 1200,
               padding: '4px 8px',
