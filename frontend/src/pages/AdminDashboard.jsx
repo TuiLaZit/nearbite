@@ -247,8 +247,8 @@ function AdminDashboard({ role = 'admin' }) {
 
         setOnlineStats({
           window_seconds: data.window_seconds || 30,
-          online_devices: data.online_devices *2 || 0,
-          online_users: data.online_users *2 || 0
+          online_devices: data.online_devices || 0,
+          online_users: data.online_users || 0
         })
       })
       .catch(err => {
